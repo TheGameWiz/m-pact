@@ -19,7 +19,7 @@ Memory roots use this standard layout:
   case-studies/
   journal/
   tasks/
-    current-task.md
+    current__<active-task-folder>
     A__p*-t####-*/
       task.md
       specification.md
@@ -27,7 +27,7 @@ Memory roots use this standard layout:
       summary/
 ```
 
-`specification.md` is optional. `current-task.md` is optional and must point only to an existing active task folder. It exists only when a task has explicitly been made current; absence means no current task.
+`specification.md` is optional. The current task pointer is an optional zero-byte sentinel file named `current__<active-task-folder>` directly under `tasks/`. It must point only to an existing active task folder. It exists only when a task has explicitly been made current; absence means no current task.
 
 The user root is required and canonically named `.AgentMemoryRoot/`. Project roots are canonically named `.AgentMemory/`.
 
@@ -62,7 +62,7 @@ Startup refresh has one compliant unattended path: run `scripts/build-refresh-bu
 
 If stdout reports `AUDIT: FAIL` and `END REFRESH FAILURE`, stop and report the exact failure. If the script is missing, fails, output is truncated, lacks `AUDIT: PASS`, lacks a `BundlePath`, lacks final-line `END REFRESH BUNDLE`, the bundle file cannot be read, the bundle file lacks final-line `END REFRESH BUNDLE`, or stdout reports `AUDIT: FAIL`, stop and report the exact failure. Do not improvise a manual refresh. Manual investigation is allowed only when the Director explicitly asks for debugging or repair.
 
-The script is the executable startup spec. It resolves roots, builds the layered rule index, reads `memory-contract.md` in full, reads core rules, selects sessions by filename timestamp, extracts required full and summary session slices, notes active tasks, validates `current-task.md`, reads the pointed startup task only when the pointer names an active task, writes the bundle to an ephemeral temp file, and prints a small stdout manifest only after the bundle is complete.
+The script is the executable startup spec. It resolves roots, builds the layered rule index, reads `memory-contract.md` in full, reads core rules, selects sessions by filename timestamp, extracts required full and summary session slices, notes active tasks, validates any `tasks/current__<active-task-folder>` sentinel, reads the pointed startup task only when exactly one zero-byte sentinel names an active task, writes the bundle to an ephemeral temp file, and prints a small stdout manifest only after the bundle is complete.
 
 The script enforces a default 100KB bundle size limit as a partial-success boundary. If the assembled bundle exceeds the limit, it writes the largest line-safe bundle it can, includes `LimitHit: true` and `OriginalBundleBytes` in the stdout manifest, adds a `Refresh Bundle Limit Notice` inside the bundle, and marks `Missing or ambiguous` in the receipt with the size-limit warning. Agents must emit the receipt body verbatim, say the bundle is partial, and use targeted retrieval for omitted startup content when needed.
 
@@ -90,7 +90,7 @@ Core rules loaded (full): [<filenames in load order>]
 Protocol references loaded (full): [memory-contract.md]
 Rule index noted: <count by root; include unread non-core count by root>
 Recent sessions read: full=<count>, summary=<count>, full-fallback=<count>; by root=<counts>; active-selected=<count>; ancestor-sentinels=<count>; selection=filename-desc
-Active tasks noted: <count from active root; current-task pointer or "(none)">
+Active tasks noted: <count from active root; current task pointer or "(none)">
 Startup task read: <task-folder>/task.md, or "(none)"
 Missing or ambiguous: [<list, size-limit warning, or "(none)">]
 ```
@@ -162,11 +162,11 @@ A task is a folder under `tasks/`.
 - When taking a handoff or resuming task context, always read `task.md` and read `specification.md` when present, then list log filenames with sizes before deciding how much log history to load. The reader's last known record is a valid read cursor, but this read cursor does not authorize stale write numbering, implementation, specification edits, or log appends. If total log bytes are 50KB or less, read all log records. If total log bytes exceed 50KB and the Director did not request all logs or a specific range, read newest records backward up to about 50KB of log content, including the newest single log even if it alone exceeds 50KB. If a known read cursor exists and the later unread span is modest, read every later record except exact known self-written identities in non-colliding numeric-prefix groups; if the later unread span is large, use the same newest-backward 50KB budget unless the Director requested the full span. If a numeric prefix has multiple files in the selected span, read every file in that collision group, including any entry the agent thinks it wrote, and report the duplicate record number. Report what log range was loaded and what older history was skipped; note obvious topic boundaries rather than pretending un-read logs were loaded.
 - Writing a task log entry does not automatically advance the read cursor. After a write, record the new file as a known self-written `record-source` identity. If the written record number is exactly one greater than the current last-read numeric record, advance the read cursor by one. If it is not adjacent, preserve the previous read cursor; later catch-up may skip known self-written identities only in non-colliding numeric-prefix groups and must still read intervening or same-number records from other sources.
 - `summary/` contains generated task summaries spanning log ranges, themes, or current-state slices. Summaries are context, not task state, and do not replace required unseen log records unless the Director accepts that tradeoff. Write summaries with `write-task-summary.md`.
-- `tasks/current-task.md` points to the active task explicitly made current. It is an attention pointer, not an index or queue, and it does not create, close, reopen, or imply tasks. Agents must never infer a replacement current task from other active tasks. Closing the pointed task removes `current-task.md` unless the Director explicitly names a valid active replacement.
+- A zero-byte `tasks/current__<active-task-folder>` sentinel points to the active task explicitly made current. The pointer is entirely in the filename; agents must not read or write pointer file content. There must be zero or one current sentinel. Multiple `current__*` files are ambiguous and require Director resolution. The sentinel is an attention pointer, not an index, queue, task activity timestamp, or log cursor, and it does not create, close, reopen, or imply tasks. Appending task logs or updating `specification.md` must not rewrite the sentinel when the task is already current. Agents must never infer a replacement current task from other active tasks. Closing the pointed task removes the sentinel unless the Director explicitly names a valid active replacement.
 
 Only the Director creates, closes, or reopens tasks. Closure means `A__...` -> `C__...` plus matching `Status:` in `task.md`.
 
-Director phrases such as "handoff," "hand this off," "handoff to <agent>," "create a task from this conversation," and "make this a task" authorize creating an ordinary task from the live conversation. The created task should receive a meaningful derived title and slug when possible, be made current, and include an initial task log entry that preserves enough conversation state for another agent or future context to resume. This is a task birth procedure, not a separate scratch-task type. A named receiving agent may be the same as the current agent; the intent may be a durable context-switch point rather than an agent change. A standalone "handoff" request creates a new task from the current live conversation even when `current-task.md` points to an older task. Append a handoff log to an existing task only when the Director explicitly ties the handoff to that task, such as "handoff this task," "write a handoff for the current task," or by naming the task.
+Director phrases such as "handoff," "hand this off," "handoff to <agent>," "create a task from this conversation," and "make this a task" authorize creating an ordinary task from the live conversation. The created task should receive a meaningful derived title and slug when possible, be made current, and include an initial task log entry that preserves enough conversation state for another agent or future context to resume. This is a task birth procedure, not a separate scratch-task type. A named receiving agent may be the same as the current agent; the intent may be a durable context-switch point rather than an agent change. A standalone "handoff" request creates a new task from the live conversation even when a `current__*` sentinel points to an older task. Append a handoff log to an existing task only when the Director explicitly ties the handoff to that task, such as "handoff this task," "write a handoff for the current task," or by naming the task.
 
 Task numbering is local to each memory root. Do not merge or renumber across roots.
 
@@ -174,7 +174,7 @@ Unscoped task-list requests mean active memory root only. Show active tasks by d
 
 Before writing a task, log entry, summary, or specification, use the corresponding verb reference for the current template.
 
-Taking a task handoff means read, analyze, evaluate, and report for an existing task, usually the task named by `current-task.md` or the Director. It does not authorize modifying source code, `specification.md`, docs, task state, task logs, rules, sessions, or other durable artifacts. For design, exploration, and planning handoffs, evaluate the current plan, spec, and log against Director intent and relevant source materials for consistency, feasibility, ambiguity, missing constraints, and fit. For implementation handoffs, evaluate the implementation against the task, spec, log decisions, and relevant source behavior. Offer focused alternatives or recommendations when they directly serve the current goal, but do not push the Director to choose immediately.
+Taking a task handoff means read, analyze, evaluate, and report for an existing task, usually the task named by the `current__*` sentinel or the Director. It does not authorize modifying source code, `specification.md`, docs, task state, task logs, rules, sessions, or other durable artifacts. For design, exploration, and planning handoffs, evaluate the current plan, spec, and log against Director intent and relevant source materials for consistency, feasibility, ambiguity, missing constraints, and fit. For implementation handoffs, evaluate the implementation against the task, spec, log decisions, and relevant source behavior. Offer focused alternatives or recommendations when they directly serve the current goal, but do not push the Director to choose immediately.
 
 ## 12. Session Entries
 
@@ -218,7 +218,7 @@ Journal entries are not part of the core startup read contract. Use `write-journ
 - Never create ambiguous or judgment-call durable memory without Director confirmation.
 - Never create, close, or reopen a task folder without explicit Director instruction.
 - Never modify or delete another agent's log entry, summary entry, or session entry.
-- Never rely on filesystem metadata timestamps for routine task ordering or listing. Use `tasks/current-task.md`, task numbers, and header timestamps; never use filesystem timestamps to infer a replacement current task.
+- Never rely on filesystem metadata timestamps for routine task ordering or listing. Use the `tasks/current__<active-task-folder>` sentinel, task numbers, and header timestamps; never use filesystem timestamps to infer a replacement current task.
 - Never improvise when a protocol step is ambiguous. Ask one concise question.
 - Never silently lose handoff-worthy state when context is getting low; mention preservation only when continuity risk is high.
 - Never claim memory is loaded when it is not.

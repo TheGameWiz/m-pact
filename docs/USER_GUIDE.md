@@ -175,7 +175,7 @@ Task folders may contain:
 
 ```text
 tasks/
-  current-task.md
+  current__A__p2-t0007-short-task-slug
   A__p2-t0007-short-task-slug/
     task.md
     specification.md
@@ -446,7 +446,7 @@ If you say only "create a task," the agent may ask a short clarification unless 
 
 ### Current Task Pointer
 
-`tasks/current-task.md` points to the active task explicitly made current. It is an attention pointer, not a task index or queue. If there is no current task, the file should be absent; agents should never infer a replacement from other active tasks.
+The current task pointer is a zero-byte sentinel named `tasks/current__<active-task-folder>`. The pointer is entirely in the filename and has no extension or body. It is an attention pointer, not a task index, queue, activity timestamp, or log cursor. If there is no current task, no `current__*` file should exist. If multiple `current__*` files exist, agents should stop and report ambiguity.
 
 ### Task Close And Reopen
 
@@ -479,7 +479,7 @@ Hand this off.
 
 In that case, the current agent should create a normal task from the conversation, make it current, and write the first log entry as the compressed handoff state. Naming an agent is optional. If you name the same agent you are already using, the request still makes sense: it creates a durable context-switch point.
 
-Standalone `handoff` means create a new task from the live conversation. It should not append to an older task just because `tasks/current-task.md` still points there from earlier work. To write a handoff for an existing task instead, say that explicitly:
+Standalone `handoff` means create a new task from the live conversation. It should not append to an older task just because a `tasks/current__*` sentinel still points there from earlier work. To write a handoff for an existing task instead, say that explicitly:
 
 ```text
 Write a handoff for the current task.
@@ -494,7 +494,7 @@ Take handoff.
 Take handoff from Codex.
 ```
 
-The receiving agent should read `tasks/current-task.md`, then take that task handoff.
+The receiving agent should resolve the single `tasks/current__*` sentinel, then take that task handoff.
 
 ### Cold-Start Log Loading
 

@@ -495,28 +495,30 @@ function main() {
     const tasksDir = path.join(activeRoot, "tasks");
     if (existsDir(tasksDir)) {
       activeTaskNames = listDirectories(tasksDir, "A__");
-      const currentTaskPath = path.join(tasksDir, "current-task.md");
       let selectedTask = null;
+      const taskEntries = fs.readdirSync(tasksDir, { withFileTypes: true });
+      const currentPointers = taskEntries
+        .filter((entry) => entry.isFile() && entry.name.startsWith("current__"))
+        .map((entry) => entry.name)
+        .sort((a, b) => a.localeCompare(b));
 
-      if (existsFile(currentTaskPath)) {
-        try {
-          const pointerText = readText(currentTaskPath);
-          const taskLine = splitLines(pointerText).find((line) => /^task:\s*/.test(line));
-          if (taskLine) {
-            currentTaskPointer = taskLine.replace(/^task:\s*/, "").trim();
-            const candidateTaskPath = path.join(tasksDir, currentTaskPointer);
-            if (/^A__/.test(currentTaskPointer) && existsDir(candidateTaskPath)) {
-              selectedTask = currentTaskPointer;
-            } else {
-              missingOrAmbiguous.push(`stale current-task pointer ${currentTaskPointer}; remove current-task.md or explicitly choose an active task`);
-            }
-          } else {
-            currentTaskPointer = "(invalid: missing task line)";
-            missingOrAmbiguous.push("current-task.md is missing a task line");
-          }
-        } catch (error) {
-          failures.push(`Failed to read current task pointer: ${currentTaskPath} (${error.message})`);
+      if (currentPointers.length === 1) {
+        const pointerName = currentPointers[0];
+        const pointerPath = path.join(tasksDir, pointerName);
+        const pointerStat = fs.statSync(pointerPath);
+        currentTaskPointer = pointerName.slice("current__".length);
+        const candidateTaskPath = path.join(tasksDir, currentTaskPointer);
+        if (pointerStat.size !== 0) {
+          missingOrAmbiguous.push(`current task pointer ${pointerName} must be a zero-byte sentinel`);
         }
+        if (/^A__/.test(currentTaskPointer) && existsDir(candidateTaskPath)) {
+          selectedTask = currentTaskPointer;
+        } else {
+          missingOrAmbiguous.push(`stale current task pointer ${pointerName}; remove it or explicitly choose an active task`);
+        }
+      } else if (currentPointers.length > 1) {
+        currentTaskPointer = `(ambiguous: ${currentPointers.join(", ")})`;
+        missingOrAmbiguous.push(`multiple current task pointers found: ${currentPointers.join(", ")}`);
       }
 
       if (selectedTask) {
@@ -552,7 +554,7 @@ function main() {
     }
   }
   const sessionByRootDisplay = sessionByRootParts.length > 0 ? sessionByRootParts.join("; ") : "(none)";
-  const activeTasksDisplay = `${activeTaskNames.length} from active root; current-task pointer ${currentTaskPointer}`;
+  const activeTasksDisplay = `${activeTaskNames.length} from active root; current task pointer ${currentTaskPointer}`;
   const missingOrAmbiguousDisplay = missingOrAmbiguous.length > 0 ? formatList(missingOrAmbiguous) : "[(none)]";
   const projectRootsDisplay = formatList(projectRoots);
 
@@ -586,7 +588,7 @@ function main() {
   addLine(bundle, `- Active project root: ${activeDisplay}`);
   addLine(bundle, `- Memory chain, broad-to-specific: ${chainDisplay}`);
   addLine(bundle, "- Startup session selection: active root first by filename descending, newest full, remaining selected active sessions summary-only, then one summary-only ancestor sentinel per remaining root from nearest parent to user root.");
-  addLine(bundle, "- Startup task selection: active root only, read task.md only when current-task.md points to an active task; never infer a replacement current task.");
+  addLine(bundle, "- Startup task selection: active root only, read task.md only when exactly one zero-byte tasks/current__<task-folder> sentinel points to an active task; never infer a replacement current task.");
   addLine(bundle, "- Startup exclusions: non-core rule bodies, task specification.md, task logs, task summaries, journals, and case studies.");
   addLine(bundle);
   addLine(bundle, "## Protocol References Loaded In Full");

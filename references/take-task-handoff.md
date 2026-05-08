@@ -10,7 +10,7 @@ Default endpoint: explain the current task state, relevant verification or consi
 
 ## Procedure
 
-1. Identify the task folder from Director context, `tasks/current-task.md`, or explicit task reference.
+1. Identify the task folder from Director context, exactly one `tasks/current__<active-task-folder>` sentinel, or explicit task reference.
 2. Read the task's `task.md`.
 3. Read `specification.md` when present; it is the current mutable task state.
 4. List `log/` filenames with file sizes before deciding how much log history to load.

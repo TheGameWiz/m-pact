@@ -4,7 +4,7 @@ Task creation is Director-orchestrated only. Use this reference only after expli
 
 Phrases such as "create a task from this conversation," "make this a task," "make a task out of this," "handoff," "hand this off," and "handoff to <agent>" are explicit task-creation instructions when the Director is asking to preserve the live discussion as durable task context. A bare "create a task" may need one concise clarification unless the current conversation has an obvious single topic.
 
-Treat a standalone "handoff" request as new task creation from the current live conversation, even when `tasks/current-task.md` already points to an older task. Do not append to the existing current task merely because a pointer exists. Append a handoff log to an existing task only when the Director says "handoff this task," "write a handoff for the current task," "append a handoff log," names a task, or otherwise explicitly ties the handoff to an existing task.
+Treat a standalone "handoff" request as new task creation from the current live conversation, even when a `tasks/current__<active-task-folder>` sentinel already points to an older task. Do not append to the existing current task merely because a pointer exists. Append a handoff log to an existing task only when the Director says "handoff this task," "write a handoff for the current task," "append a handoff log," names a task, or otherwise explicitly ties the handoff to an existing task.
 
 ## Target
 
@@ -49,7 +49,7 @@ For "handoff" requests, create the same ordinary task, make it current, and writ
 
 ## task.md Template
 
-Use `references/emit-local-timestamp.md` and the bundled timestamp helper once for the task creation. Put `BodyTimestamp` in both the `task.md` `Timestamp:` field and the `current-task.md` `updated:` field unless there is a deliberate reason to record two different moments. Use the emitted field verbatim; do not reformat, recompute, or call the clock again for the same task creation.
+Use `references/emit-local-timestamp.md` and the bundled timestamp helper once for the task creation. Put `BodyTimestamp` in the `task.md` `Timestamp:` field. Use the emitted field verbatim; do not reformat, recompute, or call the clock again for the same task creation.
 
 ```markdown
 # Task Entry
@@ -72,15 +72,10 @@ Status: Active|Closed
 
 ## Current Task Pointer
 
-After creating an active task, write or update `tasks/current-task.md`:
+After creating an active task, make it current by creating a zero-byte sentinel directly under `tasks/`:
 
-```markdown
-# Current Task
-
-task: <task-folder>
-updated: YYYY-MM-DD HH:MM:SS <local-zone>
-source: director|claude|codex|shared
-reason: created task
+```text
+tasks/current__<task-folder>
 ```
 
-The pointer must reference an existing active task folder in the same `tasks/` directory.
+The sentinel filename is the pointer. It has no extension and no body; never write content into it. There must be zero or one `current__*` sentinel. When making a newly created task current, remove any prior current sentinel only as part of this explicit current-task change. The pointer must reference an existing active task folder in the same `tasks/` directory.

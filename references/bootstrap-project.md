@@ -27,7 +27,7 @@ When offering user-root bootstrap for a missing `.AgentMemoryRoot/`, state that 
   journal/
 ```
 
-`tasks/` may contain `current-task.md` plus task folders. Each task folder contains `task.md`, optional `specification.md`, `log/`, and `summary/`.
+`tasks/` may contain a zero-byte `current__<active-task-folder>` sentinel plus task folders. Each task folder contains `task.md`, optional `specification.md`, `log/`, and `summary/`.
 
 Approved project bootstrap also installs project startup shims:
 

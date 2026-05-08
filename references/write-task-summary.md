@@ -12,7 +12,7 @@ Do not treat summarizing as permission to update `specification.md`, append a ta
 
 Default target is the active task folder's `summary/` directory.
 
-Identify the task folder from Director context, `tasks/current-task.md`, or explicit task reference. Read `task.md` first. Read `specification.md`, relevant `log/` records, and existing summaries only as needed to create an accurate summary.
+Identify the task folder from Director context, exactly one `tasks/current__<active-task-folder>` sentinel, or explicit task reference. Read `task.md` first. Read `specification.md`, relevant `log/` records, and existing summaries only as needed to create an accurate summary.
 
 ## Default Range
 

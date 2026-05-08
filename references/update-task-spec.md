@@ -8,7 +8,7 @@ Requires Director instruction. Do not autonomously update `specification.md`.
 
 ## Procedure
 
-1. Identify the active task folder from Director context, `tasks/current-task.md`, or explicit task reference.
+1. Identify the active task folder from Director context, exactly one `tasks/current__<active-task-folder>` sentinel, or explicit task reference.
 2. Read the task's `task.md`.
 3. Read current `specification.md` if present.
 4. Read the relevant ordered `log/` span needed to understand the approved change. Include every record since your last known read point when known, except known self-written identities matched by numeric prefix plus source such as `0007-codex` in non-colliding numeric-prefix groups; never skip by numeric prefix alone. If a numeric prefix has multiple files, read every file in that collision group and report the duplicate record number. Otherwise read enough recent or unsummarized log history to reconstruct current state. Multiple consecutive records from the same agent are normal.
@@ -18,7 +18,7 @@ Requires Director instruction. Do not autonomously update `specification.md`.
 8. Append one new file in `log/` explaining what changed and why, using no-overwrite semantics.
 9. If exact filename creation fails because the file already exists, preserve the existing file, re-list `log/`, choose the next unused record number, and retry once with the same source and slug. If the retry fails or state is ambiguous, stop and report the write collision to the Director.
 10. Treat the new file as a known self-written record identity (`record-source`), not automatically as a new read cursor. If the written record number is exactly one greater than the current last-read numeric record, advance the read cursor by one. Otherwise preserve the previous read cursor.
-11. Update `tasks/current-task.md` to point at this task.
+11. Do not update the `tasks/current__<active-task-folder>` sentinel merely because `specification.md` or `log/` changed. The current-task pointer is an attention pointer, not a task activity timestamp. If the Director explicitly asked to make or change the current task, perform that pointer update as a separate intentional action; otherwise leave the sentinel unchanged.
 12. Report the task folder, specification path, and new log entry file.
 
 ## Log Filename
@@ -31,7 +31,7 @@ For catch-up reads, an agent may skip a log entry it wrote itself by matching th
 
 ## Log Template
 
-Use `references/emit-local-timestamp.md` and the bundled timestamp helper once before appending the log and updating the task pointer. Put `BodyTimestamp` in the log `timestamp:` field and any `updated:` field written during the same operation. Use the emitted field verbatim; do not reformat, recompute, or call the clock again for the same update.
+Use `references/emit-local-timestamp.md` and the bundled timestamp helper once before appending the log. Put `BodyTimestamp` in the log `timestamp:` field and any `updated:` field written during the same operation. Use the emitted field verbatim; do not reformat, recompute, or call the clock again for the same update.
 
 ```markdown
 ---
