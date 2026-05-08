@@ -8,7 +8,7 @@ Requires Director instruction. Do not autonomously update `specification.md`.
 
 ## Procedure
 
-1. Identify the active task folder from Director context, exactly one `tasks/current__<active-task-folder>` sentinel, or explicit task reference.
+1. Identify the active task folder from Director context, exactly one `tasks/current__<active-task-folder>` sentinel, or explicit task reference. If multiple `current__*` sentinels exist, delete them all and proceed as if there is no current task.
 2. Read the task's `task.md`.
 3. Read current `specification.md` if present.
 4. Read the relevant ordered `log/` span needed to understand the approved change. Include every record since your last known read point when known, except known self-written identities matched by numeric prefix plus source such as `0007-codex` in non-colliding numeric-prefix groups; never skip by numeric prefix alone. If a numeric prefix has multiple files, read every file in that collision group and report the duplicate record number. Otherwise read enough recent or unsummarized log history to reconstruct current state. Multiple consecutive records from the same agent are normal.

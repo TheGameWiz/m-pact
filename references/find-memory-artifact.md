@@ -55,7 +55,7 @@ Do not scan sibling projects unless the Director names them. Normal memory looku
 - If task folder names are inconclusive, search `task.md`, then `specification.md`, `summary/`, and `log/` only as needed to narrow the candidate set.
 - For a specific task lookup, read `task.md` first. Read `specification.md`, `log/`, or `summary/` only when the request needs them.
 - For handoff, resume, continue, or "pick up this task" requests, read `task.md` and `specification.md` when present, then list log filenames with sizes before loading logs. If total logs are 50KB or less, read all logs. If total logs exceed 50KB and the Director did not request all logs or a specific range, read newest logs backward up to about 50KB, include the newest single log even when it alone exceeds 50KB, and report the loaded log range and skipped older history.
-- Use the zero-byte `tasks/current__<active-task-folder>` sentinel as the current-task pointer, not as a task index.
+- Use the zero-byte `tasks/current__<active-task-folder>` sentinel as the current-task pointer, not as a task index. If multiple `current__*` sentinels exist, delete them all and treat the root as having no current task.
 
 ### Case Studies
 

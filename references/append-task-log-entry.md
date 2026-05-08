@@ -4,7 +4,7 @@ Use when the Director asks to write a task log entry without changing `specifica
 
 ## Procedure
 
-1. Identify the task folder from Director context, exactly one `tasks/current__<active-task-folder>` sentinel, or explicit task reference.
+1. Identify the task folder from Director context, exactly one `tasks/current__<active-task-folder>` sentinel, or explicit task reference. If multiple `current__*` sentinels exist, delete them all and proceed as if there is no current task.
 2. Read the task's `task.md`.
 3. Read only the task artifacts needed to write an accurate checkpoint. When catching up from a last-read cursor, read every later record except known self-written identities matched by numeric prefix plus source, such as `0007-codex`, in non-colliding numeric-prefix groups; never skip by numeric prefix alone. If a numeric prefix has multiple files, read every file in that collision group and report the duplicate record number.
 4. Immediately before writing, re-list existing files in `log/` and determine the next record number from the highest existing record number. Do not rely on prior conversational knowledge or a stale directory listing.

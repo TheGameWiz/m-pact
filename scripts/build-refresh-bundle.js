@@ -517,8 +517,11 @@ function main() {
           missingOrAmbiguous.push(`stale current task pointer ${pointerName}; remove it or explicitly choose an active task`);
         }
       } else if (currentPointers.length > 1) {
-        currentTaskPointer = `(ambiguous: ${currentPointers.join(", ")})`;
-        missingOrAmbiguous.push(`multiple current task pointers found: ${currentPointers.join(", ")}`);
+        for (const pointerName of currentPointers) {
+          fs.unlinkSync(path.join(tasksDir, pointerName));
+        }
+        currentTaskPointer = "(none; cleared multiple current task sentinels)";
+        missingOrAmbiguous.push(`cleared multiple current task sentinels: ${currentPointers.join(", ")}; no current task selected`);
       }
 
       if (selectedTask) {

@@ -72,10 +72,10 @@ Status: Active|Closed
 
 ## Current Task Pointer
 
-After creating an active task, make it current by creating a zero-byte sentinel directly under `tasks/`:
+After creating an active task, make it current using `references/set-current-task.md`: verify the new task folder exists and starts with `A__`, delete all existing `current__*` sentinels directly under `tasks/`, then create a zero-byte sentinel directly under `tasks/`:
 
 ```text
 tasks/current__<task-folder>
 ```
 
-The sentinel filename is the pointer. It has no extension and no body; never write content into it. There must be zero or one `current__*` sentinel. When making a newly created task current, remove any prior current sentinel only as part of this explicit current-task change. The pointer must reference an existing active task folder in the same `tasks/` directory.
+The sentinel filename is the pointer. It has no extension and no body; never write content into it. The pointer must reference an existing active task folder in the same `tasks/` directory.

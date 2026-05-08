@@ -446,7 +446,7 @@ If you say only "create a task," the agent may ask a short clarification unless 
 
 ### Current Task Pointer
 
-The current task pointer is a zero-byte sentinel named `tasks/current__<active-task-folder>`. The pointer is entirely in the filename and has no extension or body. It is an attention pointer, not a task index, queue, activity timestamp, or log cursor. If there is no current task, no `current__*` file should exist. If multiple `current__*` files exist, agents should stop and report ambiguity.
+The current task pointer is a zero-byte sentinel named `tasks/current__<active-task-folder>`. The pointer is entirely in the filename and has no extension or body. It is an attention pointer, not a task index, queue, activity timestamp, or log cursor. If there is no current task, no `current__*` file should exist. If multiple `current__*` files exist, agents should delete all of them and proceed as if there is no current task.
 
 ### Task Close And Reopen
 
