@@ -49,6 +49,8 @@ For "handoff" requests, create the same ordinary task, make it current, and writ
 
 ## task.md Template
 
+Use `references/emit-local-timestamp.md` and the bundled timestamp helper once for the task creation. Put `BodyTimestamp` in both the `task.md` `Timestamp:` field and the `current-task.md` `updated:` field unless there is a deliberate reason to record two different moments. Use the emitted field verbatim; do not reformat, recompute, or call the clock again for the same task creation.
+
 ```markdown
 # Task Entry
 

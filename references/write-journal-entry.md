@@ -24,7 +24,7 @@ Journal entries are Director-authored or Director-voiced: first-person, reflecti
 
 `YYYY-MM-DD-HHMMSS-<local-zone>-director-<descriptive-slug>.md`
 
-Use the user's local time zone. Query the system clock or use trusted host-provided time; do not rely on internal model time. Timestamp-bearing filenames use hours, minutes, and seconds (`HHMMSS`) so forgotten entries can be inserted into the correct day/time sequence.
+Use `references/emit-local-timestamp.md` and the bundled timestamp helper. Put `FilenameStamp` at the start of the filename and `Date` in the `Date:` field. Use those fields verbatim; do not reformat, recompute, or call the clock again for the same entry. Timestamp-bearing filenames use hours, minutes, and seconds (`HHMMSS`) so forgotten entries can be inserted into the correct day/time sequence.
 
 ## Template
 

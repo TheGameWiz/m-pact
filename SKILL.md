@@ -26,6 +26,7 @@ When the Director explicitly asks to bootstrap or set up M-PACT in the current p
 Read only the reference needed for the current operation:
 
 - Refresh memory or startup load: `references/refresh-memory.md` and bundled script `scripts/build-refresh-bundle.js`
+- Emit a local timestamp for filenames or body metadata: `references/emit-local-timestamp.md` and bundled script `scripts/emit-local-timestamp.js`
 - Find, list, or read memory artifacts: `references/find-memory-artifact.md`
 - Root discovery or write-target decisions: `references/resolve-memory-roots.md`
 - Full operating protocol: `references/memory-contract.md`

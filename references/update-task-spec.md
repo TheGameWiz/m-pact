@@ -31,6 +31,8 @@ For catch-up reads, an agent may skip a log entry it wrote itself by matching th
 
 ## Log Template
 
+Use `references/emit-local-timestamp.md` and the bundled timestamp helper once before appending the log and updating the task pointer. Put `BodyTimestamp` in the log `timestamp:` field and any `updated:` field written during the same operation. Use the emitted field verbatim; do not reformat, recompute, or call the clock again for the same update.
+
 ```markdown
 ---
 record: 0001

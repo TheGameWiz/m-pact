@@ -31,6 +31,8 @@ The filename should be mostly the rule: descriptive enough that a directory list
 
 ## Template
 
+Use `references/emit-local-timestamp.md` and the bundled timestamp helper when creating a new rule. Put `Date` in the `created:` field. Use that field verbatim; do not reformat, recompute, or call the clock again for the same rule.
+
 ```markdown
 ---
 description: One sentence of additive clarification, instruction, scope, trigger, or nuance beyond the filename.

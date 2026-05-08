@@ -29,7 +29,7 @@ Default target is the active project root: `.AgentMemory/sessions/`.
 
 `YYYY-MM-DD-HHMMSS-<local-zone>-agent-summary.md`
 
-Use the user's local time zone. Query the system clock or use trusted host-provided time; do not rely on internal model time.
+Use `references/emit-local-timestamp.md` and the bundled timestamp helper. Put `FilenameStamp` at the start of the filename and `BodyTimestamp` in the `Timestamp:` field. Use those fields verbatim; do not reformat, recompute, or call the clock again for the same entry.
 
 ## Template
 

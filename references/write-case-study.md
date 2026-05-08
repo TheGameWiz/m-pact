@@ -21,7 +21,7 @@ Use the same scoping model as sessions:
 
 `YYYY-MM-DD-short-slug.md`
 
-Use the current local date. Keep the slug descriptive and ASCII-only.
+Use `references/emit-local-timestamp.md` and the bundled timestamp helper. Put `Date` at the start of the filename and in the frontmatter `date:` field. Use that field verbatim; do not reformat, recompute, or call the clock again for the same case study. Keep the slug descriptive and ASCII-only.
 
 ## Frontmatter
 

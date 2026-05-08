@@ -26,7 +26,7 @@ Use the latest relevant summary for the same kind of compression. Do not treat a
 
 `YYYY-MM-DD-HHMMSS-<local-zone>-<agent>-<scope-slug>.md`
 
-Use the user's local time zone. Query the system clock or use trusted host-provided time; do not rely on internal model time.
+Use `references/emit-local-timestamp.md` and the bundled timestamp helper. Put `FilenameStamp` at the start of the filename and `BodyTimestamp` in the `Timestamp:` field. Use those fields verbatim; do not reformat, recompute, or call the clock again for the same summary.
 
 Use a scope slug that says what the summary covers:
 

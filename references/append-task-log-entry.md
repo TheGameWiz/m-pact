@@ -27,6 +27,10 @@ Examples:
 - `0002-claude-spec-v1-handoff.md`
 - `0003-director-scope-decision.md`
 
+## Timestamp
+
+Use `references/emit-local-timestamp.md` and the bundled timestamp helper. Put `BodyTimestamp` in the `timestamp:` field. Use that field verbatim; do not reformat, recompute, or call the clock again for the same log entry.
+
 ## Template
 
 ```markdown

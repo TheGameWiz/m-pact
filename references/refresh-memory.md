@@ -58,7 +58,7 @@ If stdout contains `AUDIT: PASS`, `M-PACT REFRESH BUNDLE MANIFEST`, a `BundlePat
 
 The stdout manifest alone is not a completed refresh and does not load memory by itself. `BundlePath` is not a question for the Director; it is the next required step. Never stop after printing the bundle path, never ask whether to open or apply the bundle, and never ask what to do next before the receipt body has been emitted.
 
-After successful refresh, treat the verified bundle as the loaded startup context. Do not read `.AgentMemory`, `.AgentMemoryRoot`, rules, sessions, tasks, journals, case studies, or generated temp bundles merely to verify refresh or "complete" the startup load. The script already selected the startup content and audited the bundle. Use targeted lookup only when the Director asks for a specific artifact or the current work actually requires omitted details.
+After successful refresh, treat the verified bundle as the loaded startup context. Do not read `.AgentMemory`, `.AgentMemoryRoot`, rules, sessions, tasks, journals, case studies, or generated temp bundles merely to verify refresh or "complete" the startup load. The script already selected the startup content and audited the bundle. If the same user message includes a substantive request beyond refresh/startup, continue with that request using the loaded context. Use targeted lookup only when the Director asks for a specific artifact or the current work actually requires omitted details.
 
 If stdout reports `AUDIT: FAIL` and `END REFRESH FAILURE`, stop and report the exact failure. If the script is missing, fails, output is truncated, lacks `AUDIT: PASS`, lacks a `BundlePath`, lacks final-line `END REFRESH BUNDLE`, the bundle file cannot be read, the bundle file lacks final-line `END REFRESH BUNDLE`, or stdout reports `AUDIT: FAIL`, stop and report the exact failure. Do not improvise a manual refresh.
 
@@ -70,7 +70,7 @@ Manual investigation is allowed only when the Director explicitly asks for debug
 
 ## Receipt
 
-The bundle file includes a receipt block between `BEGIN REFRESH RECEIPT` and `END REFRESH RECEIPT`. Emit only the receipt body between those markers, excluding the marker lines themselves. The first visible line must be `M-PACT MEMORY REFRESH`. Do not summarize, condense, or paraphrase the receipt body. After emitting it, stop the refresh flow; do not self-verify with additional memory reads.
+The bundle file includes a receipt block between `BEGIN REFRESH RECEIPT` and `END REFRESH RECEIPT`. Emit only the receipt body between those markers, excluding the marker lines themselves. The first visible line must be `M-PACT MEMORY REFRESH`. Do not summarize, condense, or paraphrase the receipt body. After emitting it, stop the refresh flow; do not self-verify with additional memory reads, and do not end the turn solely because refresh completed when the same user message includes a substantive request.
 
 ## When Refresh Fails
 
