@@ -1,0 +1,4 @@
+interface:
+  display_name: "M-PACT: Multi-Provider Agent Context Toolkit"
+  short_description: "Multi-provider memory and context for visible agent sessions."
+  default_prompt: "Refresh shared agent memory and follow the active memory workflow."
