@@ -43,7 +43,7 @@ For a new project, ask:
 Set up m-pact for this project.
 ```
 
-The agent should create or repair `.AgentMemory/` and create or append the M-PACT startup shims in `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`. It should not run refresh after bootstrap unless you also ask it to refresh, load, or verify. `AGENTS.md` is also the default project shim for Copilot-compatible agents; `shims/copilot-instructions.md` is available as an optional GitHub Copilot custom-instructions template.
+The agent should add any missing project scaffolding: `.AgentMemory/` with standard subfolders and the M-PACT startup shims in `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`. It should not run refresh after bootstrap unless you also ask it to refresh, load, or verify. `AGENTS.md` is also the default project shim for Copilot-compatible agents; `shims/copilot-instructions.md` is available as an optional GitHub Copilot custom-instructions template.
 
 Use this wording instead of "install m-pact" when the skill is already installed and your goal is to configure the current workspace.
 
@@ -67,13 +67,13 @@ At the start of a new agent context, say:
 Use $m-pact and refresh memory.
 ```
 
-The agent should run the skill's refresh procedure, load the memory chain, and emit the refresh receipt body verbatim. The visible receipt starts with `M-PACT MEMORY REFRESH`; internal begin/end marker lines in the bundle are not shown. That receipt proves memory was loaded and tells you which roots, rules, sessions, and task pointer were seen.
+The agent should run the skill's refresh procedure. If a project memory root exists, it loads the memory chain and emits a compact refresh receipt. The visible receipt starts with `M-PACT MEMORY REFRESH`; internal begin/end marker lines in the bundle are not shown. The full roots, rules, sessions, and task pointer details stay inside the loaded bundle instead of being printed during normal startup.
 
 After the receipt, the agent should not scan `.AgentMemory`, sessions, rules, tasks, or the generated bundle just to verify the refresh. The bundle is already the verified startup context. Ask for targeted lookup when you want a specific memory artifact.
 
 This startup refresh is the practical bridge for multi-provider work. A Codex tab, a Claude Code tab, and a Gemini CLI session can all begin from the same memory chain instead of acting like separate isolated chats. Copilot CLI is a plausible future target, but the current project should describe it as unvalidated best-effort support.
 
-If refresh succeeds but says `project: (none found)`, only your user-level memory was loaded. The agent should offer to set up the project by creating or repairing `.AgentMemory/`, creating or appending `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` startup shims, and running refresh again to verify the local root is active.
+If no project `.AgentMemory/` exists, normal refresh should stop before emitting a receipt and ask whether to create project scaffolding. If you answer yes, the agent should add `.AgentMemory/` with standard subfolders, create or append `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` startup shims without overwriting existing files, and then run refresh again. If you answer no, the agent should run user-root-only refresh and emit that receipt.
 
 Refresh is only for:
 
@@ -215,7 +215,7 @@ Use $m-pact and refresh memory.
 
 ### What To Expect
 
-The agent should emit a verbatim refresh receipt body, starting with `M-PACT MEMORY REFRESH` and excluding internal begin/end marker lines. After the receipt, the refresh flow is done; the agent should not self-verify by scanning memory folders. If refresh succeeds with `LimitHit: true`, the agent should say the bundle is partial and use targeted lookup for omitted content when needed. If refresh fails with `AUDIT: FAIL`, the agent should stop and report the exact failure instead of pretending memory loaded.
+The agent should emit the compact refresh receipt body, starting with `M-PACT MEMORY REFRESH` and excluding internal begin/end marker lines. After the receipt, the refresh flow is done; the agent should not self-verify by scanning memory folders. If refresh succeeds with `LimitHit: true`, the agent should say the bundle is partial and use targeted lookup for omitted content when needed. If refresh fails with `AUDIT: FAIL`, the agent should stop and report the exact failure instead of pretending memory loaded.
 
 Gemini CLI uses `scripts/emit-refresh-bundle.js` for `/m-pact:fast-refresh` and `/m-pact:refresh`. That wrapper generates, validates, and injects the whole refresh bundle as one startup-context document, then Gemini should emit only the receipt body and stop. `/m-pact:fast-refresh` exists to test whether natural Impact requests can be routed into the faster custom-command path. Gemini custom slash commands are still model-mediated, so this may be slower than Codex or Claude Code if Gemini stays in a normal model turn. Inline `!node ...` can also make Gemini continue thinking after the receipt is printed, and Gemini CLI v0.40.1 on Windows did not reliably accept `!` as a standalone shell-mode toggle during testing. For a fast terminal-only receipt outside Gemini's agent turn, run this from PowerShell in the project root:
 
@@ -296,7 +296,7 @@ GEMINI.md
 
 If a shim file is missing, the agent creates it from the bundled shim. If a shim file already exists, the agent appends the M-PACT shim section while preserving the existing content. If the file already invokes M-PACT, the agent leaves it unchanged. If there are conflicting M-PACT instructions, the agent should stop and ask how to merge them.
 
-After setup, the agent should run refresh once and verify that the new `.AgentMemory/` is the active project root.
+After setup from a refresh preflight yes/no prompt, the agent should run refresh once and emit the receipt for the new `.AgentMemory/`. For a standalone bootstrap request, it should run refresh only if you also ask it to refresh, load, or verify.
 
 ### Approval Gate
 
@@ -463,7 +463,7 @@ Reopen C__p2-t0008-example because we found follow-up work.
 
 ### What They Are
 
-A task handoff is a read/analyze/evaluate/report operation for an existing task. The agent reads `task.md`, `specification.md` when present, relevant summaries when useful, and the ordered log span needed for continuity.
+A task handoff is a read/analyze/evaluate/report operation for an existing task. The agent reads `task.md`, `specification.md` when present, relevant summaries when useful, and the ordered log span needed for continuity. The expected output is not just a summary: the agent should evaluate the current handoff span for feasibility, risks, assumptions, implementation or specification issues, and recommend the best next path when evidence supports one.
 
 ### Why Use Them
 
@@ -506,15 +506,17 @@ Default behavior:
 1. Read task.md.
 2. Read specification.md when present.
 3. List log filenames with sizes.
-4. If logs total 50KB or less, read all logs.
-5. If logs exceed 50KB, read newest logs backward up to about 50KB unless you asked for all logs or a specific range.
+4. If a read cursor is known, treat records after that cursor as the current handoff span.
+5. If no cursor is known, use the latest relevant current-state or handoff summary as the boundary when one exists, then treat later records as the current handoff span.
+6. If no cursor or summary boundary exists and logs total 50KB or less, read all logs.
+7. If no cursor or summary boundary exists and logs exceed 50KB, read newest logs backward up to about 50KB unless you asked for all logs or a specific range.
 ```
 
-If the newest single log is larger than 50KB, the agent should read that newest log rather than splitting it. When it does not read all logs, it should say what range it read and what older history it skipped. If the older logs appear to switch to a different workstream, it should say that too and offer to read another chunk or search older logs for a specific decision.
+If the newest single log is larger than 50KB, the agent should read that newest log rather than splitting it. A cursor or summary boundary should prevent old logs from being treated as current just because the task is under 50KB. The agent may still read older logs as background context when useful, but it should not act on them as live state when later records have superseded them. When it does not read all logs, it should say what range it read as the current span, what boundary it used, and what older history it loaded only as background or skipped. If the older logs appear to switch to a different workstream, it should say that too and offer to read another chunk or search older logs for a specific decision.
 
 ### Important Limit
 
-"Take this handoff" does not by itself authorize implementation, spec edits, doc edits, task-state changes, or log writes. It means read, analyze, evaluate, verify, and report unless you also explicitly ask the agent to continue implementation or update memory.
+"Take this handoff" does not by itself authorize implementation, spec edits, doc edits, task-state changes, or log writes. It means read, analyze, evaluate, verify, and report unless you also explicitly ask the agent to continue implementation or update memory. If judging the handoff requires checking the codebase, spec, tests, or docs, the agent should inspect those artifacts and then give you its recommendation rather than leaving the interpretation entirely to you.
 
 ### Common Requests
 

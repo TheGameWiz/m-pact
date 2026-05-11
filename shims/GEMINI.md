@@ -8,7 +8,9 @@ For natural Impact refresh requests, route immediately to `/m-pact:fast-refresh`
 
 If Gemini cannot invoke another slash command from the current turn, tell the Director to run `/m-pact:fast-refresh`. Do not fall back to scanning `.AgentMemory` or manually loading memory.
 
-After the command runs, emit only the M-PACT refresh receipt body and stop. Do not add a readiness summary, topic line, or follow-up question.
+If the command reports `M-PACT PROJECT SETUP REQUIRED`, ask the setup question from the command output before emitting any receipt. If the Director says yes, add the missing project scaffolding and then refresh again. If the Director says no, rerun refresh with `--AllowUserRootOnly` and emit that user-root-only receipt.
+
+After the command runs with a successful refresh bundle, emit only the M-PACT refresh receipt body and stop. Do not add a readiness summary, topic line, or follow-up question.
 
 Do not reinterpret generic Gemini memory requests such as `refresh memory`, `show memory`, or `reload memory` as M-PACT unless the user also mentions Impact, M-PACT, m-pact, shared agent memory, or project memory.
 

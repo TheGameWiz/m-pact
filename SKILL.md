@@ -17,9 +17,9 @@ Startup refresh is for local agent clients only: Codex CLI, Claude Code, Gemini 
 
 Installing the skill or extension only makes M-PACT available globally. Setting up a project is a separate bootstrap operation.
 
-When the Director asks to use, load, sync, or refresh M-PACT in a project, run the normal refresh. If refresh succeeds with `project: (none found)`, explain that only user-level memory loaded and ask a hard yes/no bootstrap question. The question must name the write action: create or repair `.AgentMemory/` and create or embed `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` startup shims. Stop unless the Director gives explicit approval such as "yes," "bootstrap it," "set it up," or "go ahead." Treat "maybe," "not sure," "let me think," or explanatory questions as no approval yet.
+When the Director asks to use, load, sync, or refresh M-PACT in a project, run the normal refresh. If the script reports `M-PACT PROJECT SETUP REQUIRED`, do not emit a refresh receipt yet. Ask the hard yes/no setup question from the script output. If the Director says yes, create the missing project scaffolding and then refresh again. If the Director says no, run refresh again with `--AllowUserRootOnly` and emit that receipt. Treat "maybe," "not sure," "let me think," or explanatory questions as no approval yet.
 
-When the Director explicitly asks to bootstrap or set up M-PACT in the current project, that is approval for project bootstrap. Create or repair `.AgentMemory/` and create or embed `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` startup shims. Do not run refresh after bootstrap unless the Director also asks to refresh, load, or verify.
+When the Director explicitly asks to bootstrap or set up M-PACT in the current project, that is approval for project bootstrap. Add any missing project scaffolding: `.AgentMemory/` standard subfolders plus `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` startup shims. Do not run refresh after bootstrap unless the Director also asks to refresh, load, or verify.
 
 ## Dispatch
 
@@ -58,10 +58,10 @@ Read only the reference needed for the current operation:
 
 - Filenames are the index. Directory listings are the table of contents. Do not create separate index files.
 - Refresh only on new context/session startup, after known or suspected compaction/context loss, or when the Director explicitly says "refresh memory." Refresh uses the bundled script path in `references/refresh-memory.md`; if the script fails, stop instead of improvising manual refresh. If refresh succeeds with `LimitHit: true`, emit the partial-bundle warning and use targeted retrieval for omitted content. Do not refresh merely because a handoff, large task, or implementation may be coming; use targeted retrieval while context is intact.
-- The refresh stdout manifest is not the loaded memory. A refresh is incomplete until the agent reads the bundle file at `BundlePath`, verifies it ends with `END REFRESH BUNDLE`, treats that verified bundle as startup context, emits the receipt body, and stops. Never ask the Director whether to open or apply the bundle after a successful manifest; do it as part of refresh.
+- The refresh stdout manifest is not the loaded memory. A refresh is incomplete until the agent reads the bundle file at `BundlePath`, verifies it ends with `END REFRESH BUNDLE`, treats that verified bundle as startup context, emits the receipt body, and stops. Never ask the Director whether to open or apply the bundle after a successful manifest; do it as part of refresh. If stdout instead reports `M-PACT PROJECT SETUP REQUIRED`, no bundle was produced and no receipt should be emitted yet; ask the setup question before loading user-root-only context.
 - Run refresh from the real project working directory. If using an installed skill script, pass that script path to Node without changing directories. Never `cd` into the skill install folder to run refresh; that can falsely report `project: (none found)`.
 - After successful refresh, treat the verified refresh bundle as the loaded startup context. Do not read `.AgentMemory`, `.AgentMemoryRoot`, rules, sessions, tasks, journals, case studies, or generated temp bundles merely to verify refresh. Use targeted lookup only when the Director asks for a specific memory artifact or the current work actually requires it.
-- If refresh succeeds with `project: (none found)`, explain that only user-level memory loaded and ask a hard yes/no project bootstrap question for `.AgentMemory/`, `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`. Stop unless the Director explicitly approves bootstrap.
+- If refresh reports `M-PACT PROJECT SETUP REQUIRED`, ask the hard yes/no project setup question before any receipt. If yes, add the missing project scaffolding and refresh again. If no, run refresh with `--AllowUserRootOnly` and emit the user-root-only receipt.
 - The memory chain is broad-to-specific: required user `.AgentMemoryRoot/`, then ancestor `.AgentMemory/` roots from broadest ancestor to nearest active root.
 - User-root bootstrap installs bundled starter core rules only during initial `.AgentMemoryRoot/` creation, unless the Director asks to skip them. Starter rules are editable defaults; tell the Director to review, edit, delete, or replace them.
 - The nearest project `.AgentMemory/` is active. Sessions, task writes, journals, case studies, and project rules default there unless the Director names another target.
@@ -74,7 +74,7 @@ Read only the reference needed for the current operation:
 
 ## Refresh Receipt
 
-Every successful refresh must read/apply the verified bundle and emit the script-provided receipt body verbatim, excluding the internal `BEGIN REFRESH RECEIPT` and `END REFRESH RECEIPT` marker lines. The first visible line should be `M-PACT MEMORY REFRESH`. After emitting the receipt, stop the refresh flow; do not ask whether to open/apply the bundle and do not self-verify by scanning memory folders. If the script fails, say what failed. Do not pretend memory is loaded.
+Every successful refresh must read/apply the verified bundle and emit the script-provided compact receipt body, excluding the internal `BEGIN REFRESH RECEIPT` and `END REFRESH RECEIPT` marker lines. The first visible line should be `M-PACT MEMORY REFRESH`. Normal successful refresh should be a tiny acknowledgement, not a startup report. The full startup manifest remains loaded inside the verified bundle and should not be printed merely to prove refresh. After emitting the compact receipt, stop the refresh flow; do not ask whether to open/apply the bundle and do not self-verify by scanning memory folders. If the script fails, say what failed. Do not pretend memory is loaded.
 
 ## Compaction Note
 

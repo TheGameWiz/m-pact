@@ -11,4 +11,4 @@ Do not treat the context window as the workspace. Use tools, scripts, indexes, m
 
 Avoid kitchen-sink sessions where unrelated tasks, failed approaches, stale logs, and repeated corrections accumulate around the current task.
 
-**How to apply:** Before reading or pasting large material, ask what evidence is actually needed and whether a search, script, count, summary, or small excerpt can answer it. After repeated failed corrections or unrelated task switches, checkpoint useful findings and restart from cleaner context.
+**How to apply:** Before reading or pasting large material, ask what evidence is actually needed and whether a search, script, count, summary, or small excerpt can answer it.

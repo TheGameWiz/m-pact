@@ -5,7 +5,9 @@ source: director
 created: 2026-03-15
 ---
 
-- Do not undercount edits.
+- Read the full Director message before acting, especially dictated or multi-part messages.
+- Do not undercount edits, requested parts, constraints, or follow-up asks.
+- Do not reduce a complete or multi-part request to the first or easiest slice; unilateral narrowing is a scope error.
 - Do not go beyond the requested task without approval.
 - Never remove diagnostic/debug code until told to.
 - Ask when the Director's experience may resolve ambiguity.

@@ -14,6 +14,7 @@ function parseArgs(argv) {
     startPath: process.cwd(),
     activeSessionLimit: 10,
     sizeLimitKB: 100,
+    allowUserRootOnly: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -28,6 +29,8 @@ function parseArgs(argv) {
     } else if ((arg === "--SizeLimitKB" || arg === "-SizeLimitKB" || arg === "--size-limit-kb") && next) {
       options.sizeLimitKB = Number.parseInt(next, 10);
       i++;
+    } else if (arg === "--AllowUserRootOnly" || arg === "-AllowUserRootOnly" || arg === "--allow-user-root-only") {
+      options.allowUserRootOnly = true;
     }
   }
 
@@ -84,6 +87,17 @@ function formatList(items) {
   return `[${items.join(", ")}]`;
 }
 
+function formatDisplayPath(filePath) {
+  if (!filePath || filePath.startsWith("(")) {
+    return filePath;
+  }
+  return process.platform === "win32" ? filePath.replace(/\\/g, "/") : filePath;
+}
+
+function formatDisplayPathList(items) {
+  return formatList((items || []).map(formatDisplayPath));
+}
+
 function splitLines(text) {
   return text.split(/\r?\n/);
 }
@@ -117,7 +131,7 @@ function getSummarySlice(filePath) {
 function addArtifact(lines, title, artifactPath, body) {
   addLine(lines, `### ${title}`);
   addLine(lines);
-  addLine(lines, `Path: ${artifactPath}`);
+  addLine(lines, `Path: ${formatDisplayPath(artifactPath)}`);
   addLine(lines);
   addLine(lines, "```text");
   addLine(lines, String(body || "").trimEnd());
@@ -128,13 +142,29 @@ function addArtifact(lines, title, artifactPath, body) {
 function writeFailureAndExit(resolvedStart, failures) {
   console.log("AUDIT: FAIL");
   console.log("M-PACT REFRESH FAILURE");
-  console.log(`StartPath: ${resolvedStart}`);
+  console.log(`StartPath: ${formatDisplayPath(resolvedStart)}`);
   console.log(`Failure count: ${failures.length}`);
   for (const failure of failures) {
     console.log(`- ${failure}`);
   }
   console.log("END REFRESH FAILURE");
   process.exit(1);
+}
+
+function writeProjectSetupRequiredAndExit(details) {
+  console.log("M-PACT PROJECT SETUP REQUIRED");
+  console.log(`StartPath: ${formatDisplayPath(details.resolvedStart)}`);
+  console.log(`Active: (none found)`);
+  console.log(`Project: (none found)`);
+  console.log(`User: ${formatDisplayPath(details.userDisplay)}`);
+  console.log(`Chain: ${formatDisplayPathList(details.chain)}`);
+  console.log("No project .AgentMemory/ root was found for this workspace.");
+  console.log("Ask the Director whether to create project M-PACT scaffolding here before emitting any refresh receipt.");
+  console.log("Question: No project M-PACT root was found for this workspace. Create project M-PACT scaffolding here? This will add any missing pieces: .AgentMemory/ with standard subfolders, AGENTS.md startup shim, CLAUDE.md startup shim, and GEMINI.md startup shim. Existing files will not be overwritten. Answer yes or no.");
+  console.log("If yes: follow references/bootstrap-project.md, then run refresh again.");
+  console.log("If no: run refresh again with --AllowUserRootOnly and emit the resulting receipt.");
+  console.log("END PROJECT SETUP REQUIRED");
+  process.exit(0);
 }
 
 function utf8ByteCount(text) {
@@ -367,6 +397,17 @@ function main() {
     chain.push(root);
   }
 
+  if (!activeRoot && !options.allowUserRootOnly) {
+    if (failures.length > 0) {
+      writeFailureAndExit(resolvedStart, failures);
+    }
+    writeProjectSetupRequiredAndExit({
+      resolvedStart,
+      userDisplay: resolveExisting(userRoot),
+      chain,
+    });
+  }
+
   for (const root of chain) {
     for (const folder of ["rules", "sessions", "tasks", "case-studies", "journal"]) {
       const folderPath = path.join(root, folder);
@@ -380,7 +421,7 @@ function main() {
     const rulesDir = path.join(root, "rules");
     const rules = listMarkdownFiles(rulesDir);
     const nonCoreCount = rules.filter((rule) => !rule.name.startsWith("core-")).length;
-    ruleIndexParts.push(`${root}: ${rules.length} rules, ${nonCoreCount} unread non-core`);
+    ruleIndexParts.push(`${formatDisplayPath(root)}: ${rules.length} rules, ${nonCoreCount} unread non-core`);
 
     for (const rule of rules.filter((item) => item.name.startsWith("core-"))) {
       try {
@@ -544,48 +585,36 @@ function main() {
     writeFailureAndExit(resolvedStart, failures);
   }
 
-  const chainDisplay = formatList(chain);
-  const projectDisplay = activeRoot || "(none found)";
+  const chainDisplay = formatDisplayPathList(chain);
+  const projectDisplay = activeRoot ? formatDisplayPath(activeRoot) : "(none found)";
   const activeDisplay = projectDisplay;
-  const userDisplay = resolveExisting(userRoot);
+  const userDisplay = formatDisplayPath(resolveExisting(userRoot));
   const coreRuleDisplay = formatList(coreRuleNames);
   const ruleIndexDisplay = ruleIndexParts.length > 0 ? ruleIndexParts.join("; ") : "(none)";
   const sessionByRootParts = [];
   for (const root of chain) {
     if (sessionCountByRoot.has(root)) {
-      sessionByRootParts.push(`${root}=${sessionCountByRoot.get(root)}`);
+      sessionByRootParts.push(`${formatDisplayPath(root)}=${sessionCountByRoot.get(root)}`);
     }
   }
   const sessionByRootDisplay = sessionByRootParts.length > 0 ? sessionByRootParts.join("; ") : "(none)";
   const activeTasksDisplay = `${activeTaskNames.length} from active root; current task pointer ${currentTaskPointer}`;
   const missingOrAmbiguousDisplay = missingOrAmbiguous.length > 0 ? formatList(missingOrAmbiguous) : "[(none)]";
-  const projectRootsDisplay = formatList(projectRoots);
+  const projectRootsDisplay = formatDisplayPathList(projectRoots);
 
   addLine(bundle, "AUDIT: PASS");
   addLine(bundle, "M-PACT REFRESH BUNDLE");
   addLine(bundle, `Generated: ${generatedTimestamp()}`);
-  addLine(bundle, `StartPath: ${resolvedStart}`);
+  addLine(bundle, `StartPath: ${formatDisplayPath(resolvedStart)}`);
   addLine(bundle);
   addLine(bundle, "BEGIN REFRESH RECEIPT");
   addLine(bundle, "M-PACT MEMORY REFRESH");
-  addLine(bundle, "Refresh bundle script: build-refresh-bundle.js; audit=PASS; output-complete=END REFRESH BUNDLE");
-  addLine(bundle, "Roots resolved:");
-  addLine(bundle, `  active: ${activeDisplay}`);
-  addLine(bundle, `  chain: ${chainDisplay}`);
-  addLine(bundle, `  project: ${projectDisplay}`);
-  addLine(bundle, `  user: ${userDisplay}`);
-  addLine(bundle, "Protocol references loaded (full): [memory-contract.md]");
-  addLine(bundle, `Core rules loaded (full): ${coreRuleDisplay}`);
-  addLine(bundle, `Rule index noted: ${ruleIndexDisplay}`);
-  addLine(bundle, `Recent sessions read: full=${sessionFullCount}, summary=${sessionSummaryCount}, full-fallback=${sessionFallbackCount}; by root=${sessionByRootDisplay}; active-selected=${activeSelectedCount}; ancestor-sentinels=${ancestorSentinelCount}; selection=filename-desc`);
-  addLine(bundle, `Active tasks noted: ${activeTasksDisplay}`);
-  addLine(bundle, `Startup task read: ${startupTaskRead}`);
-  addLine(bundle, `Missing or ambiguous: ${missingOrAmbiguousDisplay}`);
+  addLine(bundle, "audit=PASS; bundle=loaded; output-complete=END REFRESH BUNDLE");
   addLine(bundle, "END REFRESH RECEIPT");
   addLine(bundle);
   addLine(bundle, "## Root And Startup Manifest");
   addLine(bundle);
-  addLine(bundle, `- Start path: ${resolvedStart}`);
+  addLine(bundle, `- Start path: ${formatDisplayPath(resolvedStart)}`);
   addLine(bundle, `- Required user root: ${userDisplay}`);
   addLine(bundle, `- Project roots, broad-to-specific: ${projectRootsDisplay}`);
   addLine(bundle, `- Active project root: ${activeDisplay}`);

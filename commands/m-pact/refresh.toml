@@ -1,13 +1,15 @@
 description = "Refresh M-PACT shared agent memory for the current workspace."
 
 prompt = """
-The M-PACT refresh bundle is below. It was generated and audit-checked by the wrapper script.
+The M-PACT refresh wrapper output is below. It contains either a verified refresh bundle or a project-setup preflight message.
 
 ```text
 !{node -e "const fs=require('fs'),os=require('os'),path=require('path'),cp=require('child_process');const candidates=[path.join(process.cwd(),'scripts','emit-refresh-bundle.js'),path.join(os.homedir(),'.gemini','extensions','m-pact','scripts','emit-refresh-bundle.js')];const script=candidates.find(candidate=>fs.existsSync(candidate));if(!script){console.error('M-PACT refresh bundle wrapper not found. Checked: '+candidates.join('; '));process.exit(1);}const result=cp.spawnSync(process.execPath,[script],{cwd:process.cwd(),stdio:'inherit',windowsHide:true});process.exit(result.status===null?1:result.status);"}
 ```
 
-Use the bundle above as the loaded M-PACT startup context for this session. Do not read `.AgentMemory`, `.AgentMemoryRoot`, `rules`, `sessions`, `tasks`, or the generated temp bundle with additional tool calls. The wrapper has already verified that the bundle is complete.
+If the output contains `M-PACT PROJECT SETUP REQUIRED`, do not emit a refresh receipt and do not claim memory is loaded. Ask the setup question from the output and stop. If the Director answers yes, add the missing project scaffolding and then refresh again. If the Director answers no, run refresh again with `--AllowUserRootOnly`.
+
+If the output contains `M-PACT REFRESH BUNDLE`, use the bundle above as the loaded M-PACT startup context for this session. Do not read `.AgentMemory`, `.AgentMemoryRoot`, `rules`, `sessions`, `tasks`, or the generated temp bundle with additional tool calls. The wrapper has already verified that the bundle is complete.
 
 Emit only the receipt body between `BEGIN REFRESH RECEIPT` and `END REFRESH RECEIPT`, excluding those marker lines. The first visible line must be `M-PACT MEMORY REFRESH`. Do not summarize, condense, paraphrase, inspect more files, or add a closing explanation.
 """

@@ -10,6 +10,7 @@ created: 2026-04-29
 - Say when you need to verify instead of stating guesses as facts.
 - Do not edit code, durable memory, or project artifacts until the Director has authorized that kind of action.
 - After implementation is clearly assigned, continue through low-risk next steps inside scope without repeatedly pausing for permission.
+- Do not ask the Director to verify work the agent can verify with tools. Ask at real decision points, unsafe or irreversible actions, actions only the Director can perform, or ambiguity that cannot be resolved from project context.
 
 Stop for a real Director decision, an action only the Director can perform, approval for irreversible or risky action, or clarification needed to avoid the wrong path.
 

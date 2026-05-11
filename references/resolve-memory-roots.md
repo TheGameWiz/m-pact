@@ -18,7 +18,7 @@ Use this reference whenever root discovery, read roots, or write targets matter.
 
 If the user root is missing, enter bootstrap-required state and report it in the refresh receipt. Do not pretend memory is fully loaded. Create the user root only after Director approval.
 
-If no project root exists, report `(none found)` in the refresh receipt. Do not create a root without approval.
+If no project root exists during normal refresh, stop with `M-PACT PROJECT SETUP REQUIRED` before emitting any receipt. Do not create a root without approval. Emit a user-root-only receipt only if the Director answers no and refresh is rerun with `--AllowUserRootOnly`.
 
 ## Active Root
 

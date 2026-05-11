@@ -77,7 +77,7 @@ For a new project, ask:
 Set up m-pact for this project.
 ```
 
-The agent should create or repair `.AgentMemory/` and create or append the M-PACT startup shims in `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`. It should not run refresh after bootstrap unless you also ask it to refresh, load, or verify. `AGENTS.md` is also the default project shim for Copilot-compatible agents; `shims/copilot-instructions.md` is available as an optional GitHub Copilot custom-instructions template.
+The agent should add any missing project scaffolding: `.AgentMemory/` with standard subfolders and the M-PACT startup shims in `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`. It should not run refresh after bootstrap unless you also ask it to refresh, load, or verify. `AGENTS.md` is also the default project shim for Copilot-compatible agents; `shims/copilot-instructions.md` is available as an optional GitHub Copilot custom-instructions template.
 
 At the start of a new context, ask the agent:
 
@@ -85,7 +85,7 @@ At the start of a new context, ask the agent:
 Use $m-pact and refresh memory.
 ```
 
-The agent should run the bundled refresh procedure and emit a refresh receipt. Refresh is intended only for new context/session startup, known or suspected context loss, or explicit refresh requests. If the refresh bundle hits the size limit, the script emits a partial bundle with `LimitHit: true`; the agent should keep going with the warning visible and use targeted lookup for anything omitted.
+The agent should run the bundled refresh procedure. If no project `.AgentMemory/` exists, refresh should stop before any receipt and ask whether to add project scaffolding. If you answer no, it should rerun user-root-only refresh and emit that receipt. Refresh is intended only for new context/session startup, known or suspected context loss, or explicit refresh requests. If the refresh bundle hits the size limit, the script emits a partial bundle with `LimitHit: true`; the agent should keep going with the warning visible and use targeted lookup for anything omitted.
 
 After the receipt, refresh is complete. Agents should not scan memory folders merely to verify refresh; targeted lookup is for specific follow-up needs.
 

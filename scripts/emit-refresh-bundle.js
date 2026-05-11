@@ -20,12 +20,16 @@ function findManifestValue(stdout, key) {
   return match ? match[1].trim() : "";
 }
 
+function isProjectSetupRequired(stdout) {
+  return stdout.includes("M-PACT PROJECT SETUP REQUIRED") && finalLine(stdout) === "END PROJECT SETUP REQUIRED";
+}
+
 const scriptPath = path.join(__dirname, "build-refresh-bundle.js");
 if (!fs.existsSync(scriptPath)) {
   fail(`Refresh script missing: ${scriptPath}`);
 }
 
-const result = childProcess.spawnSync(process.execPath, [scriptPath], {
+const result = childProcess.spawnSync(process.execPath, [scriptPath, ...process.argv.slice(2)], {
   cwd: process.cwd(),
   encoding: "utf8",
   windowsHide: true
@@ -37,6 +41,14 @@ if (result.error) {
 
 const stdout = result.stdout || "";
 const stderr = result.stderr || "";
+
+if (isProjectSetupRequired(stdout)) {
+  process.stdout.write(stdout);
+  if (!stdout.endsWith("\n")) {
+    process.stdout.write("\n");
+  }
+  process.exit(result.status === null ? 2 : result.status);
+}
 
 if (result.status !== 0) {
   fail(`Refresh script exited with code ${result.status}.\n${stderr || stdout}`.trim());

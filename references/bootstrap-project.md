@@ -6,9 +6,9 @@ Explicit bootstrap or setup language from the Director is approval to bootstrap 
 
 ## When To Offer
 
-Offer project bootstrap when no active project `.AgentMemory/` exists after refresh, or when the Director asks to create a local memory root for a child folder.
+Offer project bootstrap when refresh preflight reports `M-PACT PROJECT SETUP REQUIRED`, or when the Director asks to create a local memory root for a child folder.
 
-When offering project bootstrap after refresh reports `project: (none found)`, ask a hard yes/no question and stop. The question must name the write action: create or repair `.AgentMemory/` and create or append startup shims in `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`. Treat "maybe," "not sure," "let me think," or explanatory questions as no approval yet.
+When offering project bootstrap during refresh preflight, ask a hard yes/no question and stop. The question must name the write action: add any missing project scaffolding, including `.AgentMemory/` with standard subfolders and startup shims in `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`. Say existing files will not be overwritten. Treat "maybe," "not sure," "let me think," or explanatory questions as no approval yet.
 
 Offer user-root bootstrap when required `.AgentMemoryRoot/` is missing. Missing user root blocks a fully loaded refresh until the Director approves bootstrap.
 
@@ -59,7 +59,7 @@ For each project shim:
 4. If the existing file appears to contain conflicting M-PACT instructions, stop and ask the Director how to merge them.
 5. Report each shim file as created, appended, already configured, skipped, or blocked.
 
-After approved project bootstrap, report each created, repaired, appended, already configured, skipped, or blocked artifact. Do not run refresh merely because bootstrap completed. Run refresh after bootstrap only when the Director also asks to refresh, load, or verify.
+After approved project bootstrap, report each created, missing-folder-added, appended, already configured, skipped, or blocked artifact. Do not run refresh merely because bootstrap completed. If bootstrap approval was the yes answer to a refresh preflight question, the original refresh request is still active: run refresh again after setup and emit the resulting receipt.
 
 ## User Root Structure
 
