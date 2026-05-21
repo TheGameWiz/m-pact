@@ -31,8 +31,6 @@ Do not reinterpret generic Gemini memory requests such as `refresh memory`, `sho
 
 For explicit M-PACT refresh through `/m-pact:fast-refresh` or `/m-pact:refresh`, use `scripts/emit-refresh-bundle.js`. It runs the bundled `scripts/build-refresh-bundle.js` script, validates the audit and bundle, reads the generated bundle, and injects the entire verified bundle as startup context. Run the wrapper from the current project working directory so it resolves the active `.AgentMemory/` chain for that project.
 
-After a refresh bundle is provided, do not read `.AgentMemory`, `.AgentMemoryRoot`, `rules`, `sessions`, `tasks`, or the generated temp bundle with extra tool calls unless the Director explicitly asks for targeted lookup. The refresh bundle is the startup context.
-
 Gemini custom slash commands are model-mediated. Inline `!node ...` can also return the command output into an agent turn, which may make Gemini keep thinking or reading memory folders after the receipt is already printed. In Gemini CLI v0.40.1 on Windows, `!` did not reliably work as a standalone shell-mode toggle during testing.
 
 Use `/m-pact:fast-refresh` when testing whether natural Impact requests can be routed into the faster custom-command path. `/m-pact:refresh` remains the compatibility command. Expect Gemini to be slower than Codex or Claude Code when it stays in a normal model turn around the command output. For a fast terminal-only receipt outside Gemini's agent turn, run this from PowerShell in the project root:
@@ -43,9 +41,7 @@ node scripts\emit-refresh-receipt.js
 
 If this extension is installed under Gemini's extension directory, resolve `references/` and `scripts/` relative to the extension root containing `gemini-extension.json`. If this repository itself is the current workspace, the same paths are available from the workspace root.
 
-A successful refresh must emit the script-provided receipt body verbatim, excluding the internal `BEGIN REFRESH RECEIPT` and `END REFRESH RECEIPT` marker lines. The first visible line is `M-PACT MEMORY REFRESH`. After the receipt body, stop.
-
-If the refresh script fails, stop and report the exact failure. Do not pretend memory is loaded.
+After a refresh bundle is provided, treat it as startup context and stop the refresh flow after the compact receipt. Do not read `.AgentMemory`, `.AgentMemoryRoot`, `rules`, `sessions`, `tasks`, or the generated temp bundle with extra tool calls unless the Director explicitly asks for targeted lookup. If the same user message includes work beyond refresh/startup, continue after the receipt using the loaded context.
 
 ## Operating Contract
 

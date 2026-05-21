@@ -1,97 +1,48 @@
 # Bootstrap Project
 
-Bootstrap is approval-gated. Do not create memory folders silently.
+Bootstrap is approval-gated. Do not create memory roots or starter rules silently.
 
-Explicit bootstrap or setup language from the Director is approval to bootstrap the named project root. A use, load, sync, or refresh request is not bootstrap approval.
+Use `scripts/bootstrap-project.js` after the Director explicitly approves bootstrap or setup. The helper owns creating `.AgentMemory/`, creating `.AgentMemoryRoot/`, copying starter rules, and preserving existing files.
 
 ## When To Offer
 
 Offer project bootstrap when refresh preflight reports `M-PACT PROJECT SETUP REQUIRED`, or when the Director asks to create a local memory root for a child folder.
 
-When offering project bootstrap during refresh preflight, ask a hard yes/no question and stop. The question must name the write action: add any missing project scaffolding, including `.AgentMemory/` with standard subfolders and startup shims in `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`. Say existing files will not be overwritten. Treat "maybe," "not sure," "let me think," or explanatory questions as no approval yet.
+When offering project bootstrap during refresh preflight, ask a hard yes/no question and stop. The question must name the write action: add `.AgentMemory/`. Say artifact folders and ZIP containers are created lazily when first used. Project startup shims are not part of project bootstrap; provider-global shims invoke the skill.
 
-Offer user-root bootstrap when required `.AgentMemoryRoot/` is missing. Missing user root blocks a fully loaded refresh until the Director approves bootstrap.
+Offer user-root bootstrap when required `.AgentMemoryRoot/` is missing. Tell the Director that approved user-root bootstrap installs bundled starter core rules into `.AgentMemoryRoot/rules/` unless they ask to skip them. Starter rules are editable defaults.
 
-If a parent project root exists, report that it is being used. Offer local bootstrap only when setup or isolation is clearly relevant or the Director asks.
+Normal global install should already create `.AgentMemoryRoot/` and install starter rules. If the Director asks to install or set up M-PACT for a project and `.AgentMemoryRoot/` is missing, run `references/install-mpact.md` first, then create the project `.AgentMemory/`.
 
-When offering user-root bootstrap for a missing `.AgentMemoryRoot/`, state that the skill will also install bundled starter core rules into `.AgentMemoryRoot/rules/`. Tell the Director these rules are editable defaults: they should review each rule and edit, delete, or replace anything that does not match their workflow.
+## Project Bootstrap
 
-## Project Setup
+Run from the project directory or pass `--project <project-root>`:
 
-```text
-.AgentMemory/
-  rules/
-  sessions/
-  tasks/
-  case-studies/
-  journal/
+```bash
+node scripts/bootstrap-project.js --project <project-root>
 ```
 
-`tasks/` may contain a zero-byte `current__<active-task-folder>` sentinel plus task folders. Each task folder contains `task.md`, optional `specification.md`, `log/`, and `summary/`.
+The helper creates `.AgentMemory/` only. Artifact folders and ZIP containers are lazy and appear when later helpers need them.
 
-Approved project bootstrap also installs project startup shims:
+Project bootstrap does not write `AGENTS.md`, `CLAUDE.md`, or `GEMINI.md`. Startup belongs to provider-global shims installed by `references/install-mpact.md`.
 
-```text
-AGENTS.md
-CLAUDE.md
-GEMINI.md
+In project mode, `scripts/bootstrap-project.js` checks for the user `.AgentMemoryRoot/`. If it is missing, the helper runs `scripts/install-mpact.js` first so provider-global shims, provider skill packages, starter rules, and `.AgentMemoryRoot/` exist before the project root is created.
+
+After approved project bootstrap, reply with one concise user-level sentence. Mention skipped or blocked files only when the user needs to act. Do not run refresh merely because bootstrap completed. If bootstrap approval was the yes answer to a refresh preflight question, the original refresh request is still active: run refresh again after setup and emit the resulting receipt.
+
+## User Root Bootstrap
+
+Run:
+
+```bash
+node scripts/bootstrap-project.js --user-root
 ```
 
-The bundled shim templates live in the skill folder:
+Optional flags:
 
-```text
-shims/AGENTS.md
-shims/CLAUDE.md
-shims/GEMINI.md
-```
+- `--root <user-root>` targets a non-default user root when explicitly needed.
+- `--skip-starter-rules true` creates only the root.
 
-These shims tell compatible agents to invoke M-PACT and refresh memory on new context. `AGENTS.md` covers Codex and skill-compatible agents such as Copilot CLI, `CLAUDE.md` covers Claude Code, and `GEMINI.md` covers Gemini CLI. Without them, a future local agent session may not automatically refresh memory for the project.
-
-## Project Shim Handling
-
-Project bootstrap approval includes creating or embedding the startup shims unless the Director asks to skip them or names only one agent client.
-
-For each project shim:
-
-1. If the file does not exist, create it from the bundled shim template.
-2. If the file exists and already invokes `m-pact` on new context, leave it unchanged and report that it was already configured.
-3. If the file exists and has no M-PACT instruction, append the bundled shim section to the existing file. Preserve all existing content. Do not rewrite, reorder, or summarize unrelated instructions.
-4. If the existing file appears to contain conflicting M-PACT instructions, stop and ask the Director how to merge them.
-5. Report each shim file as created, appended, already configured, skipped, or blocked.
-
-After approved project bootstrap, report each created, missing-folder-added, appended, already configured, skipped, or blocked artifact. Do not run refresh merely because bootstrap completed. If bootstrap approval was the yes answer to a refresh preflight question, the original refresh request is still active: run refresh again after setup and emit the resulting receipt.
-
-## User Root Structure
-
-```text
-.AgentMemoryRoot/
-  rules/
-  sessions/
-  tasks/
-  case-studies/
-  journal/
-```
-
-User and project roots use the same standard artifact folders. Journal entries are still written only when the Director explicitly asks.
-
-## User Root Starter Rules
-
-Bundled starter rules live in the skill folder:
-
-```text
-starter-rules/user-root/rules/
-```
-
-On approved user-root bootstrap for a missing `.AgentMemoryRoot/`:
-
-1. Create the standard `.AgentMemoryRoot/` folders.
-2. Copy every bundled `starter-rules/user-root/rules/*.md` file into `.AgentMemoryRoot/rules/`.
-3. Never overwrite an existing rule file. If a destination filename already exists, skip it and report the skip.
-4. After copying, list the installed starter rule filenames.
-5. Tell the Director: "These starter rules are editable defaults. Please review each one and edit, delete, or replace rules that do not fit your workflow."
-
-If the Director asks to bootstrap folders without starter rules, create only the standard folders and report that starter rules were skipped by request.
-
-Starter rules are installed only during initial `.AgentMemoryRoot/` creation. If `.AgentMemoryRoot/` already exists, do not install or re-install bundled starter rules as part of bootstrap; rule changes to existing roots must use normal rule write/update procedures for specific named rules.
+Starter rules are installed only during initial user-root bootstrap. If a destination rule file already exists, the helper skips it instead of overwriting.
 
 Create only what the Director approved.

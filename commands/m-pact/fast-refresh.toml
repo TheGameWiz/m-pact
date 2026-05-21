@@ -4,7 +4,7 @@ prompt = """
 The M-PACT refresh wrapper output is below. It contains either a verified refresh bundle or a project-setup preflight message.
 
 ```text
-!{node -e "const fs=require('fs'),os=require('os'),path=require('path'),cp=require('child_process');const candidates=[path.join(process.cwd(),'scripts','emit-refresh-bundle.js'),path.join(os.homedir(),'.gemini','extensions','m-pact','scripts','emit-refresh-bundle.js')];const script=candidates.find(candidate=>fs.existsSync(candidate));if(!script){console.error('M-PACT refresh bundle wrapper not found. Checked: '+candidates.join('; '));process.exit(1);}const result=cp.spawnSync(process.execPath,[script],{cwd:process.cwd(),stdio:'inherit',windowsHide:true});process.exit(result.status===null?1:result.status);"}
+!{node -e "const fs=require('fs'),os=require('os'),path=require('path'),cp=require('child_process');const script=path.join(os.homedir(),'.gemini','extensions','m-pact','scripts','emit-refresh-bundle.js');if(!fs.existsSync(script)){console.error('M-PACT refresh bundle wrapper not found: '+script);process.exit(1);}const result=cp.spawnSync(process.execPath,[script],{cwd:process.cwd(),stdio:'inherit',windowsHide:true});process.exit(result.status===null?1:result.status);"}
 ```
 
 If the output contains `M-PACT PROJECT SETUP REQUIRED`, do not emit a refresh receipt and do not claim memory is loaded. Ask the setup question from the output and stop. If the Director answers yes, add the missing project scaffolding and then refresh again. If the Director answers no, run refresh again with `--AllowUserRootOnly`.

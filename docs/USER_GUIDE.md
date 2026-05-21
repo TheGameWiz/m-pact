@@ -18,9 +18,10 @@ M-PACT is packaged as one folder with native entrypoints for multiple local agen
 ```text
 ~/.codex/skills/m-pact/
 ~/.claude/skills/m-pact/
-~/.copilot/skills/m-pact/      # or ~/.agents/skills/m-pact/
 ~/.gemini/extensions/m-pact/   # or link this repo with gemini extensions link
 ```
+
+Copilot CLI may later use `~/.copilot/skills/m-pact/` or `~/.agents/skills/m-pact/`, but that install path remains best-effort and is not enabled by the default helper.
 
 Use `$m-pact` in Codex, `/m-pact` in Claude Code, and `/m-pact:fast-refresh` in Gemini CLI. `/m-pact:refresh` remains a Gemini compatibility command. Copilot CLI may use `/m-pact` or `m-pact` if its runtime exposes the skill, but this path is best-effort until validated. In dictated Gemini requests, `Impact` is the spoken alias for M-PACT, for example `refresh Impact` or `Impact refresh`. Gemini is instructed to route these natural M-PACT requests, including `m-pact refresh`, to `/m-pact:fast-refresh` when possible, then emit only the receipt body and stop. Plain `refresh memory` remains the ordinary refresh wording for Codex, Claude Code, and Copilot-style agents, but Gemini should not treat it as M-PACT unless the request also names Impact or M-PACT.
 
@@ -33,9 +34,27 @@ Web-only ChatGPT or Claude clients may be able to read or install skill instruct
 
 ## Quick Start
 
+### Global Install
+
+Install M-PACT once for the current user:
+
+```text
+node scripts/install-mpact.js
+```
+
+The install helper syncs the package to the validated provider targets, creates or preserves `.AgentMemoryRoot/`, installs starter user-root rules without overwriting existing rule files, and installs provider-global startup shims:
+
+```text
+~/.codex/AGENTS.md
+~/.claude/CLAUDE.md
+~/.gemini/GEMINI.md
+```
+
+Install does not create project `.AgentMemory/` roots or project-local instruction files.
+
 ### New Project Setup
 
-Install makes the skill available globally. A new workspace still needs project setup.
+Install makes the skill available globally, configures provider-global startup shims, and creates the user `.AgentMemoryRoot/`. A new workspace still needs project setup.
 
 For a new project, ask:
 
@@ -43,7 +62,9 @@ For a new project, ask:
 Set up m-pact for this project.
 ```
 
-The agent should add any missing project scaffolding: `.AgentMemory/` with standard subfolders and the M-PACT startup shims in `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`. It should not run refresh after bootstrap unless you also ask it to refresh, load, or verify. `AGENTS.md` is also the default project shim for Copilot-compatible agents; `shims/copilot-instructions.md` is available as an optional GitHub Copilot custom-instructions template.
+The agent should first confirm `.AgentMemoryRoot/` exists. If it is missing, it should run global install, then add the project scaffold: `.AgentMemory/`. Artifact folders and ZIP containers are lazy and are created only when first used. It should not run refresh after bootstrap unless you also ask it to refresh, load, or verify. Provider-global shims should invoke M-PACT for Codex, Claude Code, and other configured runtimes; project bootstrap does not write project instruction files.
+
+If you start an agent from a subfolder below an existing project `.AgentMemory/`, refresh uses the nearest parent project root. It should not ask to create another `.AgentMemory/` in the subfolder unless you explicitly ask for a new child project root.
 
 Use this wording instead of "install m-pact" when the skill is already installed and your goal is to configure the current workspace.
 
@@ -73,7 +94,7 @@ After the receipt, the agent should not scan `.AgentMemory`, sessions, rules, ta
 
 This startup refresh is the practical bridge for multi-provider work. A Codex tab, a Claude Code tab, and a Gemini CLI session can all begin from the same memory chain instead of acting like separate isolated chats. Copilot CLI is a plausible future target, but the current project should describe it as unvalidated best-effort support.
 
-If no project `.AgentMemory/` exists, normal refresh should stop before emitting a receipt and ask whether to create project scaffolding. If you answer yes, the agent should add `.AgentMemory/` with standard subfolders, create or append `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` startup shims without overwriting existing files, and then run refresh again. If you answer no, the agent should run user-root-only refresh and emit that receipt.
+If no project `.AgentMemory/` exists, normal refresh should stop before emitting a receipt and ask whether to create project scaffolding. If you answer yes, the agent should add `.AgentMemory/` and then run refresh again. Artifact folders and ZIP containers remain absent until an approved operation needs them. If you answer no, the agent should run user-root-only refresh and emit that receipt.
 
 Refresh is only for:
 
@@ -105,7 +126,7 @@ Take the current task handoff and report the state.
 Append a task log checkpoint for what we just decided.
 Update the task specification with this decision and write the log entry.
 Close this task as complete.
-Reopen task A__p2-t0007-example because there is follow-up work.
+Reopen task t0007 because there is follow-up work.
 ```
 
 Common durable-context requests:
@@ -123,7 +144,7 @@ If a project has no `.AgentMemory/`, ask:
 Bootstrap M-PACT for this project.
 ```
 
-Project bootstrap creates the local memory folders and configures startup shims in `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`. If those files already exist, the agent should append the M-PACT section instead of overwriting your existing agent instructions.
+Project bootstrap first ensures the user `.AgentMemoryRoot/` exists, running global install if needed. Then it creates only the local memory root. The root's artifact folders are created later by the first approved write that needs them. It does not write project-local instruction files.
 
 If your user root is missing, ask:
 
@@ -139,7 +160,7 @@ As a general pattern: start each new context with refresh, use targeted reads du
 
 ### Director
 
-The user is the Director. The Director has decision authority over task creation, durable rules, memory writes, bootstrap, migration, deletion, close/reopen actions, and ambiguous judgment calls.
+The user is the Director. The Director has decision authority over task creation, durable rules, memory writes, bootstrap, deletion, close/reopen actions, and ambiguous judgment calls.
 
 ### Memory Roots
 
@@ -158,17 +179,19 @@ nearest-project/.AgentMemory/
 
 The nearest project `.AgentMemory/` is the active root. Most project writes default there.
 
-### Standard Root Structure
+Subfolders inherit the nearest parent project root. Running refresh inside `project/subfolder/` should use `project/.AgentMemory/` when it exists, not prompt for a new subfolder root. Create a child `.AgentMemory/` only when you explicitly want that subfolder to become its own M-PACT project.
 
-Both user and project roots use the same standard folders:
+### Standard Root Shape
+
+Both user and project roots may eventually have this shape:
 
 ```text
 .AgentMemoryRoot/ or .AgentMemory/
   rules/
-  sessions/
+  sessions.zip
   tasks/
-  case-studies/
-  journal/
+  case-studies.zip
+  journal.zip
 ```
 
 Task folders may contain:
@@ -178,10 +201,12 @@ tasks/
   current__A__p2-t0007-short-task-slug
   A__p2-t0007-short-task-slug/
     task.md
-    specification.md
-    log/
-    summary/
+    specification.zip
+    log.zip
+    summary.zip
 ```
+
+The shape is lazy. A new project bootstrap creates `.AgentMemory/` only. `rules/`, `tasks/`, `sessions.zip`, `case-studies.zip`, and `journal.zip` appear only when first used. A new task folder starts with `task.md`; its specification, log, and summary ZIPs appear only when those records are written.
 
 ### Filenames Are The Index
 
@@ -215,7 +240,7 @@ Use $m-pact and refresh memory.
 
 ### What To Expect
 
-The agent should emit the compact refresh receipt body, starting with `M-PACT MEMORY REFRESH` and excluding internal begin/end marker lines. After the receipt, the refresh flow is done; the agent should not self-verify by scanning memory folders. If refresh succeeds with `LimitHit: true`, the agent should say the bundle is partial and use targeted lookup for omitted content when needed. If refresh fails with `AUDIT: FAIL`, the agent should stop and report the exact failure instead of pretending memory loaded.
+The agent should emit the compact stdout refresh receipt body, starting with `M-PACT MEMORY REFRESH` and excluding internal begin/end marker lines. It must still verify the bundle at `BundlePath` before emitting the receipt. After the receipt, the refresh flow is done; the agent should not self-verify by scanning memory folders. If refresh succeeds with `LimitHit: true`, the agent should say the bundle is partial and use targeted lookup for omitted content when needed. If refresh fails with `AUDIT: FAIL`, the agent should stop and report the exact failure instead of pretending memory loaded.
 
 Gemini CLI uses `scripts/emit-refresh-bundle.js` for `/m-pact:fast-refresh` and `/m-pact:refresh`. That wrapper generates, validates, and injects the whole refresh bundle as one startup-context document, then Gemini should emit only the receipt body and stop. `/m-pact:fast-refresh` exists to test whether natural Impact requests can be routed into the faster custom-command path. Gemini custom slash commands are still model-mediated, so this may be slower than Codex or Claude Code if Gemini stays in a normal model turn. Inline `!node ...` can also make Gemini continue thinking after the receipt is printed, and Gemini CLI v0.40.1 on Windows did not reliably accept `!` as a standalone shell-mode toggle during testing. For a fast terminal-only receipt outside Gemini's agent turn, run this from PowerShell in the project root:
 
@@ -250,7 +275,7 @@ Use the user root for this rule.
 
 ### What It Does
 
-Bootstrap creates the standard memory folder structure for a missing `.AgentMemoryRoot/` or `.AgentMemory/`. Project bootstrap also creates or embeds local startup shims so future Codex, Claude Code, Gemini CLI, and compatible local-agent sessions refresh memory automatically. Copilot-facing shims are included as best-effort future support.
+Bootstrap creates the memory root for a missing `.AgentMemoryRoot/` or `.AgentMemory/`. Project bootstrap does not create local startup shims; provider-global shims should make future Codex, Claude Code, Gemini CLI, and compatible local-agent sessions refresh memory automatically. Artifact folders and ZIP containers are lazy. Copilot-facing shims are included as best-effort future support.
 
 ### Why Use It
 
@@ -258,43 +283,27 @@ Use bootstrap when a project or user has no memory root yet and you want agents 
 
 ### User Root Bootstrap
 
-Approved user-root bootstrap creates:
+Approved user-root bootstrap creates the root:
 
 ```text
 .AgentMemoryRoot/
-  rules/
-  sessions/
-  tasks/
-  case-studies/
-  journal/
 ```
 
-It also installs bundled starter core rules unless you ask to skip them.
+It also installs bundled starter core rules unless you ask to skip them. Installing starter rules creates `rules/` because rule files are being written. If you skip starter rules, `.AgentMemoryRoot/` remains otherwise empty until first use.
 
 The starter rules are editable defaults. Review, edit, delete, or replace any rule that does not fit your workflow.
 
 ### Project Bootstrap
 
-Approved project bootstrap creates:
+Approved project bootstrap creates the root:
 
 ```text
 .AgentMemory/
-  rules/
-  sessions/
-  tasks/
-  case-studies/
-  journal/
 ```
 
-It also configures:
+Before creating that root, project bootstrap ensures `.AgentMemoryRoot/` exists. If it is missing, the agent runs global install first. Project bootstrap does not configure project startup shims. Startup is handled by provider-global shims installed during global install.
 
-```text
-AGENTS.md
-CLAUDE.md
-GEMINI.md
-```
-
-If a shim file is missing, the agent creates it from the bundled shim. If a shim file already exists, the agent appends the M-PACT shim section while preserving the existing content. If the file already invokes M-PACT, the agent leaves it unchanged. If there are conflicting M-PACT instructions, the agent should stop and ask how to merge them.
+Project bootstrap is only needed when no `.AgentMemory/` exists in the current folder or any ancestor folder. If an ancestor project root exists, the child folder inherits it.
 
 After setup from a refresh preflight yes/no prompt, the agent should run refresh once and emit the receipt for the new `.AgentMemory/`. For a standalone bootstrap request, it should run refresh only if you also ask it to refresh, load, or verify.
 
@@ -380,7 +389,7 @@ Update the existing handoff rule instead of creating a duplicate.
 
 ### What They Are
 
-Session entries are append-only summaries in `sessions/`. They preserve cross-task or project-wide continuity.
+Session entries are append-only summaries in `sessions.zip`. They preserve cross-task or project-wide continuity.
 
 ### Why Use Them
 
@@ -450,20 +459,20 @@ The current task pointer is a zero-byte sentinel named `tasks/current__<active-t
 
 ### Task Close And Reopen
 
-Closing or reopening a task requires explicit Director instruction. Close appends a closing log entry, renames `A__` to `C__`, and updates task status. Reopen does the reverse and appends a reopen log entry.
+Closing or reopening a task requires explicit Director instruction. Close marks the task closed. Reopen marks it active again and makes it current.
 
 Common requests:
 
 ```text
 Close the current task as complete.
-Reopen C__p2-t0008-example because we found follow-up work.
+Reopen t0008 because we found follow-up work.
 ```
 
 ## Task Handoffs
 
 ### What They Are
 
-A task handoff is a read/analyze/evaluate/report operation for an existing task. The agent reads `task.md`, `specification.md` when present, relevant summaries when useful, and the ordered log span needed for continuity. The expected output is not just a summary: the agent should evaluate the current handoff span for feasibility, risks, assumptions, implementation or specification issues, and recommend the best next path when evidence supports one.
+A task handoff is a read/analyze/evaluate/report operation for an existing task. The agent reads `task.md`, the latest `specification.zip` member when present, relevant summaries when useful, and the ordered log span needed for continuity. The expected output is not just a summary: the agent should evaluate the current handoff span for feasibility, risks, assumptions, implementation or specification issues, and recommend the best next path when evidence supports one.
 
 ### Why Use Them
 
@@ -500,19 +509,16 @@ The receiving agent should resolve the single `tasks/current__*` sentinel, then 
 
 When an agent enters a task from a fresh session or after context loss, it should load enough context to work without silently consuming the whole conversation history.
 
-Default behavior:
+Default behavior now starts with the handoff read-plan helper:
 
 ```text
-1. Read task.md.
-2. Read specification.md when present.
-3. List log filenames with sizes.
-4. If a read cursor is known, treat records after that cursor as the current handoff span.
-5. If no cursor is known, use the latest relevant current-state or handoff summary as the boundary when one exists, then treat later records as the current handoff span.
-6. If no cursor or summary boundary exists and logs total 50KB or less, read all logs.
-7. If no cursor or summary boundary exists and logs exceed 50KB, read newest logs backward up to about 50KB unless you asked for all logs or a specific range.
+1. Run scripts/prepare-handoff.js for the current or named task.
+2. Pass any conversation-known read cursor.
+3. Read task.md, the current specification snapshot, and the recommended log span in order.
+4. Treat summaries as background boundaries, not replacements for later log records.
 ```
 
-If the newest single log is larger than 50KB, the agent should read that newest log rather than splitting it. A cursor or summary boundary should prevent old logs from being treated as current just because the task is under 50KB. The agent may still read older logs as background context when useful, but it should not act on them as live state when later records have superseded them. When it does not read all logs, it should say what range it read as the current span, what boundary it used, and what older history it loaded only as background or skipped. If the older logs appear to switch to a different workstream, it should say that too and offer to read another chunk or search older logs for a specific decision.
+The helper owns the byte-budget and collision checks. A cursor or summary boundary should prevent old logs from being treated as current. The agent may still read older logs as background context when useful, but it should not act on them as live state when later records have superseded them. When it does not read all logs, it should say what range it read as the current span, what boundary it used, and what older history it loaded only as background or skipped.
 
 ### Important Limit
 
@@ -530,7 +536,7 @@ Read enough log history to reconstruct the current task state.
 
 ### What They Are
 
-Task logs are append-only records in a task's `log/` folder. Each log file has a global record number within that task.
+Task logs are append-only records in a task's `log.zip` container. Each log member has a global record number within that task.
 
 Example:
 
@@ -545,7 +551,7 @@ Use task logs to preserve what happened, what was decided, what changed, and wha
 
 ### Numbering Rule
 
-Immediately before writing a log entry, the agent must re-list the log folder and use the next unused number after the highest existing record. It must not rely on a stale remembered number.
+When writing a log entry, the helper handles `log.zip` placement and uses the next unused record number. The agent supplies the task, agent name, title, body, and metadata from the current request and current conversation. It should not read existing log entries just to append, and it must not assign the record number itself.
 
 ### Common Requests
 
@@ -558,7 +564,7 @@ Write a handoff log entry for the next agent.
 
 ### What They Are
 
-`specification.md` is the mutable current state of a task. It may contain requirements, refined decisions, implementation plan, acceptance criteria, or design state.
+`specification.zip` stores numbered specification snapshots. The highest-numbered member is the current state of the task. A task has no specification container until the first approved specification write.
 
 ### Why Use It
 
@@ -566,7 +572,7 @@ Use the task specification when the current task has an evolving source of truth
 
 ### Approval Gate
 
-Agents should not update `specification.md` unless you instruct them to update the spec or fold approved decisions into it.
+Agents should not write a new specification snapshot unless you instruct them to update the spec or fold approved decisions into it.
 
 ### Common Requests
 
@@ -579,7 +585,7 @@ Fold these requirements into the current spec.
 
 ### What They Are
 
-Task summaries live in `summary/`. They are generated on demand to compress long task histories, capture current state, or create a compact handoff map.
+Task summaries live in `summary.zip`. They are generated on demand to compress long task histories, capture current state, or create a compact handoff map. A task has no summary container until the first summary is written.
 
 ### Why Use Them
 
@@ -610,7 +616,7 @@ Write a complete summary of this task from the beginning.
 
 ### What They Are
 
-Case studies are narrative write-ups in `case-studies/`. They describe incidents, investigations, decisions, pivots, root causes, fixes, and lessons learned.
+Case studies are narrative write-ups in `case-studies.zip`. They describe incidents, investigations, decisions, pivots, root causes, fixes, and lessons learned.
 
 ### Why Use Them
 
@@ -632,7 +638,7 @@ Read the case study that explains the filename-led rule model.
 
 ### What They Are
 
-Journal entries are first-person, Director-voiced reflective notes in `journal/`.
+Journal entries are first-person, Director-voiced reflective notes in `journal.zip`.
 
 ### Why Use Them
 
@@ -672,30 +678,29 @@ The package includes small `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` shims. Thei
 
 ### Why Use Them
 
-Use shims when you want a project to opt into the skill without copying the full operating protocol into every repository instruction file.
+Use provider-global shims when you want a runtime to invoke M-PACT on startup.
 
-Project bootstrap should install these shims. If the project already has `AGENTS.md`, `CLAUDE.md`, or `GEMINI.md`, setup should append the M-PACT shim section to the existing file rather than replacing it. `AGENTS.md` is the default Copilot-compatible project shim; `shims/copilot-instructions.md` can also be copied to `.github/copilot-instructions.md` when the Director wants GitHub Copilot custom instructions.
+Project bootstrap does not install these shims. Global install writes them to provider-global locations such as `~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`, and `~/.gemini/GEMINI.md`. `shims/copilot-instructions.md` is available as optional best-effort material if the Director wants GitHub Copilot custom instructions.
 
 ## Recommended Workflows
 
 ### New Project
 
 1. Bootstrap M-PACT for the project.
-2. Confirm `.AgentMemory/`, `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` were created or updated.
+2. Confirm `.AgentMemory/` was created.
 3. Add only project-specific rules when real project behavior needs to persist.
 4. Use sessions for broad continuity and tasks for structured work.
 
 ### New User Setup
 
-1. Bootstrap `.AgentMemoryRoot/`.
-2. Install starter rules unless you want a blank root.
-3. Review starter rules.
-4. Add user-level rules only for broad behavior that should follow you across projects.
+1. Run global install.
+2. Review starter rules.
+3. Add user-level rules only for broad behavior that should follow you across projects.
 
 ### Multi-Agent Task
 
 1. Create a task with priority and clear acceptance.
-2. Keep current state in `specification.md` when the task has evolving requirements.
+2. Keep current state in `specification.zip` snapshots when the task has evolving requirements.
 3. Append task logs for decisions, implementations, reviews, and handoffs.
 4. Use task summaries to compress long or standing task histories.
 5. Tell the next agent to take the task handoff.
@@ -716,7 +721,6 @@ M-PACT is designed to avoid silent state changes. Agents should surface durable 
 Director approval is required for:
 
 - Bootstrap.
-- Migration.
 - Deletion.
 - Task creation.
 - Task close.

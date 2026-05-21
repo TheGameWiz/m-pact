@@ -1,6 +1,6 @@
 ---
 description: Assume prior failures behind user-authored durable rules even when history is unloaded.
-type: user
+type: behavior
 source: director
 created: 2026-04-08
 ---

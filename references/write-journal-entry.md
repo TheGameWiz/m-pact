@@ -1,44 +1,21 @@
 # Write Journal Entry
 
-Use only when the Director explicitly asks for a journal entry or reflective note. Journal entries are not part of the core startup contract.
+Use only when the Director explicitly asks for a journal entry or reflective note. Journal entries are not startup context and are not prompts.
 
 ## Target
 
-Default target is the active root `journal/`. Use `.AgentMemoryRoot/journal/` only when the Director explicitly wants a user-level or cross-project journal entry.
+Default target is active root `journal.zip`. Use user root only when the Director explicitly wants a user-level or cross-project journal entry. The container is lazy.
 
-## Lookup And Listing
+## Procedure
 
-Use the same scoping model as sessions:
+1. Write in Director voice: first-person, reflective, useful to a future reader.
+2. Include project/phase/key-insight arguments only when useful.
+3. Call `scripts/write-journal-entry.js` once with direct helper arguments plus raw/plain stdin body text.
 
-- Unscoped journal lookup/list requests mean active root only.
-- Parent/root/named/all/layered scope requests use that scope.
-- All/layered order is `.AgentMemoryRoot`, ancestor roots, active root.
-- Do not merge or renumber across roots.
-- Journal entries are not prompts or task assignments.
+Example:
 
-## Voice
-
-Journal entries are Director-authored or Director-voiced: first-person, reflective, written for a future reader who was not present.
-
-## Filename
-
-`YYYY-MM-DD-HHMMSS-<local-zone>-director-<descriptive-slug>.md`
-
-Use `references/emit-local-timestamp.md` and the bundled timestamp helper. Put `FilenameStamp` at the start of the filename and `Date` in the `Date:` field. Use those fields verbatim; do not reformat, recompute, or call the clock again for the same entry. Timestamp-bearing filenames use hours, minutes, and seconds (`HHMMSS`) so forgotten entries can be inserted into the correct day/time sequence.
-
-## Template
-
-```markdown
-# Short Title
-
-Project: <project or cross-project>
-Phase: <optional>
-Date: YYYY-MM-DD
-Author: director
-
-<Narrative body in Director voice.>
-
-Key Insight: <one-line takeaway>
+```bash
+node scripts/write-journal-entry.js --root .AgentMemory --title "Short journal cue"
 ```
 
-Do not proactively suggest journaling. Draft it when asked.
+For lookup, use `list-members.js`, `read-member.js`, and `search-bodies.js` with `--container journal`. Use `modify-journal-entry.js` only for controlled modification. Do not proactively suggest journaling.

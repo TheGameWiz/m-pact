@@ -24,6 +24,16 @@ function isProjectSetupRequired(stdout) {
   return stdout.includes("M-PACT PROJECT SETUP REQUIRED") && finalLine(stdout) === "END PROJECT SETUP REQUIRED";
 }
 
+function extractReceiptBody(text) {
+  const lines = String(text || "").split(/\r?\n/);
+  const start = lines.indexOf("BEGIN REFRESH RECEIPT");
+  const end = lines.indexOf("END REFRESH RECEIPT");
+  if (start < 0 || end <= start) {
+    return "";
+  }
+  return lines.slice(start + 1, end).join("\n").trimEnd();
+}
+
 const scriptPath = path.join(__dirname, "build-refresh-bundle.js");
 if (!fs.existsSync(scriptPath)) {
   fail(`Refresh script missing: ${scriptPath}`);
@@ -82,15 +92,7 @@ if (finalLine(bundle) !== "END REFRESH BUNDLE") {
   fail(`Refresh bundle incomplete; final line was ${JSON.stringify(finalLine(bundle))}.`);
 }
 
-const lines = bundle.split(/\r?\n/);
-const start = lines.indexOf("BEGIN REFRESH RECEIPT");
-const end = lines.indexOf("END REFRESH RECEIPT");
-
-if (start < 0 || end <= start) {
-  fail("Refresh bundle did not include a valid receipt block.");
-}
-
-const receiptBody = lines.slice(start + 1, end).join("\n").trimEnd();
+const receiptBody = extractReceiptBody(bundle) || extractReceiptBody(stdout);
 if (!receiptBody.startsWith("M-PACT MEMORY REFRESH")) {
   fail("Refresh receipt body did not start with M-PACT MEMORY REFRESH.");
 }

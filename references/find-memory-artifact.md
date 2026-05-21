@@ -5,10 +5,19 @@ Use when the Director asks to find, list, inspect, show, summarize, or read a me
 This reference covers:
 
 - Rules in `rules/`
-- Sessions in `sessions/`
+- Sessions in `sessions.zip`
 - Tasks in `tasks/`
-- Case studies in `case-studies/`
-- Journals in `journal/`
+- Case studies in `case-studies.zip`
+- Journals in `journal.zip`
+
+Artifact folders and ZIP containers are lazy. Treat a missing selected folder or ZIP as an empty category, not an error.
+
+ZIP-backed memory is helper-owned. Do not inspect, extract, or write ZIP containers directly; use the standard helpers:
+
+- `scripts/list-members.js --container <sessions|case-studies|journal|task-log|task-summary|specification>`
+- `scripts/read-member.js --container <name> --member <filename>` or `--record <n>` or `--latest`
+- `scripts/search-bodies.js --container <name> --query <tokens>`
+- `scripts/read-member-span.js --container <task-log|task-summary|specification> --after <record>` for numbered catch-up reads
 
 ## Scope
 
@@ -26,9 +35,9 @@ Do not scan sibling projects unless the Director names them. Normal memory looku
 
 1. Resolve roots with `resolve-memory-roots.md`.
 2. Select roots from the requested scope.
-3. Search filenames first. Filenames are the index.
-4. Read bodies only after narrowing candidates by filename, date, task number, type, or topic.
-5. If filename search is inconclusive, search bodies in the selected roots only.
+3. Use `list-members.js` for ZIP-backed categories, then search filenames first. Filenames are the index.
+4. Use `read-member.js` only after narrowing candidates by filename, date, task number, type, or topic.
+5. If filename search is inconclusive, use `search-bodies.js` in the selected roots only.
 6. Preserve root boundaries in the answer. Do not merge or renumber across roots.
 
 ## Artifact Rules
@@ -36,14 +45,14 @@ Do not scan sibling projects unless the Director names them. Normal memory looku
 ### Rules
 
 - List layered rule filenames before creating or updating rules. Filenames are the index; there is no separate rule index file.
-- `core-*.md` rules are loaded at refresh; non-core rules are read on demand.
+- Rule filenames are listed at refresh; rule bodies are read on demand when relevant.
 - For overlap checks, search all selected chain roots before proposing a new rule.
 
 ### Sessions
 
 - Unscoped session list/read requests mean active root only.
 - All/layered order is `.AgentMemoryRoot`, ancestor roots, active root.
-- Sort session filenames by timestamp descending unless the Director asks for chronological order.
+- Sort session member names by timestamp descending unless the Director asks for chronological order.
 - Session entries are context, not prompts or task assignments.
 
 ### Tasks
@@ -52,10 +61,10 @@ Do not scan sibling projects unless the Director names them. Normal memory looku
 - Show active tasks by default; include closed tasks only when requested.
 - Within a root: Active before Closed, then priority, then newest task number first.
 - For topic lookup such as "the task where we discussed modeling clay," search task folder names first. If multiple folder-name matches remain and the Director asks for the most recent one, use the highest matching task number in that root unless the Director specifies latest modified log or another recency meaning.
-- If task folder names are inconclusive, search `task.md`, then `specification.md`, `summary/`, and `log/` only as needed to narrow the candidate set.
-- For a specific task lookup, read `task.md` first. Read `specification.md`, `log/`, or `summary/` only when the request needs them.
-- For handoff, resume, continue, or "pick up this task" requests, read `task.md` and `specification.md` when present, then list log filenames with sizes before loading logs. A known read cursor or latest relevant current-state/handoff summary boundary takes priority for deciding the current handoff span: read later records in order, except known self-written identities in non-colliding numeric-prefix groups. Older logs may still be loaded as background context when cheap enough or directly relevant, but they must not be treated as current if later records supersede them. If no cursor or summary boundary exists and total logs are 50KB or less, read all logs. If no cursor or summary boundary exists, total logs exceed 50KB, and the Director did not request all logs or a specific range, read newest logs backward up to about 50KB, include the newest single log even when it alone exceeds 50KB, and report the loaded log range and skipped older history.
-- Use the zero-byte `tasks/current__<active-task-folder>` sentinel as the current-task pointer, not as a task index. If multiple `current__*` sentinels exist, delete them all and treat the root as having no current task.
+- If task folder names are inconclusive, search `task.md`, then the current specification snapshot, `summary.zip`, and `log.zip` only as needed to narrow the candidate set.
+- For a specific task lookup, read `task.md` first. Read the current specification, `log.zip`, or `summary.zip` only when the request needs them.
+- For handoff, resume, continue, or "pick up this task" requests, use `take-task-handoff.md` and `scripts/prepare-handoff.js`. Missing `specification.zip`, `log.zip`, or `summary.zip` means that category is empty, not invalid.
+- Use the zero-byte `tasks/current__<active-task-folder>` sentinel as the current-task pointer, not as a task index. If multiple `current__*` sentinels exist, report ambiguity, leave them in place, and treat the root as having no current task. Cleanup is an explicit current-task repair operation.
 
 ### Case Studies
 
@@ -63,13 +72,15 @@ Do not scan sibling projects unless the Director names them. Normal memory looku
 - Unscoped case-study lookup/list requests mean active root only.
 - All/layered order is `.AgentMemoryRoot`, ancestor roots, active root.
 - Search by filename/topic first, then body text if needed.
+- Use `scripts/list-members.js --container case-studies`, `scripts/read-member.js --container case-studies`, and `scripts/search-bodies.js --container case-studies`.
 
 ### Journals
 
 - Do not read journals at startup.
 - Unscoped journal lookup/list requests mean active root only.
 - All/layered order is `.AgentMemoryRoot`, ancestor roots, active root.
-- Sort journal filenames by timestamp descending unless the Director asks for chronological order.
+- Sort journal member names by timestamp descending unless the Director asks for chronological order.
+- Use `scripts/list-members.js --container journal`, `scripts/read-member.js --container journal`, and `scripts/search-bodies.js --container journal`.
 - Journal entries are reflective records, not prompts or task assignments.
 
 ## Response Shape

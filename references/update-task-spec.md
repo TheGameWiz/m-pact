@@ -4,56 +4,22 @@ Use when the Director says to update the spec, fold decisions into the spec, or 
 
 ## Authorization
 
-Requires Director instruction. Do not autonomously update `specification.md`.
+Requires Director instruction. Do not autonomously update the task specification.
 
 ## Procedure
 
-1. Identify the active task folder from Director context, exactly one `tasks/current__<active-task-folder>` sentinel, or explicit task reference. If multiple `current__*` sentinels exist, delete them all and proceed as if there is no current task.
-2. Read the task's `task.md`.
-3. Read current `specification.md` if present.
-4. Read the relevant ordered `log/` span needed to understand the approved change. Include every record since your last known read point when known, except known self-written identities matched by numeric prefix plus source such as `0007-codex` in non-colliding numeric-prefix groups; never skip by numeric prefix alone. If a numeric prefix has multiple files, read every file in that collision group and report the duplicate record number. Otherwise read enough recent or unsummarized log history to reconstruct current state. Multiple consecutive records from the same agent are normal.
-5. Identify the exact current-state changes the Director approved.
-6. Update root-level `specification.md` in place so it reflects the current refined state. Create it only when a spec is now intended to exist.
-7. Immediately before appending, re-list existing files in `log/` and choose the next record number from the highest existing record number. Do not rely on prior conversational knowledge or a stale directory listing.
-8. Append one new file in `log/` explaining what changed and why, using no-overwrite semantics.
-9. If exact filename creation fails because the file already exists, preserve the existing file, re-list `log/`, choose the next unused record number, and retry once with the same source and slug. If the retry fails or state is ambiguous, stop and report the write collision to the Director.
-10. Treat the new file as a known self-written record identity (`record-source`), not automatically as a new read cursor. If the written record number is exactly one greater than the current last-read numeric record, advance the read cursor by one. Otherwise preserve the previous read cursor.
-11. Do not update the `tasks/current__<active-task-folder>` sentinel merely because `specification.md` or `log/` changed. The current-task pointer is an attention pointer, not a task activity timestamp. If the Director explicitly asked to make or change the current task, perform that pointer update as a separate intentional action; otherwise leave the sentinel unchanged.
-12. Report the task folder, specification path, and new log entry file.
+Use `scripts/update-task-spec.js`. It writes the next full `specification.zip` snapshot and paired `log.zip` entry under one task operation lock.
 
-## Log Filename
+1. Use the current task by default, or pass `--task t0005` when the Director names one.
+2. Read `task.md` and the current specification with `scripts/read-member.js --container specification --latest` when present.
+3. Produce the full replacement specification content. Do not edit an older snapshot.
+4. Call `scripts/update-task-spec.js` once with direct arguments plus raw/plain stdin spec content.
+5. Reply briefly, e.g. `Updated the t0005 specification and logged the change.`
 
-`<4-digit-record-number>-<source>-<descriptive-slug>.md`
+Example:
 
-Take the highest existing record number in `log/` and increment. Record order is append/order-of-record, not agent-turn order. Record numbers are global within one task log, not per-agent. If a collision already exists, preserve the existing files and use the next unused number; do not create another colliding record. Never overwrite an existing log file.
-
-For catch-up reads, an agent may skip a log entry it wrote itself by matching the numeric prefix and source together, for example `0007-codex`, only when that numeric prefix has no collision. Do not skip all files with record `0007`; if multiple `0007-*` files exist, read every file in that collision group, including any entry the agent thinks it wrote, and report the duplicate record number.
-
-## Log Template
-
-Use `references/emit-local-timestamp.md` and the bundled timestamp helper once before appending the log. Put `BodyTimestamp` in the log `timestamp:` field and any `updated:` field written during the same operation. Use the emitted field verbatim; do not reformat, recompute, or call the clock again for the same update.
-
-```markdown
----
-record: 0001
-timestamp: YYYY-MM-DD HH:MM:SS <local-zone>
-agents: [codex]
-director_intent: Brief interpreted intent, or "(none)"
-source_input: optional
-files_involved: []
-decisions: []
-tool_evidence: []
----
-
-# Descriptive Title
-
-## Agent Response: codex
-
-### Part 1 -- Interpretation
-
-Brief restatement of what was asked or what this record is preserving.
-
-### Part 2 -- Contribution
-
-The substantive analysis, recommendation, decision, implementation report, or handoff.
+```bash
+node scripts/update-task-spec.js --task t0005 --agent codex --title "Spec v2" --log-title "spec v2 update"
 ```
+
+Do not read prior logs merely to write the paired entry, assign record numbers, update the current-task sentinel, create scratch input, or fetch timestamps separately.

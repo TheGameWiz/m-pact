@@ -1,61 +1,21 @@
 # Append Task Log Entry
 
-Use when the Director asks to write a task log entry without changing `specification.md`, or when protocol requires a task-scoped checkpoint.
+Use when the Director asks to write a task log entry without changing the current specification, or when protocol requires a task-scoped checkpoint.
 
 ## Procedure
 
-1. Identify the task folder from Director context, exactly one `tasks/current__<active-task-folder>` sentinel, or explicit task reference. If multiple `current__*` sentinels exist, delete them all and proceed as if there is no current task.
-2. Read the task's `task.md`.
-3. Read only the task artifacts needed to write an accurate checkpoint. When catching up from a last-read cursor, read every later record except known self-written identities matched by numeric prefix plus source, such as `0007-codex`, in non-colliding numeric-prefix groups; never skip by numeric prefix alone. If a numeric prefix has multiple files, read every file in that collision group and report the duplicate record number.
-4. Immediately before writing, re-list existing files in `log/` and determine the next record number from the highest existing record number. Do not rely on prior conversational knowledge or a stale directory listing.
-5. Write one new log file in `log/` with no-overwrite semantics.
-6. If exact filename creation fails because the file already exists, preserve the existing file, re-list `log/`, choose the next unused record number, and retry once with the same source and slug. If the retry fails or state is ambiguous, stop and report the write collision to the Director.
-7. Treat the new file as a known self-written record identity (`record-source`), not automatically as a new read cursor. If the written record number is exactly one greater than the current last-read numeric record, advance the read cursor by one. Otherwise preserve the previous read cursor.
-8. Do not update the `tasks/current__<active-task-folder>` sentinel merely because a log was appended. The current-task pointer is an attention pointer, not a task activity timestamp. If the Director explicitly asked to make or change the current task, perform that pointer update as a separate intentional action; otherwise leave the sentinel unchanged.
-9. Report the new log path.
+Use `scripts/append-task-log.js`. The helper owns record numbering, timestamps, member naming, task operation locking, ZIP locking, formatting, and duplicate refusal.
 
-## Filename
+1. Use the current task by default, or pass `--task t0005` when the Director names one.
+2. Do not read existing `log.zip` entries merely to append. Write from the current request, conversation state, and evidence already gathered.
+3. If the task has a current specification and the entry changes design state, provide either the paired specification member or an explicit no-spec-update-needed reason.
+4. Call the helper once with direct arguments plus raw/plain stdin body text.
+5. Reply briefly, e.g. `Logged the update for t0005.`
 
-`<4-digit-record-number>-<source>-<descriptive-slug>.md`
+Example:
 
-Record numbers are global within one task log, not per-agent. Use the next unused number after the highest existing record. If a collision already exists, preserve the existing files and use the next unused number; do not create another colliding record. Never overwrite an existing log file.
-
-For catch-up reads, an agent may skip a log entry it wrote itself by matching the numeric prefix and source together, for example `0007-codex`, only when that numeric prefix has no collision. Do not skip all files with record `0007`; if multiple `0007-*` files exist, read every file in that collision group, including any entry the agent thinks it wrote, and report the duplicate record number.
-
-Examples:
-- `0001-codex-initial-task-setup.md`
-- `0002-claude-spec-v1-handoff.md`
-- `0003-director-scope-decision.md`
-
-## Timestamp
-
-Use `references/emit-local-timestamp.md` and the bundled timestamp helper. Put `BodyTimestamp` in the `timestamp:` field. Use that field verbatim; do not reformat, recompute, or call the clock again for the same log entry.
-
-## Template
-
-```markdown
----
-record: 0001
-timestamp: YYYY-MM-DD HH:MM:SS <local-zone>
-agents: [codex]
-director_intent: Brief interpreted intent, or "(none)"
-source_input: optional
-files_involved: []
-decisions: []
-tool_evidence: []
----
-
-# Descriptive Title
-
-## Agent Response: codex
-
-### Part 1 -- Interpretation
-
-Brief restatement of what was asked or what this record is preserving.
-
-### Part 2 -- Contribution
-
-The substantive analysis, recommendation, decision, implementation report, or handoff.
+```bash
+node scripts/append-task-log.js --task t0005 --agent codex --title "short descriptive title" --no-spec-update-needed-because "Review only."
 ```
 
-The task log is append-only. Do not modify or delete another entry.
+Do not assign record numbers, update the current-task sentinel, create scratch input, or fetch timestamps separately. Lookup helpers are for handoff/resume, summarization, or explicit history questions, not normal append.

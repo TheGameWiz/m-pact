@@ -26,15 +26,17 @@ The active project root is the nearest ancestor `.AgentMemory/`. It is active fo
 
 If the current folder is a child of a project root and has no local `.AgentMemory/`, use the nearest parent project root as active. Do not create a child memory root unless the Director asks or approves bootstrap.
 
+Root-level artifact folders and ZIP containers are lazy. Missing `rules/`, `tasks/`, `case-studies.zip`, `sessions.zip`, or `journal.zip` means that category has no entries yet. Create the target folder or container only when performing an approved write.
+
 ## Default Write Targets
 
-- Sessions: active project root `sessions/`.
+- Sessions: active project root `sessions.zip`.
 - Existing task log/spec/summary updates: active project root `tasks/`.
 - Task creation, close, reopen: active project root only after explicit Director instruction.
 - Project rules: active project root `rules/`.
 - Broad user rules: user root `rules/` only when the Director explicitly wants a user-level rule.
-- Case studies: active project root `case-studies/` by default; user root only when the Director explicitly wants a user-level or cross-project case study.
-- Director journal entries: active project root `journal/` by default; user root only when the Director explicitly wants a user-level or cross-project journal entry.
+- Case studies: active project root `case-studies.zip` by default; user root only when the Director explicitly wants a user-level or cross-project case study.
+- Director journal entries: active project root `journal.zip` by default; user root only when the Director explicitly wants a user-level or cross-project journal entry.
 - Inherited roots: read-only by default.
 
 Discovery order is not write-target order. Always identify the artifact type before choosing the write target.
