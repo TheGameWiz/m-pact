@@ -8,7 +8,6 @@ const { resolveRootPath, resolveTaskPath, sanitizeSlug } = require("./helper-com
 const {
   listMembers,
   readMember,
-  readZipEntries,
 } = require("./zip-record-store");
 
 function recordFromName(name) {
@@ -71,12 +70,10 @@ function listContainerMembers(context) {
 }
 
 function readContainerEntries(context) {
-  return sortMembers(readZipEntries(context.zipPath).map((entry) => ({
-    name: entry.name,
-    size: entry.content.length,
-    modified: entry.modified.toISOString(),
-    content: entry.content,
-  })), context.container);
+  return listContainerMembers(context).map((member) => ({
+    ...member,
+    content: readMember(context.zipPath, member.name),
+  }));
 }
 
 function latestMember(members, container) {
