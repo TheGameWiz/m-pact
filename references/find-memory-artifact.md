@@ -33,7 +33,7 @@ Do not scan sibling projects unless the Director names them. Normal memory looku
 
 ## Search Order
 
-1. Resolve roots with `resolve-memory-roots.md`.
+1. Apply `memory-root-policy.md` to identify the intended scope. Use helper root resolution rather than manually reconstructing root mechanics.
 2. Select roots from the requested scope.
 3. Use `list-members.js` for ZIP-backed categories, then search filenames first. Filenames are the index.
 4. Use `read-member.js` only after narrowing candidates by filename, date, task number, type, or topic.

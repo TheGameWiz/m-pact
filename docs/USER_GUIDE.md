@@ -1,8 +1,12 @@
 # M-PACT: Multi-Provider Agent Context Toolkit User Guide
 
-M-PACT is a multi-provider agent context toolkit for visible agent sessions. It was designed and validated for Codex, Claude Code, and Gemini CLI, and lets compatible local agents carry durable context across tabs, providers, and sessions without pretending chat history is permanent or stuffing every detail into startup prompts.
+M-PACT helps local coding agents share memory. It was designed and validated for Codex, Claude Code, and Gemini CLI. Its goal is simple: let agents remember useful project information, share it with each other, and pick up work without depending on one chat window to hold everything.
 
-Multi-provider is the headline. The underlying unit is still an agent session: you can run several sessions from the same provider, several providers side by side, or any mix that fits the work. M-PACT keeps those sessions grounded in the same durable rules, task state, handoffs, decisions, and historical notes.
+M-PACT stores memory at two levels: global memory that can follow you across projects, and project memory that belongs to one workspace. That memory can include shared rules, session notes, project tasks, task logs, task specifications, task summaries, case studies, and project journals.
+
+This makes it possible to use more than one agent on the same project at the same time. One agent can work on a design, another can review it, another can implement it, and another can verify the code. They can hand work back and forth through task logs and specifications instead of trying to reconstruct state from chat history.
+
+The workflow is flexible, but one useful pattern is to pair agents from different providers. For example, Claude Code can be useful for design, code review, completeness checks, and test verification. Codex can be useful for design review, implementation, and testing. Together they can challenge each other's assumptions and often reach a good result with fewer iterations.
 
 The system has one important separation:
 
@@ -10,6 +14,27 @@ The system has one important separation:
 - Memory roots hold state: rules, sessions, tasks, case studies, and journals.
 
 This guide describes the user-facing operations, what each one is for, and why you would ask an agent to use it.
+
+## What You Can Do
+
+At the simplest level, M-PACT lets you:
+
+- Create shared rules that teach agents your coding style, preferences, project habits, and recurring lessons.
+- Write session entries that preserve a handoff when you are switching agents, switching providers, or approaching the end of a context window.
+- Create project tasks with logs, specifications, and summaries so agents can design, implement, review, test, and verify work in a structured loop.
+- Create case studies for important successes, failures, investigations, and lessons that you want future agents to remember.
+- Write journal entries for project notes you want to keep but do not want to turn into rules, tasks, or case studies.
+
+A common task workflow looks like this:
+
+1. Tell one agent to create a task for the work.
+2. Describe the goal and ask it to write a task log or task specification.
+3. Switch to another agent and ask it to take the handoff, review the plan, inspect the codebase, and identify risks or gaps.
+4. Have that agent write its own log entry back to the task.
+5. Repeat the loop until the design, implementation plan, code, tests, and verification are complete.
+6. Close the task when the work is done.
+
+For context management, you can also ask for a detailed session entry before you compact, clear, or restart a session. After that, run M-PACT refresh in the next context and continue from the saved handoff.
 
 ## Install Targets
 
@@ -34,15 +59,23 @@ Web-only ChatGPT or Claude clients may be able to read or install skill instruct
 
 ## Quick Start
 
-### Global Install
+### Provider Runtime Setup
 
-Install M-PACT once for the current user:
+Install M-PACT separately for each provider you want to use. After placing M-PACT in that provider's skill or extension folder, run runtime setup from that provider's installed copy:
 
 ```text
 node scripts/install-mpact.js
 ```
 
-The install helper syncs the package to the validated provider targets, creates or preserves `.AgentMemoryRoot/`, installs starter user-root rules without overwriting existing rule files, and installs provider-global startup shims:
+Provider skill placement is provider-specific and follows the normal skill model:
+
+```text
+~/.codex/skills/m-pact/
+~/.claude/skills/m-pact/
+~/.gemini/extensions/m-pact/   # or link this repo with gemini extensions link
+```
+
+The runtime setup helper does not copy itself across provider roots. It creates or preserves `.AgentMemoryRoot/`, installs starter user-root rules without overwriting existing rule files, and installs only the current or explicitly requested provider-global startup shim:
 
 ```text
 ~/.codex/AGENTS.md
@@ -50,11 +83,11 @@ The install helper syncs the package to the validated provider targets, creates 
 ~/.gemini/GEMINI.md
 ```
 
-Install does not create project `.AgentMemory/` roots or project-local instruction files.
+Install does not create project `.AgentMemory/` roots or project-local instruction files. Repeat provider placement and runtime setup for Codex, Claude, and Gemini separately when you want all three configured.
 
 ### New Project Setup
 
-Install makes the skill available globally, configures provider-global startup shims, and creates the user `.AgentMemoryRoot/`. A new workspace still needs project setup.
+Runtime setup configures the current provider's global startup shim and creates the user `.AgentMemoryRoot/`. A new workspace still needs project setup.
 
 For a new project, ask:
 
@@ -62,7 +95,7 @@ For a new project, ask:
 Set up m-pact for this project.
 ```
 
-The agent should first confirm `.AgentMemoryRoot/` exists. If it is missing, it should run global install, then add the project scaffold: `.AgentMemory/`. Artifact folders and ZIP containers are lazy and are created only when first used. It should not run refresh after bootstrap unless you also ask it to refresh, load, or verify. Provider-global shims should invoke M-PACT for Codex, Claude Code, and other configured runtimes; project bootstrap does not write project instruction files.
+The agent should first confirm `.AgentMemoryRoot/` exists. If it is missing, it should run runtime setup, then add the project scaffold: `.AgentMemory/`. Artifact folders and ZIP containers are lazy and are created only when first used. It should not run refresh after bootstrap unless you also ask it to refresh, load, or verify. Provider-global shims should invoke M-PACT for configured runtimes; project bootstrap does not write project instruction files.
 
 If you start an agent from a subfolder below an existing project `.AgentMemory/`, refresh uses the nearest parent project root. It should not ask to create another `.AgentMemory/` in the subfolder unless you explicitly ask for a new child project root.
 
@@ -124,7 +157,7 @@ Make this a task.
 Create a task from this conversation.
 Take the current task handoff and report the state.
 Write a task log checkpoint for what we just decided.
-Update the task specification with this decision and write the log entry.
+Write the task specification with this decision and write the paired log.
 Close this task as complete.
 Reopen task t0007 because there is follow-up work.
 ```
@@ -144,7 +177,7 @@ If a project has no `.AgentMemory/`, ask:
 Bootstrap M-PACT for this project.
 ```
 
-Project bootstrap first ensures the user `.AgentMemoryRoot/` exists, running global install if needed. Then it creates only the local memory root. The root's artifact folders are created later by the first approved write that needs them. It does not write project-local instruction files.
+Project bootstrap first ensures the user `.AgentMemoryRoot/` exists, running provider runtime setup if needed. Then it creates only the local memory root. The root's artifact folders are created later by the first approved write that needs them. It does not write project-local instruction files.
 
 If your user root is missing, ask:
 
@@ -224,6 +257,10 @@ Refresh loads startup context from the memory chain. It resolves roots, loads th
 
 Use refresh so a new or compacted agent context starts grounded in durable memory instead of guessing from partial chat history.
 
+### How To Use It
+
+Start a new local agent session, then ask that agent to refresh M-PACT. The agent should run the skill's refresh helper from the project you are working in, verify the generated bundle, print the compact receipt, and then continue with your actual work. You do not need to tell it which files to read unless you want a targeted lookup after refresh.
+
 ### When To Ask For It
 
 Ask for refresh when:
@@ -252,15 +289,21 @@ node scripts\emit-refresh-receipt.js
 
 Do not refresh just because work is large or a handoff exists. While context is intact, use targeted lookup and checkpoints.
 
-## Resolve Memory Roots
+## Memory Root Policy
 
 ### What It Does
 
-Root resolution identifies the user root, every ancestor project root, the active project root, and the default write target for the requested artifact.
+Memory root policy helps the agent understand the intended scope of a read or write without making it reimplement root discovery. Helpers own the mechanics: active root discovery, explicit `--root`, task lookup, user-root validation, chain order, and sentinel rules.
 
 ### Why Use It
 
-Use root resolution when placement matters. It prevents agents from writing a project rule into user memory, writing to a parent project by accident, or scanning unrelated sibling projects.
+Use memory root policy when placement matters. It keeps ordinary writes on the active project root, reserves user-root writes for explicit user-level or cross-project intent, and keeps inherited roots read-only by default.
+
+The startup bundle may include root orientation such as the start path, user root, project roots, active project root, memory chain, current-task state, and active task names. It does not include a full memory-root tree by default.
+
+### How To Use It
+
+Name the project, path, or scope when you want something written outside the active project. Otherwise, ask naturally and let the helper resolve the active root. This is useful when you are in one workspace but want to add a task, rule, session, or lookup to another known project.
 
 ### Common Requests
 
@@ -269,6 +312,7 @@ Which memory root is active here?
 Show the memory chain.
 Where would a new session entry be written?
 Use the user root for this rule.
+Add a task to the Conflab project.
 ```
 
 ## Bootstrap Memory Roots
@@ -280,6 +324,10 @@ Bootstrap creates the memory root for a missing `.AgentMemoryRoot/` or `.AgentMe
 ### Why Use It
 
 Use bootstrap when a project or user has no memory root yet and you want agents to start preserving durable context.
+
+### How To Use It
+
+Ask for project bootstrap when the current workspace does not have `.AgentMemory/`. Ask for user-root bootstrap or provider runtime setup when `.AgentMemoryRoot/` does not exist yet. The agent should explain what it is about to create and wait for your approval before writing the root.
 
 ### User Root Bootstrap
 
@@ -301,7 +349,7 @@ Approved project bootstrap creates the root:
 .AgentMemory/
 ```
 
-Before creating that root, project bootstrap ensures `.AgentMemoryRoot/` exists. If it is missing, the agent runs global install first. Project bootstrap does not configure project startup shims. Startup is handled by provider-global shims installed during global install.
+Before creating that root, project bootstrap ensures `.AgentMemoryRoot/` exists. If it is missing, the agent runs provider runtime setup first. Project bootstrap does not configure project startup shims. Startup is handled by provider-global shims installed during provider runtime setup.
 
 Project bootstrap is only needed when no `.AgentMemory/` exists in the current folder or any ancestor folder. If an ancestor project root exists, the child folder inherits it.
 
@@ -320,6 +368,10 @@ The lookup procedure searches memory artifacts by scope and type. It searches fi
 ### Why Use It
 
 Use lookup when you want to find prior context without loading everything into the current chat.
+
+### How To Use It
+
+Ask the agent to find, list, or read the kind of memory you need and include a few topic words. Lookup is best when you remember that something was discussed but do not know which session, task, rule, case study, or journal entry contains it. The helper should narrow by filenames first, then read only the likely matches.
 
 ### Scopes
 
@@ -362,6 +414,10 @@ Good rule topics:
 - A project-specific behavior that should not be forgotten.
 - A broad preference that is too important to rely on chat memory.
 
+### How To Use Them
+
+Ask for a rule when you want future agents to behave differently, not just remember what happened. Say whether the rule is project-level or user-level. The agent should check for an existing matching rule when duplication is plausible, then write or update the smallest rule that captures the durable behavior.
+
 ### How Rules Are Written
 
 The filename should carry the main meaning, such as:
@@ -394,6 +450,10 @@ Session entries are append-only summaries in `sessions.zip`. They preserve cross
 ### Why Use Them
 
 Use sessions when something happened outside a single task, or when future agents need a compact project-level checkpoint.
+
+### How To Use Them
+
+Ask for a session entry when you are ending a work period, approaching context limits, switching providers, or recording a project-wide decision. The agent should write a concise but useful handoff with a strong summary so the next refresh can orient the next agent quickly.
 
 ### Startup Behavior
 
@@ -432,6 +492,10 @@ Use tasks when work needs structured continuity across agents or sessions. Tasks
 
 Tasks can also be useful for standing workstreams, such as UI polish or article refinement, where the subject stays stable but individual passes are small. In that case, use summaries to keep the task readable instead of creating a new task for every small pass.
 
+### How To Use Them
+
+Ask for a task when work needs continuity, review, implementation steps, testing, or a handoff between agents. Give the agent the goal, priority if it matters, and any acceptance criteria you already know. The agent should create the task, make it current, and write an initial log entry when the task comes from the current conversation.
+
 ### Task Creation
 
 Task creation is Director-orchestrated only. The agent should not create a task based only on its own judgment.
@@ -439,6 +503,7 @@ Task creation is Director-orchestrated only. The agent should not create a task 
 You can create a task from a fresh instruction:
 
 ```text
+Add a p2 task for documenting M-PACT user workflows.
 Create a p2 task for documenting M-PACT user workflows.
 ```
 
@@ -451,7 +516,7 @@ Create a task from this conversation.
 
 For conversation-created tasks, the agent should create an ordinary task with the next normal task number, derive a meaningful title and slug from the discussion, make it current, and write the first task log entry with enough state for another agent or future context to resume. This is not a separate scratch-task type; it is just a normal task whose source material was the conversation.
 
-If you say only "create a task," the agent may ask a short clarification unless the current conversation has one obvious topic. If you say "make this a task" or "create a task from this conversation," it should not stop to ask for a title by default.
+If you say only "add a task" or "create a task," the agent may ask a short clarification unless the current conversation has one obvious topic. If you say "make this a task" or "create a task from this conversation," it should not stop to ask for a title by default.
 
 ### Current Task Pointer
 
@@ -460,6 +525,8 @@ The current task pointer is a zero-byte sentinel named `tasks/current__<active-t
 ### Task Close And Reopen
 
 Closing or reopening a task requires explicit Director instruction. Close marks the task closed. Reopen marks it active again and makes it current.
+
+Close a task when you have decided the work is complete or no longer active. Reopen it when follow-up work belongs with the same task history instead of a new task. The agent should not close or reopen based only on its own sense that the work is done.
 
 Common requests:
 
@@ -477,6 +544,10 @@ A task handoff is a read/analyze/evaluate/report operation for an existing task.
 ### Why Use Them
 
 Use handoffs when one agent or session needs to understand current task state before deciding what to do next.
+
+### How To Use Them
+
+Ask the receiving agent to take the current task handoff when you want it to understand the task before acting. The agent should read the task, current spec, relevant summaries, and the needed ordered log span, then report state, risks, assumptions, and recommended next steps. Ask it to implement, edit, or log separately if you want it to continue beyond analysis.
 
 You can also use a handoff phrase to create the handoff task from the current conversation:
 
@@ -549,6 +620,10 @@ Example:
 
 Use task logs to preserve what happened, what was decided, what changed, and what a future agent must know.
 
+### How To Use Them
+
+Ask for a task log after a decision, implementation pass, review, test result, handoff, or important correction. Logs are best for chronological task state. The agent should write the next numbered log through the helper and include enough detail for another agent to resume without reading the whole chat.
+
 ### Numbering Rule
 
 When writing a log entry, the helper handles `log.zip` placement and uses the next record number from the container entry count. The agent supplies the task, agent name, title, body, and metadata from the current request and current conversation. It should not read existing log entries just to write the next log, and it must not assign the record number itself.
@@ -570,6 +645,10 @@ Write a handoff log entry for the next agent.
 
 Use the task specification when the current task has an evolving source of truth that should be easier to read than a long log chain.
 
+### How To Use It
+
+Ask for a task specification when requirements, design decisions, acceptance criteria, or implementation plans need one current written version. The helper writes a new numbered spec snapshot and a paired task log so the task history explains why the spec changed.
+
 ### Approval Gate
 
 Agents should not write a new specification snapshot unless you instruct them to update the spec or fold approved decisions into it.
@@ -577,7 +656,7 @@ Agents should not write a new specification snapshot unless you instruct them to
 ### Common Requests
 
 ```text
-Update the task specification with this decision and append the log.
+Write the task specification with this decision and write the paired log.
 Fold these requirements into the current spec.
 ```
 
@@ -590,6 +669,10 @@ Task summaries live in `summary.zip`. They are generated on demand to compress l
 ### Why Use Them
 
 Use summaries when the log is long enough that future agents need a compact map before reading targeted log records. They are especially useful for standing tasks that stay open across many small passes, such as recurring UI cleanup, polish, article refinement, or ongoing investigation.
+
+### How To Use Them
+
+Ask for a summary when a task has enough logs that handoff is getting expensive or when you want a compact checkpoint before switching agents. The agent should summarize the relevant log range and leave later handoffs free to read only the summary plus newer logs.
 
 ### Default Range
 
@@ -622,6 +705,10 @@ Case studies are narrative write-ups in `case-studies.zip`. They describe incide
 
 Use case studies when a lesson is too rich for a rule. A rule says what to do; a case study explains why the rule exists and how the lesson was learned.
 
+### How To Use Them
+
+Ask for a case study after a meaningful success, failure, debugging incident, design pivot, or process lesson. They are useful when future agents should understand the story, tradeoffs, symptoms, root cause, and prevention pattern rather than just follow a one-line rule.
+
 ### Startup Behavior
 
 Case studies are not read at startup. Agents load them on demand when the topic is relevant.
@@ -643,6 +730,10 @@ Journal entries are first-person, Director-voiced reflective notes in `journal.z
 ### Why Use Them
 
 Use journals when you want to preserve your own thinking, design reflections, or historical notes for future readers.
+
+### How To Use Them
+
+Ask for a journal entry when you want a Director-voiced note that records your reasoning, preferences, or project history without turning it into an instruction. Journals are good for reflection and background context; they are not a command channel for future agents.
 
 ### Important Limit
 
@@ -666,6 +757,10 @@ Starter rules are bundled defaults installed during initial `.AgentMemoryRoot/` 
 
 They give new memory roots a baseline behavior profile: verify before claiming, diagnose before fixing, protect context, keep answers concise, respect Director authority, and treat user rules as incident-driven.
 
+### How To Use Them
+
+Use starter rules as editable defaults after first setup. Review them once the user root exists, keep the ones that match your workflow, and change or delete the ones that do not. New behavior that you discover later should usually become a normal rule, not an edit to a starter rule unless it belongs in that baseline.
+
 ### Important Limit
 
 Starter rules are not immutable policy. They are editable defaults. Review each one and edit, delete, or replace rules that do not match your workflow.
@@ -680,7 +775,11 @@ The package includes small `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` shims. Thei
 
 Use provider-global shims when you want a runtime to invoke M-PACT on startup.
 
-Project bootstrap does not install these shims. Global install writes them to provider-global locations such as `~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`, and `~/.gemini/GEMINI.md`. `shims/copilot-instructions.md` is available as optional best-effort material if the Director wants GitHub Copilot custom instructions.
+Project bootstrap does not install these shims. Provider runtime setup writes the current provider's shim to a provider-global location such as `~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`, or `~/.gemini/GEMINI.md`. `shims/copilot-instructions.md` is available as optional best-effort material if the Director wants GitHub Copilot custom instructions.
+
+### How To Use Them
+
+Place M-PACT in each provider's normal skill or extension folder, then run provider runtime setup from that provider's installed copy. The setup helper installs only that provider's global shim. Repeat the same process separately for Codex, Claude Code, and Gemini CLI when you want all of them configured.
 
 ## Recommended Workflows
 
@@ -693,7 +792,7 @@ Project bootstrap does not install these shims. Global install writes them to pr
 
 ### New User Setup
 
-1. Run global install.
+1. Install/place M-PACT for each provider you want to use, then run provider runtime setup.
 2. Review starter rules.
 3. Add user-level rules only for broad behavior that should follow you across projects.
 

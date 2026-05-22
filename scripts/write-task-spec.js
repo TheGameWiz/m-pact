@@ -30,7 +30,7 @@ function main({ args, input }) {
   const title = input.title || input.slugHint || args.title || args["slug-hint"] || "specification";
   const agent = input.agent || args.agent || "agent";
   const logTitle = input.logTitle || input.log_title || args["log-title"] || "Specification Update";
-  const logBody = input.logBody || input.log_body || args["log-body"] || `Updated task specification snapshot: ${title}`;
+  const logBody = input.logBody || input.log_body || args["log-body"] || `Wrote task specification snapshot: ${title}`;
 
   return withDirectoryLock(taskPath, () => {
     const now = new Date();
@@ -63,7 +63,7 @@ function main({ args, input }) {
           agent,
           title: logTitle,
           body: logBody,
-          directorIntent: input.directorIntent || input.director_intent || args["director-intent"] || "Update task specification and append paired task log.",
+          directorIntent: input.directorIntent || input.director_intent || args["director-intent"] || "Write task specification snapshot and paired task log.",
           sourceInput: input.sourceInput || input.source_input || args["source-input"],
           specMember: specAppend.member,
         },
@@ -73,7 +73,7 @@ function main({ args, input }) {
 
     return {
       ok: true,
-      operation: "update-task-spec",
+      operation: "write-task-spec",
       taskPath,
       record: specAppend.record,
       member: specAppend.member,

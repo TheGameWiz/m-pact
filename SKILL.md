@@ -9,7 +9,7 @@ description: M-PACT multi-provider shared memory operations for visible agent se
 
 Copying this skill folder into a provider skill directory only makes M-PACT invocable. On first real use, ensure the user-level install exists before refresh or project setup:
 
-1. If `.AgentMemoryRoot/` is missing, read `references/install-mpact.md` and run the global install helper.
+1. If `.AgentMemoryRoot/` is missing, read `references/install-mpact.md` and run the provider runtime setup helper.
 2. Then run refresh from the current project working directory.
 3. If no `.AgentMemory/` exists in the current folder or any ancestor, refresh will stop with `M-PACT PROJECT SETUP REQUIRED` and ask whether to create project `.AgentMemory/`.
 
@@ -42,16 +42,16 @@ M-PACT stands for Multi-Provider Agent Context Toolkit. The base unit is an agen
 Read only the reference needed for the current operation:
 
 - Refresh memory or startup load: `references/refresh-memory.md` and bundled script `scripts/build-refresh-bundle.js`
-- Install or sync M-PACT globally: `references/install-mpact.md`
+- Install M-PACT runtime setup: `references/install-mpact.md`
 - Find, list, or read memory artifacts: `references/find-memory-artifact.md`
-- Root discovery or write-target decisions: `references/resolve-memory-roots.md`
+- Memory root policy and scoped write decisions: `references/memory-root-policy.md`
 - Startup contract: `references/startup-contract.md`
 - Full operating protocol: `references/full-memory-contract.md`
 - Write a session entry: `references/write-session-entry.md`
 - Write a case study: `references/write-case-study.md`
 - Create a task: `references/create-task.md`
 - Take or resume a task handoff: `references/take-task-handoff.md`
-- Update a task specification and append a task log: `references/update-task-spec.md`
+- Write a task specification and paired task log: `references/write-task-spec.md`
 - Write task log only: `references/write-task-log.md`
 - Set or switch the current task: `references/set-current-task.md`
 - Write a task summary: `references/write-task-summary.md`

@@ -51,10 +51,10 @@ function printReceipt(operation, rootPath, results) {
   }
 }
 
-function runGlobalInstall(skillRoot, userRoot) {
+function runRuntimeSetup(skillRoot, userRoot) {
   const installScript = path.join(skillRoot, "scripts", "install-mpact.js");
   if (!fs.existsSync(installScript)) {
-    throw new Error(`global install helper is missing: ${installScript}`);
+    throw new Error(`runtime setup helper is missing: ${installScript}`);
   }
   const result = spawnSync(process.execPath, [installScript, "--user-root", userRoot], {
     cwd: skillRoot,
@@ -65,7 +65,7 @@ function runGlobalInstall(skillRoot, userRoot) {
   }
   if (result.status !== 0) {
     const message = (result.stderr || result.stdout || `exit status ${result.status}`).trim();
-    throw new Error(`global install failed before project bootstrap: ${message}`);
+    throw new Error(`runtime setup failed before project bootstrap: ${message}`);
   }
   return result.stdout.split(/\r?\n/).filter(Boolean);
 }
@@ -88,12 +88,12 @@ function main() {
   const userRoot = path.resolve(args.root || path.join(os.homedir(), ".AgentMemoryRoot"));
   const results = [];
   if (!fs.existsSync(userRoot)) {
-    results.push("global-install:required:user-root-missing");
-    for (const line of runGlobalInstall(skillRoot, userRoot)) {
-      results.push(`global-install:${line}`);
+    results.push("runtime-setup:required:user-root-missing");
+    for (const line of runRuntimeSetup(skillRoot, userRoot)) {
+      results.push(`runtime-setup:${line}`);
     }
   } else {
-    results.push(`global-install:skipped:user-root-present:${userRoot}`);
+    results.push(`runtime-setup:skipped:user-root-present:${userRoot}`);
   }
   ensureDir(path.join(projectRoot, ".AgentMemory"));
   results.push("created-or-present:.AgentMemory");

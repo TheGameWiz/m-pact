@@ -6,33 +6,19 @@ const os = require("os");
 const path = require("path");
 const { booleanArg, parseArgs } = require("./lib/helper-common");
 
-const PACKAGE_ENTRIES = [
-  "SKILL.md",
-  "GEMINI.md",
-  "gemini-extension.json",
-  "README.md",
-  "commands",
-  "docs",
-  "references",
-  "scripts",
-  "starter-rules",
-  "shims",
-  "agents",
-];
-
 const PROVIDERS = {
   codex: {
-    skillTarget: [".codex", "skills", "m-pact"],
+    installRoot: [".codex", "skills", "m-pact"],
     shimTarget: [".codex", "AGENTS.md"],
     shimSource: "AGENTS.md",
   },
   claude: {
-    skillTarget: [".claude", "skills", "m-pact"],
+    installRoot: [".claude", "skills", "m-pact"],
     shimTarget: [".claude", "CLAUDE.md"],
     shimSource: "CLAUDE.md",
   },
   gemini: {
-    skillTarget: [".gemini", "extensions", "m-pact"],
+    installRoot: [".gemini", "extensions", "m-pact"],
     shimTarget: [".gemini", "GEMINI.md"],
     shimSource: "GEMINI.md",
   },
@@ -52,35 +38,6 @@ function splitList(value) {
     return [];
   }
   return String(value).split(/[|,]/).map((item) => item.trim()).filter(Boolean);
-}
-
-function copyRecursive(sourcePath, targetPath) {
-  const stat = fs.statSync(sourcePath);
-  if (stat.isDirectory()) {
-    fs.rmSync(targetPath, { recursive: true, force: true });
-    fs.mkdirSync(targetPath, { recursive: true });
-    for (const entry of fs.readdirSync(sourcePath, { withFileTypes: true })) {
-      copyRecursive(path.join(sourcePath, entry.name), path.join(targetPath, entry.name));
-    }
-    return;
-  }
-  ensureDir(path.dirname(targetPath));
-  fs.copyFileSync(sourcePath, targetPath);
-}
-
-function syncPackage(skillRoot, targetRoot) {
-  ensureDir(targetRoot);
-  const results = [];
-  for (const entry of PACKAGE_ENTRIES) {
-    const sourcePath = path.join(skillRoot, entry);
-    if (!fs.existsSync(sourcePath)) {
-      results.push(`skipped:${entry}:missing-source`);
-      continue;
-    }
-    copyRecursive(sourcePath, path.join(targetRoot, entry));
-    results.push(`synced:${entry}`);
-  }
-  return results;
 }
 
 function hasMpactInstruction(content) {
@@ -138,7 +95,7 @@ function installStarterRules(userRoot, skillRoot, skipStarterRules) {
 
 function selectedProviders(value) {
   const names = splitList(value);
-  const selected = names.length === 0 ? Object.keys(PROVIDERS) : names.map((name) => name.toLowerCase());
+  const selected = names.map((name) => name.toLowerCase());
   for (const name of selected) {
     if (!PROVIDERS[name]) {
       throw new Error(`unknown provider: ${name}`);
@@ -147,26 +104,48 @@ function selectedProviders(value) {
   return selected;
 }
 
+function detectInstalledProvider(skillRoot, home) {
+  const resolvedSkillRoot = fs.realpathSync(skillRoot);
+  for (const [name, provider] of Object.entries(PROVIDERS)) {
+    const installRoot = path.join(home, ...provider.installRoot);
+    if (!fs.existsSync(installRoot)) {
+      continue;
+    }
+    if (fs.realpathSync(installRoot) === resolvedSkillRoot) {
+      return name;
+    }
+  }
+  return null;
+}
+
 function printReceipt(results) {
   process.stdout.write("OK: install-mpact\n");
   for (const line of results) {
     process.stdout.write(`- ${line}\n`);
   }
-  process.stdout.write("Activation: global shims are installed for future sessions; this installing session should treat M-PACT as globally installed now.\n");
-  process.stdout.write("Activation: already-open Codex and Claude sessions may need a new session or reload; Gemini can use /memory refresh.\n");
+  process.stdout.write("Activation: configured provider shims apply to future sessions; this installing session should treat M-PACT runtime setup as complete now.\n");
+  process.stdout.write("Activation: already-open provider sessions may need a new session or reload before they see shim changes.\n");
 }
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const skillRoot = path.dirname(__dirname);
   const home = path.resolve(args.home || os.homedir());
-  const providers = selectedProviders(args.providers);
+  const explicitProviders = selectedProviders(args.provider || args.providers);
+  const detectedProvider = detectInstalledProvider(skillRoot, home);
+  const providers = explicitProviders.length > 0
+    ? explicitProviders
+    : detectedProvider
+      ? [detectedProvider]
+      : [];
   const skipStarterRules = booleanArg(args, "skip-starter-rules");
   const forceShims = booleanArg(args, "force-shims");
   const userRoot = path.resolve(args.userRoot || args["user-root"] || path.join(home, ".AgentMemoryRoot"));
   const results = [];
 
   results.push(`home:${home}`);
+  results.push(`skill-root:${skillRoot}`);
+  results.push(`provider:${providers.length > 0 ? providers.join(",") : "(none detected; use --provider codex|claude|gemini to install one shim)"}`);
   results.push(`user-root:${userRoot}`);
   for (const result of installStarterRules(userRoot, skillRoot, skipStarterRules)) {
     results.push(`user-root:${result}`);
@@ -174,11 +153,6 @@ function main() {
 
   for (const providerName of providers) {
     const provider = PROVIDERS[providerName];
-    const skillTarget = path.join(home, ...provider.skillTarget);
-    results.push(`${providerName}:skill:${skillTarget}`);
-    for (const result of syncPackage(skillRoot, skillTarget)) {
-      results.push(`${providerName}:${result}`);
-    }
     const shimTarget = path.join(home, ...provider.shimTarget);
     results.push(`${providerName}:${installGlobalShim(skillRoot, shimTarget, provider.shimSource, forceShims)}`);
   }

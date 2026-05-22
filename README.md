@@ -1,10 +1,14 @@
 # M-PACT: Multi-Provider Agent Context Toolkit
 
-M-PACT is a multi-provider agent context toolkit for visible agent sessions. It was designed and validated for Codex, Claude Code, and Gemini CLI, and gives compatible local agents a shared memory layer outside the chat window so future sessions can recover durable rules, project context, task state, handoffs, decisions, and useful historical notes.
+M-PACT helps local coding agents share memory. It was designed and validated for Codex, Claude Code, and Gemini CLI. Its goal is simple: let agents remember useful project information, share it with each other, and pick up work without depending on one chat window to hold everything.
+
+M-PACT stores memory at two levels: global memory that can follow you across projects, and project memory that belongs to one workspace. That memory can include shared rules, session notes, project tasks, task logs, task specifications, task summaries, case studies, and project journals.
+
+This makes it possible to use more than one agent on the same project at the same time. One agent can work on a design, another can review it, another can implement it, and another can verify the code. They can hand work back and forth through task logs and specifications instead of reconstructing state from chat history.
 
 The skill owns the procedures. Memory roots hold the state.
 
-Multi-provider is the headline, but the base unit is an agent session. Several sessions can use the same provider, different providers, or a mix of both. The point is that every agent tab can enter the same project with the same durable memory and a common task record.
+Multi-provider is the headline, but the base unit is still an agent session. Several sessions can use the same provider, different providers, or a mix of both. The point is that every agent tab can enter the same project with the same durable memory and a common task record.
 
 ## Install Targets
 
@@ -14,13 +18,13 @@ M-PACT is packaged as one folder with native entrypoints for multiple local agen
 - Gemini CLI uses `gemini-extension.json`, root `GEMINI.md`, and `commands/`.
 - Copilot CLI may work with the same `SKILL.md` folder and Copilot-facing shims, but it has not yet been validated as a first-class supported runtime.
 
-Install globally with the bundled helper:
+Install M-PACT separately for each provider you want to use. After placing M-PACT in that provider's skill or extension folder, run the bundled runtime setup helper from that provider's installed copy:
 
 ```text
 node scripts/install-mpact.js
 ```
 
-By default, install syncs the same `m-pact` package into the validated provider targets:
+Provider skill placement is provider-specific and follows the normal skill model:
 
 ```text
 ~/.codex/skills/m-pact/
@@ -30,7 +34,7 @@ By default, install syncs the same `m-pact` package into the validated provider 
 
 Copilot CLI may later use `~/.copilot/skills/m-pact/` or `~/.agents/skills/m-pact/`, but that install path remains best-effort and is not enabled by the default helper.
 
-It also creates or preserves the user memory root at `~/.AgentMemoryRoot/`, installs starter user-root rules without overwriting existing rule files, and installs provider-global startup shims:
+The setup helper does not copy itself across provider roots. It creates or preserves the user memory root at `~/.AgentMemoryRoot/`, installs starter user-root rules without overwriting existing rule files, and installs only the current or explicitly requested provider-global startup shim:
 
 ```text
 ~/.codex/AGENTS.md
@@ -38,7 +42,7 @@ It also creates or preserves the user memory root at `~/.AgentMemoryRoot/`, inst
 ~/.gemini/GEMINI.md
 ```
 
-Project setup is separate from install. Install does not create project `.AgentMemory/` roots or project-local `AGENTS.md`, `CLAUDE.md`, or `GEMINI.md` files.
+Project setup is separate from install. Install does not create project `.AgentMemory/` roots or project-local `AGENTS.md`, `CLAUDE.md`, or `GEMINI.md` files. Repeat provider placement and runtime setup for Codex, Claude, and Gemini separately when you want all three configured.
 
 Invoke it as `$m-pact` in Codex, `/m-pact` in Claude Code, or `/m-pact:fast-refresh` in Gemini CLI. `/m-pact:refresh` remains a Gemini compatibility command. Copilot CLI may use `/m-pact` or `m-pact` if its runtime exposes the skill, but this path is best-effort until validated. In dictated Gemini requests, `Impact` is the spoken alias for M-PACT, for example `refresh Impact` or `Impact refresh`; Gemini is instructed to route those natural M-PACT requests, including `m-pact refresh`, to `/m-pact:fast-refresh` when possible. Plain `refresh memory` remains the ordinary refresh wording for Codex, Claude Code, and Copilot-style agents, but Gemini should not treat it as M-PACT unless the request also names Impact or M-PACT.
 
@@ -53,13 +57,14 @@ Invoke it as `$m-pact` in Codex, `/m-pact` in Claude Code, or `/m-pact:fast-refr
 
 Use this skill when you want agents to:
 
-- Run multiple visible agent sessions across one provider or many providers without losing shared project context.
-- Start a new context with the right durable project and user memory.
-- Pick up existing work from task handoffs.
-- Preserve decisions, checkpoints, and task progress across sessions.
-- Store durable behavioral rules without bloating every prompt.
+- Share useful memory between providers and sessions at both global and project levels.
+- Start a new context with the right rules, recent sessions, active tasks, and project orientation.
+- Create shared rules that teach agents your coding style, project habits, and recurring lessons.
+- Use task logs, specifications, and summaries to design, implement, review, test, and verify work in a visible loop.
+- Hand work from one agent to another without relying on chat history or oversized startup prompts.
+- Preserve decisions, checkpoints, task progress, and context-window handoffs across sessions.
 - Keep project memory separate from user-level memory.
-- Capture richer lessons as case studies instead of long standing instructions.
+- Capture richer successes, failures, investigations, and lessons as case studies instead of long standing instructions.
 
 It is not meant to duplicate source code, git history, or information an agent can cheaply recover from local project files.
 
@@ -86,7 +91,7 @@ journal.zip
 
 ## Quick Use
 
-Install makes the skill available globally, configures provider-global startup shims, and creates the user `.AgentMemoryRoot/`. A new workspace still needs project setup.
+Provider placement makes the skill available to that provider. Runtime setup configures that provider's global startup shim and creates the user `.AgentMemoryRoot/`. A new workspace still needs project setup.
 
 For a new project, ask:
 
@@ -94,7 +99,7 @@ For a new project, ask:
 Set up m-pact for this project.
 ```
 
-The agent should first confirm `.AgentMemoryRoot/` exists. If it is missing, it should run global install, then add the project scaffold: `.AgentMemory/`. It should not run refresh after bootstrap unless you also ask it to refresh, load, or verify. Provider-global shims should invoke M-PACT for Codex, Claude Code, and other configured runtimes; project bootstrap does not write project instruction files.
+The agent should first confirm `.AgentMemoryRoot/` exists. If it is missing, it should run provider runtime setup, then add the project scaffold: `.AgentMemory/`. It should not run refresh after bootstrap unless you also ask it to refresh, load, or verify. Provider-global shims should invoke M-PACT for configured runtimes; project bootstrap does not write project instruction files.
 
 At the start of a new context, ask the agent:
 

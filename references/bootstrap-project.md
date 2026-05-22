@@ -12,7 +12,7 @@ When offering project bootstrap during refresh preflight, ask a hard yes/no ques
 
 Offer user-root bootstrap when required `.AgentMemoryRoot/` is missing. Tell the Director that approved user-root bootstrap installs bundled starter core rules into `.AgentMemoryRoot/rules/` unless they ask to skip them. Starter rules are editable defaults.
 
-Normal global install should already create `.AgentMemoryRoot/` and install starter rules. If the Director asks to install or set up M-PACT for a project and `.AgentMemoryRoot/` is missing, run `references/install-mpact.md` first, then create the project `.AgentMemory/`.
+Normal runtime setup should already create `.AgentMemoryRoot/` and install starter rules. If the Director asks to install or set up M-PACT for a project and `.AgentMemoryRoot/` is missing, run `references/install-mpact.md` first from the current provider's installed M-PACT copy, then create the project `.AgentMemory/`.
 
 ## Project Bootstrap
 
@@ -26,7 +26,7 @@ The helper creates `.AgentMemory/` only. Artifact folders and ZIP containers are
 
 Project bootstrap does not write `AGENTS.md`, `CLAUDE.md`, or `GEMINI.md`. Startup belongs to provider-global shims installed by `references/install-mpact.md`.
 
-In project mode, `scripts/bootstrap-project.js` checks for the user `.AgentMemoryRoot/`. If it is missing, the helper runs `scripts/install-mpact.js` first so provider-global shims, provider skill packages, starter rules, and `.AgentMemoryRoot/` exist before the project root is created.
+In project mode, `scripts/bootstrap-project.js` checks for the user `.AgentMemoryRoot/`. If it is missing, the helper runs `scripts/install-mpact.js` first so the current provider shim, starter rules, and `.AgentMemoryRoot/` exist before the project root is created.
 
 After approved project bootstrap, reply with one concise user-level sentence. Mention skipped or blocked files only when the user needs to act. Do not run refresh merely because bootstrap completed. If bootstrap approval was the yes answer to a refresh preflight question, the original refresh request is still active: run refresh again after setup and emit the resulting receipt.
 
