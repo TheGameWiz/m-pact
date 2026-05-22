@@ -113,7 +113,7 @@ During normal work, ask for targeted operations instead:
 ```text
 Find layered rules about handoffs.
 Take the current task handoff and report the state.
-Append a task log checkpoint.
+Write a task log checkpoint.
 Write a session entry for this project-wide decision.
 Create a case study for this incident.
 ```

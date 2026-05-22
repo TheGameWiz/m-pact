@@ -3,7 +3,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { appendMember } = require("./lib/zip-record-store");
+const { appendGeneratedMember } = require("./lib/zip-record-store");
 const { withDirectoryLock } = require("./lib/directory-lock");
 const { buildTaskLogMarkdown } = require("./lib/task-log-markdown");
 const {
@@ -130,7 +130,7 @@ function main({ args, input }) {
         timestamp,
         record: 1,
       });
-      appendMember(path.join(taskPath, "log.zip"), member, logContent, now);
+      appendGeneratedMember(path.join(taskPath, "log.zip"), member, logContent, now);
     }
 
     const sentinel = booleanArg(args, "no-current") ? null : replaceCurrentTask(tasksPath, taskPath);

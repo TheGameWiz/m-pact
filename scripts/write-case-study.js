@@ -2,7 +2,7 @@
 "use strict";
 
 const path = require("path");
-const { appendMember, listMembers } = require("./lib/zip-record-store");
+const { appendGeneratedMember } = require("./lib/zip-record-store");
 const { withDirectoryLock } = require("./lib/directory-lock");
 const { localTimestamp, resolveRootPath, runCli, sanitizeSlug } = require("./lib/helper-common");
 
@@ -11,14 +11,8 @@ function cappedSlug(title, prefix, suffix) {
   return (sanitizeSlug(title) || "case-study").slice(0, max).replace(/-+$/g, "") || "case-study";
 }
 
-function uniqueMemberName(zipPath, timestamp, title) {
+function memberName(timestamp, title) {
   const suffix = ".md";
-  const existing = new Set(listMembers(zipPath).map((member) => member.name));
-  const shortPrefix = `${timestamp.date}-`;
-  const shortName = `${shortPrefix}${cappedSlug(title, shortPrefix, suffix)}${suffix}`;
-  if (!existing.has(shortName)) {
-    return shortName;
-  }
   const longPrefix = `${timestamp.filename}-`;
   return `${longPrefix}${cappedSlug(title, longPrefix, suffix)}${suffix}`;
 }
@@ -36,7 +30,7 @@ function main({ args, input }) {
     const now = new Date();
     const timestamp = localTimestamp(now);
     const zipPath = path.join(rootPath, "case-studies.zip");
-    const member = uniqueMemberName(zipPath, timestamp, title);
+    const member = memberName(timestamp, title);
     const content = [
       "---",
       `title: ${title}`,
@@ -51,7 +45,7 @@ function main({ args, input }) {
       "",
     ].filter((line) => line !== null).join("\n");
 
-    appendMember(zipPath, member, content, now);
+    appendGeneratedMember(zipPath, member, content, now);
     return { ok: true, operation: "write-case-study", rootPath, zipPath, member, timestamp: timestamp.body };
   });
 }

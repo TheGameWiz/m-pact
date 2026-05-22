@@ -431,6 +431,61 @@ function readCatalogFromEocdUnlocked(zipPath) {
   }
 }
 
+function readAppendMetadataFromEocdUnlocked(zipPath) {
+  if (!fs.existsSync(zipPath)) {
+    return {
+      totalEntries: 0,
+      centralOffset: 0,
+      centralSize: 0,
+      oldCentral: Buffer.alloc(0),
+    };
+  }
+  const fd = fs.openSync(zipPath, "r");
+  try {
+    const fileSize = fs.fstatSync(fd).size;
+    if (fileSize === 0) {
+      return {
+        totalEntries: 0,
+        centralOffset: 0,
+        centralSize: 0,
+        oldCentral: Buffer.alloc(0),
+      };
+    }
+    if (fileSize < 22) {
+      return null;
+    }
+    const eocdOffset = fileSize - 22;
+    const eocd = readBufferAt(fd, eocdOffset, 22);
+    if (eocd.readUInt32LE(0) !== END_OF_CENTRAL_DIRECTORY) {
+      return null;
+    }
+    const diskNumber = eocd.readUInt16LE(4);
+    const centralDisk = eocd.readUInt16LE(6);
+    const entriesOnDisk = eocd.readUInt16LE(8);
+    const totalEntries = eocd.readUInt16LE(10);
+    const centralSize = eocd.readUInt32LE(12);
+    const centralOffset = eocd.readUInt32LE(16);
+    const commentLength = eocd.readUInt16LE(20);
+    if (commentLength !== 0 || diskNumber !== 0 || centralDisk !== 0 || entriesOnDisk !== totalEntries) {
+      return null;
+    }
+    if (totalEntries === MAX_UINT16 || centralOffset === MAX_UINT32 || centralSize === MAX_UINT32) {
+      throw new Error("Zip64 archives are not supported by this helper slice");
+    }
+    if (centralOffset + centralSize !== eocdOffset) {
+      return null;
+    }
+    return {
+      totalEntries,
+      centralOffset,
+      centralSize,
+      oldCentral: readBufferAt(fd, centralOffset, centralSize),
+    };
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 function buildLocalRecord(entry, compressed) {
   const nameBuffer = Buffer.from(entry.name, "utf8");
   assertUInt16(nameBuffer.length, `member name length for ${entry.name}`);
@@ -478,6 +533,10 @@ function entryForContent(memberName, content, modified = new Date()) {
   return { entry, compressed, localRecord: buildLocalRecord(entry, compressed) };
 }
 
+function nextRecordNumberFromEntries(entries) {
+  return entries.length + 1;
+}
+
 function buildCentralDirectory(entries, centralOffset) {
   assertUInt16(entries.length, "ZIP member count");
   const centralParts = [];
@@ -511,22 +570,27 @@ function buildCentralDirectory(entries, centralOffset) {
     centralParts.push(centralHeader, nameBuffer, extra, comment);
   }
   const centralSize = centralParts.reduce((total, part) => total + part.length, 0);
+  return {
+    central: Buffer.concat(centralParts),
+    eocd: buildEndOfCentralDirectory(entries.length, centralSize, centralOffset),
+    centralSize,
+  };
+}
+
+function buildEndOfCentralDirectory(totalEntries, centralSize, centralOffset) {
+  assertUInt16(totalEntries, "ZIP member count");
   assertUInt32(centralOffset, "central directory offset");
   assertUInt32(centralSize, "central directory size");
   const eocd = Buffer.alloc(22);
   eocd.writeUInt32LE(END_OF_CENTRAL_DIRECTORY, 0);
   eocd.writeUInt16LE(0, 4);
   eocd.writeUInt16LE(0, 6);
-  eocd.writeUInt16LE(entries.length, 8);
-  eocd.writeUInt16LE(entries.length, 10);
+  eocd.writeUInt16LE(totalEntries, 8);
+  eocd.writeUInt16LE(totalEntries, 10);
   eocd.writeUInt32LE(centralSize, 12);
   eocd.writeUInt32LE(centralOffset, 16);
   eocd.writeUInt16LE(0, 20);
-  return {
-    central: Buffer.concat(centralParts),
-    eocd,
-    centralSize,
-  };
+  return eocd;
 }
 
 function writeCentralDirectoryToFd(fd, entries, centralOffset) {
@@ -583,6 +647,19 @@ function listMembers(zipPath) {
   }));
 }
 
+function hasMembers(zipPath) {
+  const targetLockPath = acquireLock(zipPath);
+  try {
+    const metadata = readAppendMetadataFromEocdUnlocked(zipPath);
+    if (metadata) {
+      return metadata.totalEntries > 0;
+    }
+    return walkLocalHeadersUnlocked(zipPath, { validateContent: false }).entries.length > 0;
+  } finally {
+    releaseLock(targetLockPath);
+  }
+}
+
 function readMember(zipPath, memberName) {
   const targetLockPath = acquireLock(zipPath);
   try {
@@ -596,31 +673,167 @@ function readMember(zipPath, memberName) {
   }
 }
 
-function appendMember(zipPath, memberName, content, modified = new Date()) {
+function appendGeneratedMemberFromEocd(zipPath, metadata, memberName, content, modified) {
+  validateMemberName(memberName);
+  const next = entryForContent(memberName, content, modified);
+  next.entry.localOffset = metadata.centralOffset;
+  next.localRecord = buildLocalRecord(next.entry, next.compressed);
+  const newCentralOffset = metadata.centralOffset + next.localRecord.length;
+  const { central: newCentral } = buildCentralDirectory([next.entry], 0);
+  const centralSize = metadata.oldCentral.length + newCentral.length;
+  const eocd = buildEndOfCentralDirectory(metadata.totalEntries + 1, centralSize, newCentralOffset);
+  const fd = fs.openSync(zipPath, fs.existsSync(zipPath) ? "r+" : "w+");
+  try {
+    fs.writeSync(fd, next.localRecord, 0, next.localRecord.length, metadata.centralOffset);
+    if (metadata.oldCentral.length > 0) {
+      fs.writeSync(fd, metadata.oldCentral, 0, metadata.oldCentral.length, newCentralOffset);
+    }
+    fs.writeSync(fd, newCentral, 0, newCentral.length, newCentralOffset + metadata.oldCentral.length);
+    const endOffset = newCentralOffset + centralSize + eocd.length;
+    fs.writeSync(fd, eocd, 0, eocd.length, newCentralOffset + centralSize);
+    fs.ftruncateSync(fd, endOffset);
+    try {
+      fs.fsyncSync(fd);
+    } catch {
+      // Best effort on platforms/filesystems that refuse fsync for this handle.
+    }
+    return {
+      bytes: endOffset,
+      strategy: "eocd-tail-copy-catalog",
+      attempts: 1,
+    };
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function appendGeneratedMemberFromLocalScan(zipPath, memberName, content, modified) {
+  const { entries, localEnd } = walkLocalHeadersUnlocked(zipPath, { validateContent: false });
+  if (entries.some((entry) => entry.name === memberName)) {
+    throw new Error(`ZIP member already exists: ${memberName}`);
+  }
+  const next = entryForContent(memberName, content, modified);
+  next.entry.localOffset = localEnd;
+  next.localRecord = buildLocalRecord(next.entry, next.compressed);
+  const fd = fs.openSync(zipPath, fs.existsSync(zipPath) ? "r+" : "w+");
+  try {
+    fs.writeSync(fd, next.localRecord, 0, next.localRecord.length, localEnd);
+    const centralOffset = localEnd + next.localRecord.length;
+    const endOffset = writeCentralDirectoryToFd(fd, [...entries, next.entry], centralOffset);
+    return {
+      bytes: endOffset,
+      strategy: "lfh-recovery-overwrite-catalog",
+      attempts: 1,
+    };
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function appendGeneratedMemberLocked(zipPath, memberName, content, modified) {
+  validateMemberName(memberName);
+  const metadata = readAppendMetadataFromEocdUnlocked(zipPath);
+  return metadata
+    ? appendGeneratedMemberFromEocd(zipPath, metadata, memberName, content, modified)
+    : appendGeneratedMemberFromLocalScan(zipPath, memberName, content, modified);
+}
+
+function appendGeneratedMember(zipPath, memberName, content, modified = new Date()) {
   validateMemberName(memberName);
   fs.mkdirSync(path.dirname(zipPath), { recursive: true });
   const targetLockPath = acquireLock(zipPath);
   try {
-    const { entries, localEnd } = walkLocalHeadersUnlocked(zipPath, { validateContent: false });
-    if (entries.some((entry) => entry.name === memberName)) {
-      throw new Error(`ZIP member already exists: ${memberName}`);
+    return appendGeneratedMemberLocked(zipPath, memberName, content, modified);
+  } finally {
+    releaseLock(targetLockPath);
+  }
+}
+
+function buildNumberedMember(record, buildMember) {
+  const built = buildMember({ record });
+  if (!built || typeof built !== "object") {
+    throw new Error("numbered ZIP append builder must return an object");
+  }
+  const memberName = built.member || built.memberName || built.name;
+  validateMemberName(memberName);
+  return { memberName, content: built.content };
+}
+
+function appendMemberFromEocd(zipPath, metadata, buildMember, modified) {
+  const record = metadata.totalEntries + 1;
+  const { memberName, content } = buildNumberedMember(record, buildMember);
+  const next = entryForContent(memberName, content, modified);
+  next.entry.localOffset = metadata.centralOffset;
+  next.localRecord = buildLocalRecord(next.entry, next.compressed);
+  const newCentralOffset = metadata.centralOffset + next.localRecord.length;
+  const { central: newCentral } = buildCentralDirectory([next.entry], 0);
+  const centralSize = metadata.oldCentral.length + newCentral.length;
+  const eocd = buildEndOfCentralDirectory(record, centralSize, newCentralOffset);
+  const fd = fs.openSync(zipPath, fs.existsSync(zipPath) ? "r+" : "w+");
+  try {
+    fs.writeSync(fd, next.localRecord, 0, next.localRecord.length, metadata.centralOffset);
+    if (metadata.oldCentral.length > 0) {
+      fs.writeSync(fd, metadata.oldCentral, 0, metadata.oldCentral.length, newCentralOffset);
     }
-    const next = entryForContent(memberName, content, modified);
-    next.entry.localOffset = localEnd;
-    next.localRecord = buildLocalRecord(next.entry, next.compressed);
-    const fd = fs.openSync(zipPath, fs.existsSync(zipPath) ? "r+" : "w+");
+    fs.writeSync(fd, newCentral, 0, newCentral.length, newCentralOffset + metadata.oldCentral.length);
+    const endOffset = newCentralOffset + centralSize + eocd.length;
+    fs.writeSync(fd, eocd, 0, eocd.length, newCentralOffset + centralSize);
+    fs.ftruncateSync(fd, endOffset);
     try {
-      fs.writeSync(fd, next.localRecord, 0, next.localRecord.length, localEnd);
-      const centralOffset = localEnd + next.localRecord.length;
-      const endOffset = writeCentralDirectoryToFd(fd, [...entries, next.entry], centralOffset);
-      return {
-        bytes: endOffset,
-        strategy: "lfh-overwrite-catalog",
-        attempts: 1,
-      };
-    } finally {
-      fs.closeSync(fd);
+      fs.fsyncSync(fd);
+    } catch {
+      // Best effort on platforms/filesystems that refuse fsync for this handle.
     }
+    return {
+      bytes: endOffset,
+      strategy: "eocd-tail-copy-catalog",
+      attempts: 1,
+      record,
+      member: memberName,
+    };
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function appendMemberFromLocalScan(zipPath, buildMember, modified) {
+  const { entries, localEnd } = walkLocalHeadersUnlocked(zipPath, { validateContent: false });
+  const record = nextRecordNumberFromEntries(entries);
+  const { memberName, content } = buildNumberedMember(record, buildMember);
+  if (entries.some((entry) => entry.name === memberName)) {
+    throw new Error(`ZIP member already exists: ${memberName}`);
+  }
+  const next = entryForContent(memberName, content, modified);
+  next.entry.localOffset = localEnd;
+  next.localRecord = buildLocalRecord(next.entry, next.compressed);
+  const fd = fs.openSync(zipPath, fs.existsSync(zipPath) ? "r+" : "w+");
+  try {
+    fs.writeSync(fd, next.localRecord, 0, next.localRecord.length, localEnd);
+    const centralOffset = localEnd + next.localRecord.length;
+    const endOffset = writeCentralDirectoryToFd(fd, [...entries, next.entry], centralOffset);
+    return {
+      bytes: endOffset,
+      strategy: "lfh-recovery-overwrite-catalog",
+      attempts: 1,
+      record,
+      member: memberName,
+    };
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function appendMember(zipPath, buildMember, modified = new Date()) {
+  if (typeof buildMember !== "function") {
+    throw new Error("numbered ZIP append requires a member builder function");
+  }
+  fs.mkdirSync(path.dirname(zipPath), { recursive: true });
+  const targetLockPath = acquireLock(zipPath);
+  try {
+    const metadata = readAppendMetadataFromEocdUnlocked(zipPath);
+    return metadata
+      ? appendMemberFromEocd(zipPath, metadata, buildMember, modified)
+      : appendMemberFromLocalScan(zipPath, buildMember, modified);
   } finally {
     releaseLock(targetLockPath);
   }
@@ -724,7 +937,9 @@ function replaceMember(zipPath, memberName, content, modified = new Date()) {
 }
 
 module.exports = {
+  appendGeneratedMember,
   appendMember,
+  hasMembers,
   listMembers,
   readCatalog,
   readCatalogUnlocked,

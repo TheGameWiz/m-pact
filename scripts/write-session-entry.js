@@ -2,7 +2,7 @@
 "use strict";
 
 const path = require("path");
-const { appendMember } = require("./lib/zip-record-store");
+const { appendGeneratedMember } = require("./lib/zip-record-store");
 const { withDirectoryLock } = require("./lib/directory-lock");
 const { localTimestamp, resolveRootPath, runCli, sanitizeSlug } = require("./lib/helper-common");
 
@@ -34,7 +34,7 @@ function main({ args, input }) {
       "",
     ].filter((line) => line !== null).join("\n");
     const zipPath = path.join(rootPath, "sessions.zip");
-    appendMember(zipPath, member, content, now);
+    appendGeneratedMember(zipPath, member, content, now);
     return { ok: true, operation: "write-session-entry", rootPath, zipPath, member, timestamp: timestamp.body };
   });
 }

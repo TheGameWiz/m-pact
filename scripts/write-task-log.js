@@ -4,7 +4,7 @@
 const path = require("path");
 const {
   appendMember,
-  listMembers,
+  hasMembers,
 } = require("./lib/zip-record-store");
 const { withDirectoryLock } = require("./lib/directory-lock");
 const { buildTaskLogMarkdown } = require("./lib/task-log-markdown");
@@ -12,14 +12,13 @@ const {
   booleanArg,
   localTimestamp,
   memberName,
-  nextRecordNumber,
   resolveTaskPath,
   runCli,
 } = require("./lib/helper-common");
 
 function hasCurrentSpecification(taskPath) {
   const specZip = path.join(taskPath, "specification.zip");
-  return listMembers(specZip).length > 0;
+  return hasMembers(specZip);
 }
 
 function main({ args, input }) {
@@ -37,38 +36,37 @@ function main({ args, input }) {
     const now = new Date();
     const timestamp = localTimestamp(now);
     const zipPath = path.join(taskPath, "log.zip");
-    const members = listMembers(zipPath);
-    const record = nextRecordNumber(members);
-    const member = memberName({
-      number: record,
-      source: agent,
-      title,
-      extension: ".md",
-      includeSource: true,
-    });
-    const content = buildTaskLogMarkdown({
-      record,
-      timestamp,
-      input: {
-        ...input,
-        agent,
+    const appended = appendMember(zipPath, ({ record }) => {
+      const member = memberName({
+        number: record,
+        source: agent,
         title,
-        directorIntent: input.directorIntent || input.director_intent || args["director-intent"],
-        sourceInput: input.sourceInput || input.source_input || args["source-input"],
-        specMember,
-        noSpecUpdateNeededBecause: noSpecUpdateReason,
-      },
-    });
-
-    appendMember(zipPath, member, content, now);
+        extension: ".md",
+        includeSource: true,
+      });
+      const content = buildTaskLogMarkdown({
+        record,
+        timestamp,
+        input: {
+          ...input,
+          agent,
+          title,
+          directorIntent: input.directorIntent || input.director_intent || args["director-intent"],
+          sourceInput: input.sourceInput || input.source_input || args["source-input"],
+          specMember,
+          noSpecUpdateNeededBecause: noSpecUpdateReason,
+        },
+      });
+      return { member, content };
+    }, now);
 
     return {
       ok: true,
-      operation: "append-task-log",
+      operation: "write-task-log",
       taskPath,
       zipPath,
-      record,
-      member,
+      record: appended.record,
+      member: appended.member,
       timestamp: timestamp.body,
     };
   });

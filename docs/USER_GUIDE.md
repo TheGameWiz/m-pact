@@ -123,7 +123,7 @@ Handoff to Claude.
 Make this a task.
 Create a task from this conversation.
 Take the current task handoff and report the state.
-Append a task log checkpoint for what we just decided.
+Write a task log checkpoint for what we just decided.
 Update the task specification with this decision and write the log entry.
 Close this task as complete.
 Reopen task t0007 because there is follow-up work.
@@ -493,7 +493,7 @@ Standalone `handoff` means create a new task from the live conversation. It shou
 ```text
 Write a handoff for the current task.
 Handoff this task.
-Append a handoff log to task A__p2-t0012-example.
+Write a handoff log to task A__p2-t0012-example.
 ```
 
 After a created handoff, go to the other agent or new session and say:
@@ -551,12 +551,12 @@ Use task logs to preserve what happened, what was decided, what changed, and wha
 
 ### Numbering Rule
 
-When writing a log entry, the helper handles `log.zip` placement and uses the next unused record number. The agent supplies the task, agent name, title, body, and metadata from the current request and current conversation. It should not read existing log entries just to append, and it must not assign the record number itself.
+When writing a log entry, the helper handles `log.zip` placement and uses the next record number from the container entry count. The agent supplies the task, agent name, title, body, and metadata from the current request and current conversation. It should not read existing log entries just to write the next log, and it must not assign the record number itself.
 
 ### Common Requests
 
 ```text
-Append a task log checkpoint for this decision.
+Write a task log checkpoint for this decision.
 Write a handoff log entry for the next agent.
 ```
 
@@ -701,7 +701,7 @@ Project bootstrap does not install these shims. Global install writes them to pr
 
 1. Create a task with priority and clear acceptance.
 2. Keep current state in `specification.zip` snapshots when the task has evolving requirements.
-3. Append task logs for decisions, implementations, reviews, and handoffs.
+3. Write task logs for decisions, implementations, reviews, and handoffs.
 4. Use task summaries to compress long or standing task histories.
 5. Tell the next agent to take the task handoff.
 6. Close the task only when you explicitly decide it is done.

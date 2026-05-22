@@ -6,13 +6,11 @@ const path = require("path");
 const { withDirectoryLock } = require("./lib/directory-lock");
 const {
   appendMember,
-  listMembers,
 } = require("./lib/zip-record-store");
 const { buildTaskLogMarkdown } = require("./lib/task-log-markdown");
 const {
   localTimestamp,
   memberName,
-  nextRecordNumber,
   resolveTaskPath,
   runCli,
 } = require("./lib/helper-common");
@@ -38,47 +36,49 @@ function main({ args, input }) {
     const now = new Date();
     const timestamp = localTimestamp(now);
     const specZipPath = path.join(taskPath, "specification.zip");
-    const specRecord = nextRecordNumber(listMembers(specZipPath));
-    const specMember = memberName({
-      number: specRecord,
-      title,
-      extension: ".md",
-      includeSource: false,
-    });
-    appendMember(specZipPath, specMember, content, now);
+    const specAppend = appendMember(specZipPath, ({ record }) => ({
+      member: memberName({
+        number: record,
+        title,
+        extension: ".md",
+        includeSource: false,
+      }),
+      content,
+    }), now);
 
     const logZipPath = path.join(taskPath, "log.zip");
-    const logRecord = nextRecordNumber(listMembers(logZipPath));
-    const logMember = memberName({
-      number: logRecord,
-      source: agent,
-      title: logTitle,
-      extension: ".md",
-      includeSource: true,
-    });
-    const logContent = buildTaskLogMarkdown({
-      record: logRecord,
-      timestamp,
-      input: {
-        ...input,
-        agent,
+    const logAppend = appendMember(logZipPath, ({ record }) => {
+      const member = memberName({
+        number: record,
+        source: agent,
         title: logTitle,
-        body: logBody,
-        directorIntent: input.directorIntent || input.director_intent || args["director-intent"] || "Update task specification and append paired task log.",
-        sourceInput: input.sourceInput || input.source_input || args["source-input"],
-        specMember,
-      },
-    });
-    appendMember(logZipPath, logMember, logContent, now);
+        extension: ".md",
+        includeSource: true,
+      });
+      const logContent = buildTaskLogMarkdown({
+        record,
+        timestamp,
+        input: {
+          ...input,
+          agent,
+          title: logTitle,
+          body: logBody,
+          directorIntent: input.directorIntent || input.director_intent || args["director-intent"] || "Update task specification and append paired task log.",
+          sourceInput: input.sourceInput || input.source_input || args["source-input"],
+          specMember: specAppend.member,
+        },
+      });
+      return { member, content: logContent };
+    }, now);
 
     return {
       ok: true,
       operation: "update-task-spec",
       taskPath,
-      record: specRecord,
-      member: specMember,
-      specMember,
-      logMember,
+      record: specAppend.record,
+      member: specAppend.member,
+      specMember: specAppend.member,
+      logMember: logAppend.member,
       timestamp: timestamp.body,
     };
   });

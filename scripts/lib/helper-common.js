@@ -176,18 +176,6 @@ function memberName({ number, source, title, extension = ".md", includeSource = 
   return `${prefix}${slug}${suffix}`;
 }
 
-function nextRecordNumber(members) {
-  let highest = 0;
-  for (const member of members) {
-    const name = typeof member === "string" ? member : member.name;
-    const match = /^(\d{4})-/.exec(name);
-    if (match) {
-      highest = Math.max(highest, Number.parseInt(match[1], 10));
-    }
-  }
-  return highest + 1;
-}
-
 function resolveTaskPath(input, args, options = {}) {
   return resolveMemoryTaskPath(input, args, options);
 }
@@ -245,7 +233,6 @@ module.exports = {
   booleanArg,
   localTimestamp,
   memberName,
-  nextRecordNumber,
   parseArgs,
   resolveRootPath,
   resolveTaskPath,

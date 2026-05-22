@@ -52,7 +52,7 @@ Read only the reference needed for the current operation:
 - Create a task: `references/create-task.md`
 - Take or resume a task handoff: `references/take-task-handoff.md`
 - Update a task specification and append a task log: `references/update-task-spec.md`
-- Append task log only: `references/append-task-log-entry.md`
+- Write task log only: `references/write-task-log.md`
 - Set or switch the current task: `references/set-current-task.md`
 - Write a task summary: `references/write-task-summary.md`
 - Close a task: `references/close-task.md`
