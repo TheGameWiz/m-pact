@@ -16,10 +16,12 @@ Use `scripts/write-task-spec.js`. It writes the next full `specification.zip` sn
 4. Call `scripts/write-task-spec.js` once with direct arguments plus raw/plain stdin spec content.
 5. Reply briefly, e.g. `Wrote the t0005 specification and logged the change.`
 
+If stdin body delivery fails, follow the fallback in `helper-write-conventions.md`.
+
 Example:
 
 ```bash
 node scripts/write-task-spec.js --task t0005 --agent codex --title "Spec v2" --log-title "spec v2 update"
 ```
 
-Do not read prior logs merely to write the paired entry, assign record numbers, update the current-task sentinel, create scratch input, or fetch timestamps separately.
+Do not read prior logs merely to write the paired entry, assign record numbers, update the current-task sentinel, create project/skill scratch input, or fetch timestamps separately.

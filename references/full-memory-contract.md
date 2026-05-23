@@ -205,7 +205,7 @@ Journal entries are not part of the core startup read contract. Use `write-journ
 - Restate interpreted intent when dictation artifacts are present.
 - Continue autonomously through requested analysis, evaluation, review, and handoff reporting. Do not ask whether to perform implied read/analyze steps.
 - Do not routinely prompt for session-entry checkpoints or task log entries.
-- For helper-owned writes, use direct helper arguments plus raw/plain stdin content. Do not create scratch input or fetch timestamps separately; see `helper-write-conventions.md`.
+- For helper-owned writes, use direct helper arguments plus raw/plain stdin content by default. For stdin fallback and `--input` cleanup behavior, see `helper-write-conventions.md`. Do not create project/skill scratch input or fetch timestamps separately.
 - Surface durable memory create/update actions in the response.
 - Mark blocked state explicitly when required protocol state is ambiguous.
 - Never use polling in persistent-memory workflow.

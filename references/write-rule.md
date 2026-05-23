@@ -18,6 +18,8 @@ Ambiguous, judgment-call, overlapping, or conflicting rules require Director con
 4. Call `scripts/write-rule.js` once with direct helper arguments plus raw/plain stdin body text.
 5. Surface the new or updated rule briefly.
 
+If stdin body delivery fails, follow the fallback in `helper-write-conventions.md`.
+
 Example:
 
 ```bash

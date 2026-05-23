@@ -44,7 +44,7 @@ The current specification is the highest-numbered member of `specification.zip`.
 
 Durable writes require explicit Director instruction when they create bootstrap state, tasks, task close/reopen state, ambiguous rules, deletions, or inherited/non-local root changes.
 
-Use helpers for helper-owned writes. They own timestamps, numbering, member names, formatting, validation, and ZIP writes. Do not create scratch input files or run separate timestamp commands for one-off helper writes; pass direct helper arguments plus raw/plain stdin content. See `references/helper-write-conventions.md`.
+Use helpers for helper-owned writes. They own timestamps, numbering, member names, formatting, validation, and ZIP writes. Pass direct helper arguments plus raw/plain stdin content by default. For stdin fallback and `--input` cleanup behavior, see `references/helper-write-conventions.md`. Do not create project/skill scratch input files or run separate timestamp commands for one-off helper writes.
 
 ## Safety
 

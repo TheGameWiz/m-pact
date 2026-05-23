@@ -14,6 +14,8 @@ Write one only when the Director asks, clearly approves, or a task procedure exp
 4. Call `scripts/write-task-summary.js` once with direct helper arguments plus raw/plain stdin body text.
 5. Reply briefly with the covered range or theme when helpful.
 
+If stdin body delivery fails, follow the fallback in `helper-write-conventions.md`.
+
 Example:
 
 ```bash

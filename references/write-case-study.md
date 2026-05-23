@@ -12,6 +12,8 @@ Default target is active root `case-studies.zip`. Use user root only when the Di
 2. Extract a short rule separately only when the case study reveals reusable behavior.
 3. Call `scripts/write-case-study.js` once with direct helper arguments plus raw/plain stdin body text.
 
+If stdin body delivery fails, follow the fallback in `helper-write-conventions.md`.
+
 Example:
 
 ```bash

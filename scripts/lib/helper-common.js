@@ -2,6 +2,7 @@
 "use strict";
 
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const {
   resolveRootPath: resolveMemoryRootPath,
@@ -62,8 +63,36 @@ function readStdin() {
   }
 }
 
+function normalizeForContainment(filePath) {
+  const resolved = path.resolve(filePath);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+}
+
+function isInsideDirectory(filePath, directoryPath) {
+  const file = normalizeForContainment(filePath);
+  const directory = normalizeForContainment(directoryPath);
+  const relative = path.relative(directory, file);
+  return Boolean(relative) && !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
+function readInputFile(inputPath) {
+  const realInputPath = fs.realpathSync(path.resolve(inputPath));
+  const realTempPath = fs.realpathSync(os.tmpdir());
+  const text = fs.readFileSync(realInputPath, "utf8");
+  if (isInsideDirectory(realInputPath, realTempPath)) {
+    try {
+      fs.unlinkSync(realInputPath);
+    } catch (error) {
+      if (error.code !== "ENOENT") {
+        throw new Error(`failed to delete OS-temp input file after reading: ${realInputPath}: ${error.message}`);
+      }
+    }
+  }
+  return text;
+}
+
 function readInput(args) {
-  const text = args.input ? fs.readFileSync(args.input, "utf8") : readStdin();
+  const text = args.input ? readInputFile(args.input) : readStdin();
   return text.length > 0 ? { body: text } : {};
 }
 

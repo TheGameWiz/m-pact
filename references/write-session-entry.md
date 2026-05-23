@@ -16,6 +16,8 @@ Default target is active root `sessions.zip`. The container is lazy.
 2. Put detail, caveats, current state, and read-next pointers in later sections when needed.
 3. Call `scripts/write-session-entry.js` once with direct helper arguments plus raw/plain stdin summary text.
 
+If stdin body delivery fails, follow the fallback in `helper-write-conventions.md`.
+
 Example:
 
 ```bash

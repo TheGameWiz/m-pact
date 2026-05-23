@@ -12,6 +12,8 @@ Default target is active root `journal.zip`. Use user root only when the Directo
 2. Include project/phase/key-insight arguments only when useful.
 3. Call `scripts/write-journal-entry.js` once with direct helper arguments plus raw/plain stdin body text.
 
+If stdin body delivery fails, follow the fallback in `helper-write-conventions.md`.
+
 Example:
 
 ```bash
