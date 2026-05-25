@@ -51,7 +51,7 @@ Read only the reference needed for the current operation:
 - Write a case study: `references/write-case-study.md`
 - Create a task: `references/create-task.md`
 - Take or resume a task handoff: `references/take-task-handoff.md`
-- Write a task specification and paired task log: `references/write-task-spec.md`
+- Write a task specification and substantive paired task log: `references/write-task-spec.md`
 - Write task log only: `references/write-task-log.md`
 - Set or switch the current task: `references/set-current-task.md`
 - Write a task summary: `references/write-task-summary.md`

@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 "use strict";
 
-const fs = require("fs");
 const path = require("path");
 const { withDirectoryLock } = require("./lib/directory-lock");
 const {
@@ -11,17 +10,47 @@ const { buildTaskLogMarkdown } = require("./lib/task-log-markdown");
 const {
   localTimestamp,
   memberName,
+  readInputFile,
   resolveTaskPath,
   runCli,
 } = require("./lib/helper-common");
 
 function readContent(input, args) {
   const contentFile = input.contentFile || input.content_file || args["content-file"];
-  const content = contentFile ? fs.readFileSync(path.resolve(contentFile), "utf8") : input.content || input.body;
+  const content = contentFile ? readInputFile(path.resolve(contentFile)) : input.content || input.body;
   if (typeof content !== "string" || content.length === 0) {
     throw new Error("specification content is required");
   }
   return content;
+}
+
+function defaultLogBody(title) {
+  return [
+    `Wrote a new task specification snapshot: ${title}.`,
+    "",
+    "The caller did not provide a detailed paired log body. Future specification writes should include the reason for the update, the decisions or requirements that changed, evidence reviewed, risks or open questions, and the next useful handoff notes in this paired log rather than writing a separate task log entry.",
+  ].join("\n");
+}
+
+function readLogBody(input, args, title) {
+  const logInput = input.logInput || input.log_input || args["log-input"];
+  const logBodyFile = input.logBodyFile || input.log_body_file || args["log-body-file"];
+  const logBody = input.logBody || input.log_body || args["log-body"];
+  const body = logInput || logBodyFile
+    ? readInputFile(path.resolve(logInput || logBodyFile))
+    : logBody;
+
+  if (typeof body === "string" && body.trim()) {
+    return {
+      body,
+      supplied: true,
+    };
+  }
+
+  return {
+    body: defaultLogBody(title),
+    supplied: false,
+  };
 }
 
 function main({ args, input }) {
@@ -30,7 +59,7 @@ function main({ args, input }) {
   const title = input.title || input.slugHint || args.title || args["slug-hint"] || "specification";
   const agent = input.agent || args.agent || "agent";
   const logTitle = input.logTitle || input.log_title || args["log-title"] || "Specification Update";
-  const logBody = input.logBody || input.log_body || args["log-body"] || `Wrote task specification snapshot: ${title}`;
+  const logBody = readLogBody(input, args, title);
 
   return withDirectoryLock(taskPath, () => {
     const now = new Date();
@@ -62,7 +91,7 @@ function main({ args, input }) {
           ...input,
           agent,
           title: logTitle,
-          body: logBody,
+          body: logBody.body,
           directorIntent: input.directorIntent || input.director_intent || args["director-intent"] || "Write task specification snapshot and paired task log.",
           sourceInput: input.sourceInput || input.source_input || args["source-input"],
           specMember: specAppend.member,
@@ -80,6 +109,7 @@ function main({ args, input }) {
       specMember: specAppend.member,
       logMember: logAppend.member,
       timestamp: timestamp.body,
+      warning: logBody.supplied ? undefined : "paired log body was not provided; include --log-body or --log-input with detailed context on the next specification write",
     };
   });
 }

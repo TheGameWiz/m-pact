@@ -68,6 +68,11 @@ function normalizeForContainment(filePath) {
   return process.platform === "win32" ? resolved.toLowerCase() : resolved;
 }
 
+function realpathForContainment(filePath) {
+  const realpath = fs.realpathSync.native || fs.realpathSync;
+  return realpath(path.resolve(filePath));
+}
+
 function isInsideDirectory(filePath, directoryPath) {
   const file = normalizeForContainment(filePath);
   const directory = normalizeForContainment(directoryPath);
@@ -76,8 +81,8 @@ function isInsideDirectory(filePath, directoryPath) {
 }
 
 function readInputFile(inputPath) {
-  const realInputPath = fs.realpathSync(path.resolve(inputPath));
-  const realTempPath = fs.realpathSync(os.tmpdir());
+  const realInputPath = realpathForContainment(inputPath);
+  const realTempPath = realpathForContainment(os.tmpdir());
   const text = fs.readFileSync(realInputPath, "utf8");
   if (isInsideDirectory(realInputPath, realTempPath)) {
     try {
@@ -107,7 +112,7 @@ function writeReceipt(value) {
   const lines = [
     `OK: ${value.operation || "helper"}`,
   ];
-  for (const key of ["record", "member", "timestamp", "task", "status", "taskPath", "rootPath", "zipPath", "oldPath", "newPath", "sentinel", "rulePath", "memberCount", "query", "readFrom", "readThrough", "nextCursor", "truncated", "membersRead", "specMember", "logMember"]) {
+  for (const key of ["record", "member", "timestamp", "task", "status", "taskPath", "rootPath", "zipPath", "oldPath", "newPath", "sentinel", "rulePath", "memberCount", "query", "readFrom", "readThrough", "nextCursor", "truncated", "membersRead", "specMember", "logMember", "warning"]) {
     if (value[key] !== undefined && value[key] !== null) {
       lines.push(`${key}: ${value[key]}`);
     }
@@ -263,6 +268,7 @@ module.exports = {
   localTimestamp,
   memberName,
   parseArgs,
+  readInputFile,
   resolveRootPath,
   resolveTaskPath,
   runCli,
