@@ -9,7 +9,7 @@ const {
   resolveContainer,
   withContainerOperationLock,
 } = require("./lib/container-state");
-const { parseArgs, resolveTaskPath } = require("./lib/helper-common");
+const { assertMpactAllowedInCurrentSession, parseArgs, resolveTaskPath } = require("./lib/helper-common");
 
 const DEFAULT_BUDGET_BYTES = 50 * 1024;
 
@@ -51,6 +51,7 @@ function memberTable(members) {
 }
 
 function main() {
+  assertMpactAllowedInCurrentSession();
   const args = parseArgs(process.argv.slice(2));
   const taskPath = resolveTaskPath({}, args, { allowedStates: ["A", "C"] });
   const cursorValue = args.cursor || args["read-cursor"];

@@ -5,6 +5,10 @@ description: M-PACT multi-provider shared memory operations for visible agent se
 
 # M-PACT: Multi-Provider Agent Context Toolkit
 
+## Suppressed Sessions
+
+If the environment variable `MPACT_SUPPRESS` is set to a truthy value (for example `1`), the launching environment (for example ConflabCode) owns startup and runtime context in this session. Do not invoke refresh, do not run M-PACT helpers, and do not load memory. Stop here and let the launching environment own context. The helpers enforce this on their own: each prints an `M-PACT SUPPRESSED` notice and exits nonzero. To use M-PACT anyway, unset `MPACT_SUPPRESS`, set it to an empty value, or work from a normal session.
+
 ## First Use Install Check
 
 Copying this skill folder into a provider skill directory only makes M-PACT invocable. On first real use, ensure the user-level install exists before refresh or project setup:

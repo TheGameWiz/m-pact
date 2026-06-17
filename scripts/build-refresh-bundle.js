@@ -6,6 +6,7 @@ const os = require("os");
 const path = require("path");
 const crypto = require("crypto");
 const { listMembers, readMember } = require("./lib/zip-record-store");
+const { assertMpactAllowedInCurrentSession } = require("./lib/helper-common");
 
 const MIN_NODE_MAJOR = 18;
 const EOL = os.EOL;
@@ -323,6 +324,7 @@ function assertSupportedNode() {
 }
 
 function main() {
+  assertMpactAllowedInCurrentSession();
   assertSupportedNode();
 
   const options = parseArgs(process.argv.slice(2));
@@ -363,7 +365,7 @@ function main() {
     writeFailureAndExit(options.startPath, failures);
   }
 
-  const homePath = process.env.USERPROFILE && process.env.USERPROFILE.trim()
+  const homePath = process.platform === "win32" && process.env.USERPROFILE && process.env.USERPROFILE.trim()
     ? process.env.USERPROFILE
     : os.homedir();
   const userRoot = path.join(homePath, ".AgentMemoryRoot");

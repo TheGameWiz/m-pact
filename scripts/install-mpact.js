@@ -4,7 +4,7 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { booleanArg, parseArgs } = require("./lib/helper-common");
+const { assertMpactAllowedInCurrentSession, booleanArg, parseArgs } = require("./lib/helper-common");
 
 const PROVIDERS = {
   codex: {
@@ -41,7 +41,7 @@ function splitList(value) {
 }
 
 function hasMpactInstruction(content) {
-  return /\bM-PACT\b|\bm-pact\b|\bImpact\b/.test(content);
+  return /\bM-PACT\b|\bm-pact\b/.test(content);
 }
 
 function installGlobalShim(skillRoot, targetPath, sourceName, force) {
@@ -128,6 +128,7 @@ function printReceipt(results) {
 }
 
 function main() {
+  assertMpactAllowedInCurrentSession();
   const args = parseArgs(process.argv.slice(2));
   const skillRoot = path.dirname(__dirname);
   const home = path.resolve(args.home || os.homedir());

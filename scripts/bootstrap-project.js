@@ -5,7 +5,11 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
-const { booleanArg, parseArgs } = require("./lib/helper-common");
+const {
+  assertMpactAllowedInCurrentSession,
+  booleanArg,
+  parseArgs,
+} = require("./lib/helper-common");
 
 function fail(message) {
   process.stderr.write(`ERROR: ${message}\n`);
@@ -71,6 +75,7 @@ function runRuntimeSetup(skillRoot, userRoot) {
 }
 
 function main() {
+  assertMpactAllowedInCurrentSession();
   const args = parseArgs(process.argv.slice(2));
   const skillRoot = path.dirname(__dirname);
   const userRootMode = booleanArg(args, "user-root");

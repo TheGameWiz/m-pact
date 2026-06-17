@@ -12,4 +12,6 @@ The extension owns setup-required handling, bundle verification, compact receipt
 
 Do not reinterpret generic Gemini memory requests such as `refresh memory`, `show memory`, or `reload memory` as M-PACT unless the user also mentions Impact, M-PACT, m-pact, shared agent memory, or project memory.
 
+If the environment variable `MPACT_SUPPRESS` is set to a truthy value (for example `1`), the launching environment owns context here: do not invoke M-PACT and do not run its refresh.
+
 If M-PACT is unavailable, stop and report that the extension or skill is missing.

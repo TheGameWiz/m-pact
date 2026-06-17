@@ -11,12 +11,39 @@ const {
 
 const MIN_NODE_MAJOR = 18;
 const MEMBER_NAME_MAX = 128;
+const MPACT_SUPPRESS_BEGIN = "M-PACT SUPPRESSED";
+const MPACT_SUPPRESS_END = "END M-PACT SUPPRESSED";
+const MPACT_SUPPRESS_EXIT_CODE = 3;
 
 function assertNodeVersion() {
   const nodeMajor = Number.parseInt(process.versions.node.split(".")[0], 10);
   if (!Number.isFinite(nodeMajor) || nodeMajor < MIN_NODE_MAJOR) {
     throw new Error(`Node.js ${MIN_NODE_MAJOR} or newer is required.`);
   }
+}
+
+function isMpactSuppressed() {
+  return Boolean(process.env.MPACT_SUPPRESS);
+}
+
+function suppressionNotice() {
+  return [
+    MPACT_SUPPRESS_BEGIN,
+    "MPACT_SUPPRESS is truthy; the launching environment owns startup and runtime context in this session.",
+    "M-PACT refresh and helpers are disabled here. Unset MPACT_SUPPRESS or use a normal session to run M-PACT.",
+    MPACT_SUPPRESS_END,
+  ].join("\n");
+}
+
+// Hard gate honored by every helper entrypoint. When MPACT_SUPPRESS is truthy the
+// launching environment (for example ConflabCode) owns context, so the helper
+// prints a deterministic notice and exits nonzero instead of doing any work.
+function assertMpactAllowedInCurrentSession() {
+  if (!isMpactSuppressed()) {
+    return;
+  }
+  process.stdout.write(`${suppressionNotice()}\n`);
+  process.exit(MPACT_SUPPRESS_EXIT_CODE);
 }
 
 function parseArgs(argv) {
@@ -249,6 +276,7 @@ function yamlBlockList(name, values) {
 function runCli(main) {
   try {
     assertNodeVersion();
+    assertMpactAllowedInCurrentSession();
     const argv = process.argv.slice(2);
     assertNoHelpProbe(argv);
     const args = parseArgs(argv);
@@ -263,8 +291,13 @@ function runCli(main) {
 
 module.exports = {
   MEMBER_NAME_MAX,
+  MPACT_SUPPRESS_BEGIN,
+  MPACT_SUPPRESS_END,
+  MPACT_SUPPRESS_EXIT_CODE,
+  assertMpactAllowedInCurrentSession,
   assertNoHelpProbe,
   booleanArg,
+  isMpactSuppressed,
   localTimestamp,
   memberName,
   parseArgs,
