@@ -57,6 +57,14 @@ M-PACT startup refresh is for local agent runtimes only. Codex CLI, Claude Code,
 
 Web-only ChatGPT or Claude clients may be able to read or install skill instructions in products that support skills, but they cannot refresh local `.AgentMemoryRoot/` or `.AgentMemory/` folders directly. For web-only work, provide an uploaded refresh bundle or uploaded memory artifacts instead of asking the web agent to run local refresh.
 
+### Temporarily Suspend M-PACT
+
+Set `MPACT_SUPPRESS` to a truthy value, such as `1`, when another launcher, wrapper, or host environment should own startup and runtime context for a session. This is useful for managed sessions that inject their own context and should not also trigger M-PACT refresh.
+
+When `MPACT_SUPPRESS` is set, provider startup shims should not invoke M-PACT. Helper scripts enforce the same rule themselves: they print `M-PACT SUPPRESSED`, end with `END M-PACT SUPPRESSED`, and exit nonzero before reading memory or writing setup state.
+
+To use M-PACT again, unset `MPACT_SUPPRESS`, set it to an empty value, or start a normal session without that environment variable.
+
 ## Quick Start
 
 ### Provider Runtime Setup

@@ -53,6 +53,12 @@ Invoke it as `$m-pact` in Codex, `/m-pact` in Claude Code, or `/m-pact:fast-refr
 - The refresh procedure uses the bundled `scripts/build-refresh-bundle.js` script and only Node built-in modules. No npm package install is required.
 - Check availability with `node --version`.
 
+## Suspend M-PACT
+
+Set `MPACT_SUPPRESS` to a truthy value, such as `1`, when another launcher or wrapper should own startup and runtime context for the session. Provider startup shims and helper scripts treat this as an intentional suspend state: they do not refresh memory, do not load M-PACT context, and helpers print `M-PACT SUPPRESSED` before exiting nonzero.
+
+To use M-PACT again, unset `MPACT_SUPPRESS`, set it to an empty value, or start a normal session without that environment variable.
+
 ## What It Is For
 
 Use this skill when you want agents to:
