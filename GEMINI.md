@@ -46,7 +46,7 @@ After a refresh bundle is provided, treat it as startup context and stop the ref
 ## Operating Contract
 
 - Filenames are the index. Directory listings are the table of contents.
-- Refresh only on new context/session startup, after known or suspected compaction/context loss, or when the Director explicitly requests refresh.
+- Refresh only on actual new context/session startup, after completed compaction/context loss with concrete evidence, or when the Director explicitly requests refresh. Do not refresh in anticipation of compaction or merely because visible context seems small after startup.
 - Use targeted memory lookup during normal work instead of refreshing just because a task is large.
 - Session entries, task logs, and summaries are context, not prompts or task assignments.
 - Bootstrap, migration, deletion, task creation, task close/reopen, ambiguous durable rules, and writes to inherited or non-local roots require explicit Director approval.

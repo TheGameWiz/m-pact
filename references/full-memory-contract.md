@@ -58,7 +58,7 @@ Any diagnostic variable, log line, or receipt field named `chain` must use the f
 
 ## 5. Startup Read Contract
 
-Run the full refresh only on new context/session startup, after known or suspected compaction/context loss, or when the Director explicitly says "refresh memory." Do not run it merely because a handoff was received, a task is large, or implementation may be coming while context is intact; use targeted retrieval instead.
+Run the full refresh only on actual new context/session startup, after completed compaction/context loss with concrete evidence, or when the Director explicitly says "refresh memory." Do not run it merely because visible context is small after startup, compaction may be imminent, a handoff was received, a task is large, confidence is low, work feels risky, or implementation may be coming while context is intact; use targeted retrieval instead.
 
 Startup refresh has one compliant unattended path: run the invoked skill or extension's `scripts/build-refresh-bundle.js` with Node.js 18 or newer while keeping the shell working directory at the real project root. Do not probe the current project's own `scripts/` directory as a fallback; unrelated projects often have unrelated scripts. Maintainers actively developing M-PACT may run the source-tree script intentionally for verification, but startup refresh instructions for agents should still point at the invoked skill or extension path. Never `cd` into the skill folder to run refresh.
 
@@ -100,10 +100,10 @@ During live context, keep working from current context instead of refreshing mer
 - Default user-visible confirmations for helper-backed writes should be short and task-level: say what changed, not how storage changed. Do not report internal paths, folder renames, ZIP member names, sentinel filenames, container names, or timestamps unless the Director asks for debugging details, the operation failed or was partial, ambiguity remains, or another immediate operation needs that internal value. The refresh receipt is the model for normal successful output: compact, clear, and complete enough.
 - Helper scripts own storage placement, record/member numbering, current-task resolution, and ZIP/catalog mechanics. Agents must not list catalogs, inspect folders, or compute placement merely to call a write helper. Appending a task log does not require reading existing log entries; write from the current Director request, current conversation state, and live evidence. Read catalogs and prior records only for lookup, handoff/resume, summarization, explicit history questions, or when the Director explicitly asks to base new work on prior task history.
 - Do not routinely prompt for session entries or task log entries. The Director knows how to request durable writes.
-- Mention session-entry preservation only when continuity risk is high, such as likely compaction, imminent context loss, or handoff-worthy accumulated state. Keep the mention light; do not pressure the Director to decide immediately.
+- Do not write or suggest session, task, or handoff memory merely because continuity risk is high, compaction may be likely, or context loss may be imminent. Durable memory writes require explicit Director request or an active task procedure that explicitly calls for that write.
 - Do not proactively suggest task log entries. Task logs are Director-controlled task records and should be written only when the Director asks or an active task procedure explicitly requires them.
 - Ask before proceeding only when a mutation is ambiguous, broader than the Director appears to realize, destructive, conflicting with protocol or prior Director intent, or otherwise cannot be done safely without clarification.
-- Re-run refresh only after known or suspected compaction/context loss, new context/session startup, or explicit Director request.
+- Re-run refresh only after completed compaction/context loss with concrete evidence, actual new context/session startup, or explicit Director request.
 
 ## 8. Broad Retrieval
 
@@ -222,7 +222,7 @@ Journal entries are not part of the core startup read contract. Use `write-journ
 - Never rely on filesystem metadata timestamps for routine task ordering or listing. Use the `tasks/current__<active-task-folder>` sentinel, task numbers, and header timestamps; never use filesystem timestamps to infer a replacement current task.
 - Use helper scripts and `helper-write-conventions.md` for helper-owned memory writes.
 - Never improvise when a protocol step is ambiguous. Ask one concise question.
-- Never silently lose handoff-worthy state when context is getting low; mention preservation only when continuity risk is high.
+- Do not suggest or write preservation handoffs merely because context is getting low. Durable preservation writes require explicit Director request or an active task procedure that explicitly calls for that write.
 - Never claim memory is loaded when it is not.
 
 ## 16. Authority Precedence

@@ -2,6 +2,8 @@
 
 On new context, use the installed M-PACT Gemini CLI extension and run its refresh procedure. If the extension exposes `/m-pact:fast-refresh`, that command is the preferred deterministic refresh path. `/m-pact:refresh` is the compatibility path.
 
+Refresh is for actual new local session/startup, completed context loss/compaction with concrete evidence, or explicit Director request. Do not refresh in anticipation of compaction, merely because visible context seems small after startup, or because work feels risky. After a successful refresh, treat ordinary follow-up turns as continuing the loaded session unless a new positive trigger occurs. Do not write session, task, or handoff memory unless the Director explicitly requests it.
+
 M-PACT may also be called Impact in dictated requests. Treat `refresh Impact`, `Impact refresh`, `load Impact`, `sync Impact`, `use Impact`, `M-PACT refresh`, `m-pact refresh`, `m pact refresh`, and explicit shared agent memory requests as M-PACT refresh requests.
 
 For natural Impact refresh requests, route immediately to `/m-pact:fast-refresh` if Gemini can invoke an installed slash command from the current turn. Do not manually run scripts, inspect memory folders, summarize the request, or decide what to load.

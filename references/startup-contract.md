@@ -22,7 +22,9 @@ Startup lists rule filenames only. Read a rule body with targeted lookup when th
 
 ## Refresh
 
-Refresh only on new context/session startup, after known or suspected compaction/context loss, or when the Director explicitly requests it.
+Refresh only on actual new context/session startup, after completed compaction/context loss with concrete evidence, or when the Director explicitly requests it. A new session may have very little visible context and should still refresh; small visible context alone is not a trigger after startup. Do not refresh in anticipation of compaction, because the thread is long, because context limits may be near, because confidence is low, or because work is about to become substantial.
+
+After a successful refresh, treat ordinary follow-up turns as continuing the loaded session. Do not run another refresh unless a new positive trigger occurs: actual new session/startup, concrete evidence that compaction/context loss has already happened, or explicit Director request. Do not write session, task, or handoff memory unless the Director explicitly requests it.
 
 Run the invoked skill or extension's `scripts/build-refresh-bundle.js` with Node.js 18 or newer while keeping the shell working directory at the real project root. Do not probe the current project's own `scripts/` directory as a fallback. Never `cd` into a skill install folder to run refresh.
 

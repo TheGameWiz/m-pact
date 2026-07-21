@@ -140,7 +140,7 @@ If no project `.AgentMemory/` exists, normal refresh should stop before emitting
 Refresh is only for:
 
 - New contexts or session startup.
-- Known or suspected compaction/context loss.
+- Completed compaction/context loss with concrete evidence.
 - Explicit "refresh memory" requests.
 
 Do not refresh just because a task is large. Use targeted lookup, task handoffs, and checkpoints while the current context is still intact.
@@ -274,7 +274,7 @@ Start a new local agent session, then ask that agent to refresh M-PACT. The agen
 Ask for refresh when:
 
 - Starting a new agent context.
-- Returning after known or suspected compaction or context loss.
+- Returning after completed compaction or context loss with concrete evidence.
 - You explicitly want memory reloaded.
 
 Example:
@@ -815,7 +815,7 @@ Place M-PACT in each provider's normal skill or extension folder, then run provi
 
 ### Context Hygiene
 
-1. Refresh only at startup, compaction/context loss, or explicit request.
+1. Refresh only at actual startup, completed compaction/context loss with concrete evidence, or explicit request.
 2. Use targeted lookup while context is intact.
 3. Mention session preservation only when continuity risk is high.
 4. Store narrative lessons as case studies, not long rules.

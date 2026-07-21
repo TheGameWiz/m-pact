@@ -4,7 +4,7 @@ Use when a cross-task or project-wide checkpoint is required, or when the Direct
 
 ## Approval
 
-Write a session only when the Director asks or clearly approves. Mention preservation only when continuity risk is high, such as likely compaction or handoff-worthy accumulated state.
+Write a session only when the Director explicitly asks for one. Do not suggest, mention, or write session preservation merely because continuity risk is high, compaction may be likely, or handoff-worthy state has accumulated.
 
 ## Target
 

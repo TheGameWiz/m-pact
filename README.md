@@ -113,7 +113,7 @@ At the start of a new context, ask the agent:
 Use $m-pact and refresh memory.
 ```
 
-The agent should run the bundled refresh procedure. If no project `.AgentMemory/` exists, refresh should stop before any receipt and ask whether to add project scaffolding. If you answer no, it should rerun user-root-only refresh and emit that receipt. Refresh is intended only for new context/session startup, known or suspected context loss, or explicit refresh requests. If the refresh bundle hits the size limit, the script emits a partial bundle with `LimitHit: true`; the agent should keep going with the warning visible and use targeted lookup for anything omitted.
+The agent should run the bundled refresh procedure. If no project `.AgentMemory/` exists, refresh should stop before any receipt and ask whether to add project scaffolding. If you answer no, it should rerun user-root-only refresh and emit that receipt. Refresh is intended only for actual new context/session startup, completed context loss with concrete evidence, or explicit refresh requests. It should not run in anticipation of compaction or merely because visible context seems small after startup. If the refresh bundle hits the size limit, the script emits a partial bundle with `LimitHit: true`; the agent should keep going with the warning visible and use targeted lookup for anything omitted.
 
 After the receipt, refresh is complete. Agents should not scan memory folders merely to verify refresh; targeted lookup is for specific follow-up needs.
 

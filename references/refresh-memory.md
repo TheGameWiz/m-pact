@@ -20,11 +20,15 @@ On first real use, ensure the user-level install exists before refresh. If `.Age
 
 Run refresh only when:
 
-- Starting a new context/session.
-- Returning after known or suspected compaction or context loss.
+- Starting an actual new context/session. New sessions often have very little visible context; that startup state is a valid refresh trigger.
+- Returning after completed compaction or context loss when there is concrete evidence it already happened.
 - The Director explicitly says "refresh memory."
 
-Do not run refresh merely because a handoff was received, a task seems large, or implementation may be coming. While context is intact, use targeted retrieval for the relevant task, rule, case study, or session. Mention session-entry preservation only when continuity risk is high, such as likely compaction, imminent context loss, or handoff-worthy accumulated state.
+Do not run refresh merely because visible context is small after startup, a handoff was received, a task seems large, implementation may be coming, the thread is long, compaction may be imminent, confidence is low, or work feels risky. Do not refresh in anticipation of compaction. While context is intact, use targeted retrieval for the relevant task, rule, case study, or session.
+
+After a successful refresh, treat ordinary follow-up turns as continuing the loaded session. Do not run another refresh unless a new positive trigger occurs: actual new session/startup, concrete evidence that compaction/context loss has already happened, or explicit Director request.
+
+Do not write session, task, or handoff memory unless the Director explicitly requests it.
 
 ## How To Run It
 
