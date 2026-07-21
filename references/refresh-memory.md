@@ -24,6 +24,8 @@ Run refresh only when:
 - Returning after completed compaction or context loss when there is concrete evidence it already happened.
 - The Director explicitly says "refresh memory."
 
+Concrete evidence includes a system- or tool-provided resumed-context, compacted-context, or conversation-summary block, or the Director saying they manually compacted. An ordinary assistant-written summary, a handoff, a long thread, or small visible context after startup is not enough.
+
 Do not run refresh merely because visible context is small after startup, a handoff was received, a task seems large, implementation may be coming, the thread is long, compaction may be imminent, confidence is low, or work feels risky. Do not refresh in anticipation of compaction. While context is intact, use targeted retrieval for the relevant task, rule, case study, or session.
 
 After a successful refresh, treat ordinary follow-up turns as continuing the loaded session. Do not run another refresh unless a new positive trigger occurs: actual new session/startup, concrete evidence that compaction/context loss has already happened, or explicit Director request.
