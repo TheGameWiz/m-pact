@@ -17,7 +17,7 @@ If stdin body delivery fails, follow the fallback in `helper-write-conventions.m
 Example:
 
 ```bash
-node scripts/write-task-log.js --task t0005 --agent codex --title "short descriptive title" --no-spec-update-needed-because "Review only."
+node scripts/write-task-log.js --task t0005 --project-id 7 --agent codex --title "short descriptive title" --no-spec-update-needed-because "Review only."
 ```
 
-Do not assign record numbers, update the current-task sentinel, create project/skill scratch input, or fetch timestamps separately. Lookup helpers are for handoff/resume, summarization, or explicit history questions, not normal writes.
+Use the project ID from the latest refresh or successful write receipt. Do not assign record numbers, update the current-task sentinel, create project/skill scratch input, or fetch timestamps separately. Lookup helpers are for handoff/resume, summarization, or explicit history questions, not normal writes.

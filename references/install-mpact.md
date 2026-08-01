@@ -15,6 +15,7 @@ node scripts/install-mpact.js
 By default, the helper:
 
 - creates or preserves `.AgentMemoryRoot/`;
+- creates or preserves the zero-byte `.AgentMemoryRoot/project-count__<n>` identity counter, starting at `project-count__0` on fresh installs;
 - installs bundled starter core rules into `.AgentMemoryRoot/rules/` without overwriting existing rule files;
 - installs only the current provider's global startup shim when the provider can be inferred from the installed skill location.
 

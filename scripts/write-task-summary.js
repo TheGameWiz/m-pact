@@ -5,9 +5,12 @@ const path = require("path");
 const { appendMember } = require("./lib/zip-record-store");
 const { withDirectoryLock } = require("./lib/directory-lock");
 const { localTimestamp, memberName, resolveTaskPath, runCli } = require("./lib/helper-common");
+const { validateProjectWrite } = require("./lib/project-identity");
 
 function main({ args, input }) {
   const taskPath = resolveTaskPath(input, args, { allowedStates: ["A"] });
+  const rootPath = path.dirname(path.dirname(taskPath));
+  const identity = validateProjectWrite({ rootPath, input, args });
   const body = input.body;
   if (!body || !String(body).trim()) {
     throw new Error("body is required");
@@ -33,7 +36,7 @@ function main({ args, input }) {
       ].join("\n");
       return { member, content };
     }, now);
-    return { ok: true, operation: "write-task-summary", taskPath, zipPath, record: appended.record, member: appended.member, timestamp: timestamp.body };
+    return { ok: true, operation: "write-task-summary", projectId: identity.projectId, projectPath: identity.projectPath, crossProject: identity.crossProject || undefined, taskPath, zipPath, record: appended.record, member: appended.member, timestamp: timestamp.body };
   });
 }
 

@@ -5,6 +5,7 @@ const path = require("path");
 const { appendGeneratedMember } = require("./lib/zip-record-store");
 const { withDirectoryLock } = require("./lib/directory-lock");
 const { localTimestamp, resolveRootPath, runCli, sanitizeSlug } = require("./lib/helper-common");
+const { validateProjectWrite } = require("./lib/project-identity");
 
 function cappedSlug(title, prefix, suffix) {
   const max = 128 - prefix.length - suffix.length;
@@ -19,6 +20,7 @@ function memberName(timestamp, title) {
 
 function main({ args, input }) {
   const rootPath = resolveRootPath(input, args);
+  const identity = validateProjectWrite({ rootPath, input, args });
   const title = input.title || input.slugHint || args.title || args["slug-hint"] || "Case Study";
   const body = input.body;
   if (!body || !String(body).trim()) {
@@ -46,7 +48,7 @@ function main({ args, input }) {
     ].filter((line) => line !== null).join("\n");
 
     appendGeneratedMember(zipPath, member, content, now);
-    return { ok: true, operation: "write-case-study", rootPath, zipPath, member, timestamp: timestamp.body };
+    return { ok: true, operation: "write-case-study", rootPath, projectId: identity.projectId, projectPath: identity.projectPath, crossProject: identity.crossProject || undefined, zipPath, member, timestamp: timestamp.body };
   });
 }
 

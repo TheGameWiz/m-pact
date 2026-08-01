@@ -14,7 +14,7 @@ Use `scripts/reopen-task.js`. The helper owns the task state update and current-
 Example shape:
 
 ```bash
-node scripts/reopen-task.js --task t0001
+node scripts/reopen-task.js --task t0001 --project-id 7
 ```
 
-Do not reopen a task based only on agent judgment.
+Use the project ID from the latest refresh or successful write receipt. Do not reopen a task based only on agent judgment.

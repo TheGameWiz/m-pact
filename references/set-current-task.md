@@ -13,7 +13,7 @@ Do not use this merely because a task log, summary, or specification was written
 Example:
 
 ```bash
-node scripts/set-current-task.js --root .AgentMemory --task t0001
+node scripts/set-current-task.js --root .AgentMemory --project-id 7 --task t0001
 ```
 
-The helper owns target validation and replacement of `current__*` sentinels. Never infer a replacement current task from filesystem timestamps, highest task number, active task count, or folder ordering.
+Use the project ID from the latest refresh or successful write receipt. The helper owns target validation, project identity validation, and replacement of `current__*` sentinels. Never infer a replacement current task from filesystem timestamps, highest task number, active task count, or folder ordering.

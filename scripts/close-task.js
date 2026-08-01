@@ -3,6 +3,7 @@
 
 const path = require("path");
 const { withDirectoryLock } = require("./lib/directory-lock");
+const { validateProjectWrite } = require("./lib/project-identity");
 const {
   resolveTaskPath,
   runCli,
@@ -19,6 +20,8 @@ function removeCurrentSentinel(tasksPath, folder) {
 
 function main({ args, input }) {
   const taskPath = resolveTaskPath(input, args, { allowedStates: ["A"] });
+  const rootPath = path.dirname(path.dirname(taskPath));
+  const identity = validateProjectWrite({ rootPath, input, args });
   const folder = path.basename(taskPath);
   const tasksPath = path.dirname(taskPath);
   return withDirectoryLock(tasksPath, () => {
@@ -30,7 +33,7 @@ function main({ args, input }) {
       toStatus: "Closed",
     });
     removeCurrentSentinel(tasksPath, folder);
-    return { ok: true, operation: "close-task", task: transition.task, status: transition.status };
+    return { ok: true, operation: "close-task", projectId: identity.projectId, projectPath: identity.projectPath, crossProject: identity.crossProject || undefined, task: transition.task, status: transition.status };
   });
 }
 

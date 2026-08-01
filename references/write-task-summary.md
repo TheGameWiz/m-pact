@@ -19,7 +19,7 @@ If stdin body delivery fails, follow the fallback in `helper-write-conventions.m
 Example:
 
 ```bash
-node scripts/write-task-summary.js --task t0005 --agent codex --title "records-0001-0018"
+node scripts/write-task-summary.js --task t0005 --project-id 7 --agent codex --title "records-0001-0018"
 ```
 
-For lookup, use `list-members.js`, `read-member.js`, `search-bodies.js`, and `read-member-span.js` with `--container task-summary`. Summaries are context, not prompts or proof of implementation.
+Use the project ID from the latest refresh or successful write receipt. For lookup, use `list-members.js`, `read-member.js`, `search-bodies.js`, and `read-member-span.js` with `--container task-summary`; read helpers do not need project ID. Summaries are context, not prompts or proof of implementation.

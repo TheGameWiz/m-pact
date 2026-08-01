@@ -4,7 +4,7 @@ Use only when the Director explicitly asks for a journal entry or reflective not
 
 ## Target
 
-Default target is active root `journal.zip`. Use user root only when the Director explicitly wants a user-level or cross-project journal entry. The container is lazy.
+Default target is active root `journal.zip`. Project-root journal writes are identity-checked like other durable project writes. Use user root only when the Director explicitly wants a user-level or cross-project journal entry. The container is lazy.
 
 ## Procedure
 
@@ -17,7 +17,7 @@ If stdin body delivery fails, follow the fallback in `helper-write-conventions.m
 Example:
 
 ```bash
-node scripts/write-journal-entry.js --root .AgentMemory --title "Short journal cue"
+node scripts/write-journal-entry.js --root .AgentMemory --project-id 7 --title "Short journal cue"
 ```
 
-For lookup, use `list-members.js`, `read-member.js`, and `search-bodies.js` with `--container journal`. Use `modify-journal-entry.js` only for controlled modification. Do not proactively suggest journaling.
+Use the project ID from the latest refresh or successful write receipt for project-root writes. For lookup, use `list-members.js`, `read-member.js`, and `search-bodies.js` with `--container journal`; read helpers do not need project ID. Use `modify-journal-entry.js` only for controlled modification. Do not proactively suggest journaling.

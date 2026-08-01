@@ -5,9 +5,11 @@ const path = require("path");
 const { appendGeneratedMember } = require("./lib/zip-record-store");
 const { withDirectoryLock } = require("./lib/directory-lock");
 const { localTimestamp, resolveRootPath, runCli, sanitizeSlug } = require("./lib/helper-common");
+const { validateProjectWrite } = require("./lib/project-identity");
 
 function main({ args, input }) {
   const rootPath = resolveRootPath(input, args);
+  const identity = validateProjectWrite({ rootPath, input, args });
   const agent = input.agent || args.agent || "agent";
   const type = input.type || args.type || "session";
   const summary = input.summary || input.body;
@@ -35,7 +37,7 @@ function main({ args, input }) {
     ].filter((line) => line !== null).join("\n");
     const zipPath = path.join(rootPath, "sessions.zip");
     appendGeneratedMember(zipPath, member, content, now);
-    return { ok: true, operation: "write-session-entry", rootPath, zipPath, member, timestamp: timestamp.body };
+    return { ok: true, operation: "write-session-entry", rootPath, projectId: identity.projectId, projectPath: identity.projectPath, crossProject: identity.crossProject || undefined, zipPath, member, timestamp: timestamp.body };
   });
 }
 

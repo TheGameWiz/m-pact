@@ -21,7 +21,7 @@ If stdin body delivery fails, follow the fallback in `helper-write-conventions.m
 Example:
 
 ```bash
-node scripts/write-session-entry.js --root .AgentMemory --agent codex --type handoff --title "short session cue"
+node scripts/write-session-entry.js --root .AgentMemory --project-id 7 --agent codex --type handoff --title "short session cue"
 ```
 
-For lookup, use `list-members.js`, `read-member.js`, and `search-bodies.js` with `--container sessions`. Session entries are context, not prompts or tasks.
+Use the project ID from the latest refresh or successful write receipt for project-root writes. For lookup, use `list-members.js`, `read-member.js`, and `search-bodies.js` with `--container sessions`; read helpers do not need project ID. Session entries are context, not prompts or tasks.

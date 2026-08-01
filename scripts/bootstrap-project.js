@@ -4,12 +4,13 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { spawnSync } = require("child_process");
 const {
   assertMpactAllowedInCurrentSession,
   booleanArg,
   parseArgs,
 } = require("./lib/helper-common");
+const { installMpactRuntime } = require("./lib/install-runtime");
+const { initializeProjectIdentity } = require("./lib/project-identity");
 
 function fail(message) {
   process.stderr.write(`ERROR: ${message}\n`);
@@ -20,58 +21,12 @@ function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
 }
 
-function installStarterRules(userRoot, skillRoot, skipStarterRules) {
-  if (skipStarterRules) {
-    return ["skipped:starter-rules:requested"];
-  }
-  const sourceDir = path.join(skillRoot, "starter-rules", "user-root", "rules");
-  if (!fs.existsSync(sourceDir)) {
-    return ["blocked:starter-rules:missing-template-dir"];
-  }
-  const targetDir = path.join(userRoot, "rules");
-  ensureDir(targetDir);
-  const results = [];
-  for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
-    if (!entry.isFile() || !entry.name.endsWith(".md")) {
-      continue;
-    }
-    const sourcePath = path.join(sourceDir, entry.name);
-    const targetPath = path.join(targetDir, entry.name);
-    if (fs.existsSync(targetPath)) {
-      results.push(`skipped:${entry.name}:exists`);
-      continue;
-    }
-    fs.copyFileSync(sourcePath, targetPath);
-    results.push(`created:${entry.name}`);
-  }
-  return results;
-}
-
 function printReceipt(operation, rootPath, results) {
   process.stdout.write(`OK: ${operation}\n`);
   process.stdout.write(`rootPath: ${rootPath}\n`);
   for (const result of results) {
     process.stdout.write(`- ${result}\n`);
   }
-}
-
-function runRuntimeSetup(skillRoot, userRoot) {
-  const installScript = path.join(skillRoot, "scripts", "install-mpact.js");
-  if (!fs.existsSync(installScript)) {
-    throw new Error(`runtime setup helper is missing: ${installScript}`);
-  }
-  const result = spawnSync(process.execPath, [installScript, "--user-root", userRoot], {
-    cwd: skillRoot,
-    encoding: "utf8",
-  });
-  if (result.error) {
-    throw result.error;
-  }
-  if (result.status !== 0) {
-    const message = (result.stderr || result.stdout || `exit status ${result.status}`).trim();
-    throw new Error(`runtime setup failed before project bootstrap: ${message}`);
-  }
-  return result.stdout.split(/\r?\n/).filter(Boolean);
 }
 
 function main() {
@@ -83,8 +38,11 @@ function main() {
 
   if (userRootMode) {
     const userRoot = path.resolve(args.root || args.project || path.join(os.homedir(), ".AgentMemoryRoot"));
-    ensureDir(userRoot);
-    const results = installStarterRules(userRoot, skillRoot, skipStarterRules);
+    const runtimeArgs = { ...args, "user-root": userRoot };
+    if (skipStarterRules) {
+      runtimeArgs["skip-starter-rules"] = true;
+    }
+    const { results } = installMpactRuntime({ args: runtimeArgs, skillRoot, userRoot });
     printReceipt("bootstrap-user-root", userRoot, results);
     return;
   }
@@ -94,7 +52,8 @@ function main() {
   const results = [];
   if (!fs.existsSync(userRoot)) {
     results.push("runtime-setup:required:user-root-missing");
-    for (const line of runRuntimeSetup(skillRoot, userRoot)) {
+    const { results: setupResults } = installMpactRuntime({ args, skillRoot, userRoot });
+    for (const line of setupResults) {
       results.push(`runtime-setup:${line}`);
     }
   } else {
@@ -102,6 +61,8 @@ function main() {
   }
   ensureDir(path.join(projectRoot, ".AgentMemory"));
   results.push("created-or-present:.AgentMemory");
+  const identity = initializeProjectIdentity(path.join(projectRoot, ".AgentMemory"), userRoot);
+  results.push(`${identity.adopted ? "created" : "preserved"}:project:${identity.projectId}:${identity.sentinel}`);
   results.push("project-shims:not-supported");
   printReceipt("bootstrap-project", path.join(projectRoot, ".AgentMemory"), results);
 }

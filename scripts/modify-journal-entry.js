@@ -4,6 +4,7 @@
 const path = require("path");
 const { listMembers, readMember, replaceMember } = require("./lib/zip-record-store");
 const { booleanArg, localTimestamp, resolveRootPath, runCli, sanitizeSlug } = require("./lib/helper-common");
+const { validateProjectWrite } = require("./lib/project-identity");
 
 function selectMember(members, input, args) {
   if (input.member || args.member) {
@@ -34,6 +35,7 @@ function selectMember(members, input, args) {
 
 function main({ args, input }) {
   const rootPath = resolveRootPath(input, args);
+  const identity = validateProjectWrite({ rootPath, input, args });
   const zipPath = path.join(rootPath, "journal.zip");
   const members = listMembers(zipPath);
   const selected = selectMember(members, input, args);
@@ -52,7 +54,7 @@ function main({ args, input }) {
     ? String(replacement)
     : `${oldContent.replace(/\s*$/, "")}\n\n${String(appendText).trim()}\n`;
   replaceMember(zipPath, selected.name, newContent, new Date());
-  return { ok: true, operation: "modify-journal-entry", rootPath, zipPath, member: selected.name, timestamp: timestamp.body };
+  return { ok: true, operation: "modify-journal-entry", rootPath, projectId: identity.projectId, projectPath: identity.projectPath, crossProject: identity.crossProject || undefined, zipPath, member: selected.name, timestamp: timestamp.body };
 }
 
 runCli(main);

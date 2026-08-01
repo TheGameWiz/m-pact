@@ -83,7 +83,7 @@ Provider skill placement is provider-specific and follows the normal skill model
 ~/.gemini/extensions/m-pact/   # or link this repo with gemini extensions link
 ```
 
-The runtime setup helper does not copy itself across provider roots. It creates or preserves `.AgentMemoryRoot/`, installs starter user-root rules without overwriting existing rule files, and installs only the current or explicitly requested provider-global startup shim:
+The runtime setup helper does not copy itself across provider roots. It creates or preserves `.AgentMemoryRoot/`, creates or preserves the `project-count__<n>` identity counter, installs starter user-root rules without overwriting existing rule files, and installs only the current or explicitly requested provider-global startup shim:
 
 ```text
 ~/.codex/AGENTS.md
@@ -103,7 +103,7 @@ For a new project, ask:
 Set up m-pact for this project.
 ```
 
-The agent should first confirm `.AgentMemoryRoot/` exists. If it is missing, it should run runtime setup, then add the project scaffold: `.AgentMemory/`. Artifact folders and ZIP containers are lazy and are created only when first used. It should not run refresh after bootstrap unless you also ask it to refresh, load, or verify. Provider-global shims should invoke M-PACT for configured runtimes; project bootstrap does not write project instruction files.
+The project bootstrap helper ensures required user-root setup, then adds the project scaffold: `.AgentMemory/` with its project identity sentinel. Artifact folders and ZIP containers are lazy and are created only when first used. It should not run refresh after bootstrap unless you also ask it to refresh, load, or verify. Provider-global shims should invoke M-PACT for configured runtimes; project bootstrap does not write project instruction files.
 
 If you start an agent from a subfolder below an existing project `.AgentMemory/`, refresh uses the nearest parent project root. It should not ask to create another `.AgentMemory/` in the subfolder unless you explicitly ask for a new child project root.
 
@@ -130,6 +130,8 @@ Use $m-pact and refresh memory.
 ```
 
 The agent should run the skill's refresh procedure. If a project memory root exists, it loads the memory chain and emits a compact refresh receipt. The visible receipt starts with `M-PACT MEMORY REFRESH`; internal begin/end marker lines in the bundle are not shown. The full roots, rules, sessions, and task pointer details stay inside the loaded bundle instead of being printed during normal startup.
+
+For project roots with identity, the refresh receipt also includes the active project root and project ID. If an older project root has no identity sentinel yet, refresh reports `projectIdentity=adoption-required` and prints a `M-PACT PROJECT ADOPTION REQUIRED` question. If you answer yes, the agent runs the one-root adoption helper, refreshes again, and then passes that ID back to durable project-root write helpers as `--project-id <n>`.
 
 After the receipt, the agent should not scan `.AgentMemory`, sessions, rules, tasks, or the generated bundle just to verify the refresh. The bundle is already the verified startup context. Ask for targeted lookup when you want a specific memory artifact.
 
@@ -185,7 +187,7 @@ If a project has no `.AgentMemory/`, ask:
 Bootstrap M-PACT for this project.
 ```
 
-Project bootstrap first ensures the user `.AgentMemoryRoot/` exists, running provider runtime setup if needed. Then it creates only the local memory root. The root's artifact folders are created later by the first approved write that needs them. It does not write project-local instruction files.
+Project bootstrap first ensures the user `.AgentMemoryRoot/` exists through the helper-owned setup path if needed. Then it creates only the local memory root. The root's artifact folders are created later by the first approved write that needs them. It does not write project-local instruction files.
 
 If your user root is missing, ask:
 
@@ -228,6 +230,8 @@ Both user and project roots may eventually have this shape:
 
 ```text
 .AgentMemoryRoot/ or .AgentMemory/
+  project-count__<n>       # user root only
+  project__<path-slug>     # project roots only
   rules/
   sessions.zip
   tasks/
@@ -247,7 +251,9 @@ tasks/
     summary.zip
 ```
 
-The shape is lazy. A new project bootstrap creates `.AgentMemory/` only. `rules/`, `tasks/`, `sessions.zip`, `case-studies.zip`, and `journal.zip` appear only when first used. A new task folder starts with `task.md`; its specification, log, and summary ZIPs appear only when those records are written.
+The shape is lazy. A new project bootstrap creates `.AgentMemory/` and its `project__<path-slug>` identity sentinel only. `rules/`, `tasks/`, `sessions.zip`, `case-studies.zip`, and `journal.zip` appear only when first used. A new task folder starts with `task.md`; its specification, log, and summary ZIPs appear only when those records are written.
+
+Project identity sentinels are helper-owned. New project bootstrap mints identity automatically. Existing pre-identity roots use lazy confirmed adoption: they are considered only when encountered by refresh or a durable write, and identity is minted only after you answer yes to the adoption question. If a moved or copied project reports a path mismatch, use the repair helper instead of hand-editing sentinel files.
 
 ### Filenames Are The Index
 
@@ -305,13 +311,13 @@ Memory root policy helps the agent understand the intended scope of a read or wr
 
 ### Why Use It
 
-Use memory root policy when placement matters. It keeps ordinary writes on the active project root, reserves user-root writes for explicit user-level or cross-project intent, and keeps inherited roots read-only by default.
+Use memory root policy when placement matters. It keeps ordinary writes on the active project root, reserves user-root writes for explicit user-level or cross-project intent, and keeps inherited roots read-only by default. Durable project-root writes require the project ID from the latest refresh or successful write receipt; user-root writes and read helpers do not. Successful project-write helper receipts include `projectPath` beside `projectId` so you can verify the project by name/path.
 
-The startup bundle may include root orientation such as the start path, user root, project roots, active project root, memory chain, current-task state, and active task names. It does not include a full memory-root tree by default.
+The startup bundle may include root orientation such as the start path, user root, project roots, active project root, project identity, memory chain, current-task state, and active task names. It does not include a full memory-root tree by default.
 
 ### How To Use It
 
-Name the project, path, or scope when you want something written outside the active project. Otherwise, ask naturally and let the helper resolve the active root. This is useful when you are in one workspace but want to add a task, rule, session, or lookup to another known project.
+Name the project, path, or scope when you want something written outside the active project. Otherwise, ask naturally and let the helper resolve the active root. This is useful when you are in one workspace but want to add a task, rule, session, or lookup to another known project. A write to a different project root can proceed when the loaded project ID matches that target. `--cross-project` is only for explicitly approved writes to a project whose ID was not loaded. It lifts the requirement to supply a project ID, not the check itself: if you do supply one and it contradicts the target, the write still halts, and the target identity is validated either way.
 
 ### Common Requests
 
@@ -345,7 +351,7 @@ Approved user-root bootstrap creates the root:
 .AgentMemoryRoot/
 ```
 
-It also installs bundled starter core rules unless you ask to skip them. Installing starter rules creates `rules/` because rule files are being written. If you skip starter rules, `.AgentMemoryRoot/` remains otherwise empty until first use.
+It also creates or preserves the `project-count__<n>` identity counter and installs bundled starter core rules unless you ask to skip them. Installing starter rules creates `rules/` because rule files are being written. If you skip starter rules, `.AgentMemoryRoot/` otherwise remains empty until first use.
 
 The starter rules are editable defaults. Review, edit, delete, or replace any rule that does not fit your workflow.
 
@@ -357,11 +363,11 @@ Approved project bootstrap creates the root:
 .AgentMemory/
 ```
 
-Before creating that root, project bootstrap ensures `.AgentMemoryRoot/` exists. If it is missing, the agent runs provider runtime setup first. Project bootstrap does not configure project startup shims. Startup is handled by provider-global shims installed during provider runtime setup.
+Before creating that root, project bootstrap ensures `.AgentMemoryRoot/` exists. If it is missing, the helper uses provider runtime setup mechanics first. Project bootstrap mints the project identity sentinel and does not configure project startup shims. Startup is handled by provider-global shims installed during provider runtime setup.
 
 Project bootstrap is only needed when no `.AgentMemory/` exists in the current folder or any ancestor folder. If an ancestor project root exists, the child folder inherits it.
 
-After setup from a refresh preflight yes/no prompt, the agent should run refresh once and emit the receipt for the new `.AgentMemory/`. For a standalone bootstrap request, it should run refresh only if you also ask it to refresh, load, or verify.
+After setup from a refresh project-setup yes/no prompt, the agent should run refresh once and emit the receipt for the new `.AgentMemory/`. For a standalone bootstrap request, it should run refresh only if you also ask it to refresh, load, or verify.
 
 ### Approval Gate
 
@@ -828,6 +834,7 @@ M-PACT is designed to avoid silent state changes. Agents should surface durable 
 Director approval is required for:
 
 - Bootstrap.
+- Project identity adoption.
 - Deletion.
 - Task creation.
 - Task close.

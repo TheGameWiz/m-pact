@@ -7,6 +7,7 @@ const {
   hasMembers,
 } = require("./lib/zip-record-store");
 const { withDirectoryLock } = require("./lib/directory-lock");
+const { validateProjectWrite } = require("./lib/project-identity");
 const { buildTaskLogMarkdown } = require("./lib/task-log-markdown");
 const {
   booleanArg,
@@ -23,6 +24,8 @@ function hasCurrentSpecification(taskPath) {
 
 function main({ args, input }) {
   const taskPath = resolveTaskPath(input, args, { allowedStates: ["A"] });
+  const rootPath = path.dirname(path.dirname(taskPath));
+  const identity = validateProjectWrite({ rootPath, input, args });
   const agent = input.agent || args.agent || "agent";
   const title = input.title || input.slugHint || args.title || args["slug-hint"] || "task-log-entry";
   const designChange = Boolean(input.designChange || input.design_change || booleanArg(args, "design-change"));
@@ -63,6 +66,9 @@ function main({ args, input }) {
     return {
       ok: true,
       operation: "write-task-log",
+      projectId: identity.projectId,
+      projectPath: identity.projectPath,
+      crossProject: identity.crossProject || undefined,
       taskPath,
       zipPath,
       record: appended.record,

@@ -23,7 +23,7 @@ If stdin body delivery fails, follow the fallback in `helper-write-conventions.m
 Example:
 
 ```bash
-"# full replacement spec..." | node scripts/write-task-spec.js --task t0005 --agent codex --title "Spec v2" --log-title "Spec v2 decisions" --log-input "<OS-temp-file>"
+"# full replacement spec..." | node scripts/write-task-spec.js --task t0005 --project-id 7 --agent codex --title "Spec v2" --log-title "Spec v2 decisions" --log-input "<OS-temp-file>"
 ```
 
-Do not read prior logs merely to write the paired entry, assign record numbers, update the current-task sentinel, create project/skill scratch input, or fetch timestamps separately.
+Use the project ID from the latest refresh or successful write receipt. Do not read prior logs merely to write the paired entry, assign record numbers, update the current-task sentinel, create project/skill scratch input, or fetch timestamps separately.

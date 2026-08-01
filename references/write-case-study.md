@@ -17,7 +17,7 @@ If stdin body delivery fails, follow the fallback in `helper-write-conventions.m
 Example:
 
 ```bash
-node scripts/write-case-study.js --root .AgentMemory --title "Short descriptive title" --topic "area-tag"
+node scripts/write-case-study.js --root .AgentMemory --project-id 7 --title "Short descriptive title" --topic "area-tag"
 ```
 
-For lookup, use `list-members.js`, `read-member.js`, and `search-bodies.js` with `--container case-studies`. Do not read case studies at startup; load them on demand for topic-adjacent research.
+Use the project ID from the latest refresh or successful write receipt for project-root writes. For lookup, use `list-members.js`, `read-member.js`, and `search-bodies.js` with `--container case-studies`; read helpers do not need project ID. Do not read case studies at startup; load them on demand for topic-adjacent research.

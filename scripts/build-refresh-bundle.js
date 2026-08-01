@@ -7,6 +7,8 @@ const path = require("path");
 const crypto = require("crypto");
 const { listMembers, readMember } = require("./lib/zip-record-store");
 const { assertMpactAllowedInCurrentSession } = require("./lib/helper-common");
+const { installMpactRuntime } = require("./lib/install-runtime");
+const { adoptionNotice, defaultUserRoot, ensureCounterInitialized, readCounterSentinel, readProjectSentinel } = require("./lib/project-identity");
 
 const MIN_NODE_MAJOR = 18;
 const EOL = os.EOL;
@@ -86,6 +88,63 @@ function formatDisplayPath(filePath) {
 
 function formatDisplayPathList(items) {
   return formatList((items || []).map(formatDisplayPath));
+}
+
+function describeProjectIdentity(activeRoot, userRoot) {
+  if (!activeRoot) {
+    return { receipt: "projectIdentity=(none)", manifest: "- Project identity: (none)" };
+  }
+  const initialIdentity = readProjectSentinel(activeRoot);
+  const initialCounter = readCounterSentinel(userRoot, { allowMissing: true });
+  if (initialIdentity.state === "missing") {
+    try {
+      if (initialCounter.state === "missing") {
+        ensureCounterInitialized(userRoot);
+      } else if (initialCounter.state !== "valid") {
+        throw new Error(`project identity counter is malformed: ${initialCounter.state}`);
+      }
+      const block = adoptionNotice(activeRoot).mpactNotice;
+      return {
+        receipt: "projectIdentity=adoption-required",
+        manifest: "- Project identity: adoption-required",
+        adoptionBlock: block,
+      };
+    } catch (error) {
+      return {
+        receipt: `projectIdentity=blocked`,
+        manifest: `- Project identity: blocked (${error.message})`,
+      };
+    }
+  }
+  if (initialIdentity.state === "valid" && initialCounter.state === "missing") {
+    try {
+      ensureCounterInitialized(userRoot);
+    } catch (error) {
+      return {
+        receipt: `projectId=${initialIdentity.projectId}; projectIdentity=blocked`,
+        manifest: `- Project identity: project ${initialIdentity.projectId}; blocked (${error.message})`,
+      };
+    }
+  }
+  const identity = initialIdentity;
+  if (identity.state !== "valid") {
+    return {
+      receipt: `projectIdentity=${identity.state}`,
+      manifest: `- Project identity: ${identity.state}`,
+    };
+  }
+  const counter = readCounterSentinel(userRoot);
+  if (counter.state !== "valid") {
+    return {
+      receipt: `projectId=${identity.projectId}; projectIdentity=counter-${counter.state}`,
+      manifest: `- Project identity: project ${identity.projectId}; counter ${counter.state}`,
+    };
+  }
+  const status = identity.projectId > counter.value ? "id-above-counter" : "ok";
+  return {
+    receipt: `projectId=${identity.projectId}; projectIdentity=${status}`,
+    manifest: `- Project identity: project ${identity.projectId}; ${status}`,
+  };
 }
 
 function splitLines(text) {
@@ -336,6 +395,7 @@ function main() {
   const scriptDir = __dirname;
   const skillDir = path.dirname(scriptDir);
   const startupContractPath = path.join(skillDir, "references", "startup-contract.md");
+  let refreshInstallResults = null;
   let startupContractText = null;
   let activeTaskNames = [];
   let startupTaskRead = "(none)";
@@ -365,12 +425,16 @@ function main() {
     writeFailureAndExit(options.startPath, failures);
   }
 
-  const homePath = process.platform === "win32" && process.env.USERPROFILE && process.env.USERPROFILE.trim()
-    ? process.env.USERPROFILE
-    : os.homedir();
-  const userRoot = path.join(homePath, ".AgentMemoryRoot");
+  const userRoot = defaultUserRoot();
   if (!existsDir(userRoot)) {
-    failures.push(`Required user root is missing: ${userRoot}`);
+    try {
+      refreshInstallResults = installMpactRuntime({ skillRoot: skillDir, userRoot }).results;
+    } catch (error) {
+      failures.push(`Failed to initialize missing user root ${userRoot}: ${error.message}`);
+    }
+  }
+  if (!existsDir(userRoot)) {
+    failures.push(`Required user root is missing after setup attempt: ${userRoot}`);
   }
 
   const nearestFirstProjectRoots = [];
@@ -526,8 +590,10 @@ function main() {
   const ruleIndexDisplay = ruleIndexParts.length > 0 ? ruleIndexParts.join("; ") : "(none)";
   const missingOrAmbiguousDisplay = missingOrAmbiguous.length > 0 ? formatList(missingOrAmbiguous) : "[(none)]";
   const projectRootsDisplay = formatDisplayPathList(projectRoots);
+  const projectIdentityDisplay = describeProjectIdentity(activeRoot, userRoot);
   const receiptLines = [
     "M-PACT MEMORY REFRESH",
+    `activeProjectRoot=${activeDisplay}; ${projectIdentityDisplay.receipt}`,
     "audit=PASS; bundle=loaded; output-complete=END REFRESH BUNDLE",
   ];
   const startupContractCoverage = getStartupContractCoverage(skillDir, startupContractText);
@@ -542,13 +608,24 @@ function main() {
     addLine(bundle, line);
   }
   addLine(bundle, "END REFRESH RECEIPT");
+  if (projectIdentityDisplay.adoptionBlock) {
+    addLine(bundle);
+    addLine(bundle, projectIdentityDisplay.adoptionBlock);
+  }
   addLine(bundle);
   addLine(bundle, "## Root And Startup Manifest");
   addLine(bundle);
   addLine(bundle, `- Start path: ${formatDisplayPath(resolvedStart)}`);
   addLine(bundle, `- Required user root: ${userDisplay}`);
+  addLine(bundle, `- User setup during refresh: ${refreshInstallResults ? "performed" : "not needed"}`);
+  if (refreshInstallResults) {
+    for (const result of refreshInstallResults) {
+      addLine(bundle, `  - ${result}`);
+    }
+  }
   addLine(bundle, `- Project roots, broad-to-specific: ${projectRootsDisplay}`);
   addLine(bundle, `- Active project root: ${activeDisplay}`);
+  addLine(bundle, projectIdentityDisplay.manifest);
   addLine(bundle, `- Memory chain, broad-to-specific: ${chainDisplay}`);
   addLine(bundle, `- Missing or ambiguous: ${missingOrAmbiguousDisplay}`);
   addLine(bundle, "- Startup session selection: active root only by filename descending; newest session full or truncated, then up to four summaries, with rendered session artifacts capped at 25KB total.");
@@ -635,6 +712,9 @@ function main() {
     console.log(line);
   }
   console.log("END REFRESH RECEIPT");
+  if (projectIdentityDisplay.adoptionBlock) {
+    console.log(projectIdentityDisplay.adoptionBlock);
+  }
   console.log("END REFRESH BUNDLE");
 }
 

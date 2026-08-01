@@ -20,7 +20,7 @@ If stdin body delivery fails, follow the fallback in `helper-write-conventions.m
 Example:
 
 ```bash
-node scripts/create-task.js --root .AgentMemory --title "Short task title" --priority px --agent codex --log-title "Initial handoff"
+node scripts/create-task.js --root .AgentMemory --project-id 7 --title "Short task title" --priority px --agent codex --log-title "Initial handoff"
 ```
 
-The helper owns task numbering, folder naming, `task.md`, optional first `log.zip` member, timestamps, and current-task sentinel replacement. Do not calculate task numbers, create project/skill scratch input, or fetch timestamps separately; see `helper-write-conventions.md`.
+Use the project ID from the latest refresh or successful write receipt. The helper owns task numbering, folder naming, `task.md`, optional first `log.zip` member, timestamps, project identity validation, and current-task sentinel replacement. Do not calculate task numbers, create project/skill scratch input, or fetch timestamps separately; see `helper-write-conventions.md`.

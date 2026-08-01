@@ -14,7 +14,7 @@ Use `scripts/close-task.js`. The helper owns the task state update and current-t
 Example shape:
 
 ```bash
-node scripts/close-task.js --task t0001
+node scripts/close-task.js --task t0001 --project-id 7
 ```
 
-Do not close a task based only on agent judgment.
+Use the project ID from the latest refresh or successful write receipt. Do not close a task based only on agent judgment.

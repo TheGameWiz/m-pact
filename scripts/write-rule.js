@@ -12,6 +12,7 @@ const {
   sanitizeSlug,
   yamlScalar,
 } = require("./lib/helper-common");
+const { validateProjectWrite } = require("./lib/project-identity");
 
 const RULE_NAME_MAX = 96;
 const CATEGORIES = new Set(["core", "behavior", "format", "director", "user"]);
@@ -31,6 +32,7 @@ function existingCreatedDate(content) {
 
 function main({ args, input }) {
   const rootPath = resolveRootPath(input, args);
+  const identity = validateProjectWrite({ rootPath, input, args });
   const rulesPath = path.join(rootPath, "rules");
   const category = String(input.category || args.category || "behavior").replace(/-$/, "");
   if (!CATEGORIES.has(category) && !/^[a-z][a-z0-9]+$/.test(category)) {
@@ -83,7 +85,7 @@ function main({ args, input }) {
     ].join("\n");
 
     fs.writeFileSync(rulePath, content, "utf8");
-    return { ok: true, operation: exists ? "update-rule" : "write-rule", rootPath, rulePath, timestamp: timestamp.body };
+    return { ok: true, operation: exists ? "update-rule" : "write-rule", rootPath, projectId: identity.projectId, projectPath: identity.projectPath, crossProject: identity.crossProject || undefined, rulePath, timestamp: timestamp.body };
   });
 }
 

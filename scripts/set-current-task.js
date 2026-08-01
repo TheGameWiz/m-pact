@@ -5,6 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const { withDirectoryLock } = require("./lib/directory-lock");
 const { booleanArg, resolveRootPath, runCli } = require("./lib/helper-common");
+const { validateProjectWrite } = require("./lib/project-identity");
 const { clearCurrentSentinels, setCurrentTask, validateTaskPath } = require("./lib/task-state");
 
 function resolveTaskFolder(rootPath, args, input) {
@@ -45,17 +46,18 @@ function resolveTaskFolder(rootPath, args, input) {
 
 function main({ args, input }) {
   const rootPath = resolveRootPath(input, args);
+  const identity = validateProjectWrite({ rootPath, input, args });
   const rootTasksPath = path.join(rootPath, "tasks");
   if (booleanArg(args, "clear")) {
     return withDirectoryLock(rootTasksPath, () => {
       const cleared = clearCurrentSentinels(rootTasksPath);
-      return { ok: true, operation: "clear-current-task", rootPath, status: `cleared ${cleared.length}` };
+      return { ok: true, operation: "clear-current-task", rootPath, projectId: identity.projectId, projectPath: identity.projectPath, crossProject: identity.crossProject || undefined, status: `cleared ${cleared.length}` };
     });
   }
   const { tasksPath, taskPath, folder } = resolveTaskFolder(rootPath, args, input);
   return withDirectoryLock(tasksPath, () => {
     const sentinel = setCurrentTask(tasksPath, taskPath);
-    return { ok: true, operation: "set-current-task", rootPath, taskPath, sentinel };
+    return { ok: true, operation: "set-current-task", rootPath, projectId: identity.projectId, projectPath: identity.projectPath, crossProject: identity.crossProject || undefined, taskPath, sentinel };
   });
 }
 

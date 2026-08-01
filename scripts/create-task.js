@@ -5,6 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const { appendGeneratedMember } = require("./lib/zip-record-store");
 const { withDirectoryLock } = require("./lib/directory-lock");
+const { validateProjectWrite } = require("./lib/project-identity");
 const { buildTaskLogMarkdown } = require("./lib/task-log-markdown");
 const {
   booleanArg,
@@ -73,6 +74,7 @@ function buildTaskMarkdown({ timestamp, source, owner, priority, title, context,
 
 function main({ args, input }) {
   const rootPath = resolveRootPath(input, args);
+  const identity = validateProjectWrite({ rootPath, input, args });
   const title = input.title || args.title || input.task || args.task;
   if (!title || !String(title).trim()) {
     throw new Error("title or task is required");
@@ -138,6 +140,9 @@ function main({ args, input }) {
       ok: true,
       operation: "create-task",
       rootPath,
+      projectId: identity.projectId,
+      projectPath: identity.projectPath,
+      crossProject: identity.crossProject || undefined,
       taskPath,
       record: number,
       member,

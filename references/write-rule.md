@@ -23,7 +23,7 @@ If stdin body delivery fails, follow the fallback in `helper-write-conventions.m
 Example:
 
 ```bash
-node scripts/write-rule.js --root .AgentMemory --filename behavior-short-rule-cue.md --description "Additive scope or trigger sentence."
+node scripts/write-rule.js --root .AgentMemory --project-id 7 --filename behavior-short-rule-cue.md --description "Additive scope or trigger sentence."
 ```
 
-The helper owns timestamping, frontmatter, filename checks, `rules/` creation, and the write. Keep the body compact: apply guidance plus why; long history belongs in `case-studies.zip`.
+Use the project ID from the latest refresh or successful write receipt for project-root rule writes. User-root/global rule writes do not use project ID. The helper owns timestamping, frontmatter, filename checks, `rules/` creation, identity validation, and the write. Keep the body compact: apply guidance plus why; long history belongs in `case-studies.zip`.

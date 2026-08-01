@@ -14,7 +14,7 @@ Treat refresh as the floor of being useful, not the ceiling.
 
 For multi-provider work, refresh is the handoff point that lets each visible agent session start from the same durable memory chain instead of an isolated chat.
 
-On first real use, ensure the user-level install exists before refresh. If `.AgentMemoryRoot/` is missing, follow `references/install-mpact.md` before attempting project refresh. After user-level install exists, refresh may still stop with `M-PACT PROJECT SETUP REQUIRED` if no project `.AgentMemory/` exists in the current folder or any ancestor.
+On first real use, run refresh first. Do not perform an agent-side `.AgentMemoryRoot/` preflight check; restricted or IDE-attached environments can make a present user root look missing. The refresh helper owns missing user-root detection and runs the provider runtime setup mechanics when the user root is truly absent. Refresh may still stop with `M-PACT PROJECT SETUP REQUIRED` if no project `.AgentMemory/` exists in the current folder or any ancestor.
 
 ## When To Run It
 
@@ -65,6 +65,8 @@ If stdout contains `M-PACT SUPPRESSED` and its literal final line is `END M-PACT
 If stdout contains `M-PACT PROJECT SETUP REQUIRED` and its literal final line is `END PROJECT SETUP REQUIRED`, no refresh bundle was produced. Do not emit a receipt and do not load user-root-only context yet. Ask the setup question from stdout and stop. If the Director says yes, follow `references/bootstrap-project.md` to add the missing project scaffolding, then run refresh again. If the Director says no, run refresh again with `--AllowUserRootOnly` and emit the resulting user-root-only receipt.
 
 If stdout contains `AUDIT: PASS`, `M-PACT REFRESH BUNDLE MANIFEST`, a `BundlePath: <absolute path>` line, a compact receipt block, and its literal final line is `END REFRESH BUNDLE`, read the bundle file at `BundlePath`, verify the file's literal final line is also `END REFRESH BUNDLE`, then emit the compact receipt body. The receipt body starts with `M-PACT MEMORY REFRESH`; do not emit the internal `BEGIN REFRESH RECEIPT` or `END REFRESH RECEIPT` marker lines.
+
+If that successful stdout also contains `M-PACT PROJECT ADOPTION REQUIRED`, refresh still completed and memory is loaded. Emit the compact receipt first, then ask the adoption question from stdout. If the Director says yes, follow `references/adopt-project-identity.md`, then refresh again so the new project ID enters the receipt. If the Director says no, continue with reads only; durable writes to that root will keep halting for adoption.
 
 The stdout manifest alone is not a completed refresh and does not load memory by itself. `BundlePath` is not a question for the Director; it is the next required step. Never stop after printing the bundle path, never ask whether to open or apply the bundle, and never ask what to do next before the receipt body has been emitted.
 

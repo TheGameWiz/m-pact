@@ -139,7 +139,7 @@ function writeReceipt(value) {
   const lines = [
     `OK: ${value.operation || "helper"}`,
   ];
-  for (const key of ["record", "member", "timestamp", "task", "status", "taskPath", "rootPath", "zipPath", "oldPath", "newPath", "sentinel", "rulePath", "memberCount", "query", "readFrom", "readThrough", "nextCursor", "truncated", "membersRead", "specMember", "logMember", "warning"]) {
+  for (const key of ["record", "member", "timestamp", "task", "status", "projectId", "projectPath", "crossProject", "taskPath", "rootPath", "zipPath", "oldPath", "newPath", "sentinel", "rulePath", "memberCount", "query", "readFrom", "readThrough", "nextCursor", "truncated", "membersRead", "specMember", "logMember", "warning"]) {
     if (value[key] !== undefined && value[key] !== null) {
       lines.push(`${key}: ${value[key]}`);
     }
@@ -284,6 +284,10 @@ function runCli(main) {
     const result = main({ args, input });
     writeReceipt(result);
   } catch (error) {
+    if (error && error.mpactNotice) {
+      process.stdout.write(`${error.mpactNotice}\n`);
+      process.exit(error.exitCode || 1);
+    }
     process.stderr.write(`ERROR: ${error.message}\n`);
     process.exit(1);
   }

@@ -34,7 +34,7 @@ Provider skill placement is provider-specific and follows the normal skill model
 
 Copilot CLI may later use `~/.copilot/skills/m-pact/` or `~/.agents/skills/m-pact/`, but that install path remains best-effort and is not enabled by the default helper.
 
-The setup helper does not copy itself across provider roots. It creates or preserves the user memory root at `~/.AgentMemoryRoot/`, installs starter user-root rules without overwriting existing rule files, and installs only the current or explicitly requested provider-global startup shim:
+The setup helper does not copy itself across provider roots. It creates or preserves the user memory root at `~/.AgentMemoryRoot/`, creates or preserves the `project-count__<n>` identity counter, installs starter user-root rules without overwriting existing rule files, and installs only the current or explicitly requested provider-global startup shim:
 
 ```text
 ~/.codex/AGENTS.md
@@ -88,12 +88,16 @@ The memory chain is broad-to-specific: user root first, then ancestor project ro
 Each root uses the same standard folders:
 
 ```text
+project-count__<n>       # user root only
+project__<path-slug>     # project roots only
 rules/
 sessions.zip
 tasks/
 case-studies.zip
 journal.zip
 ```
+
+Project identity sentinels are helper-owned. New project bootstrap mints a local project ID automatically. Existing pre-identity roots use lazy confirmed adoption: refresh or a durable write reports `M-PACT PROJECT ADOPTION REQUIRED`, asks for a Director yes, and only the one-root adoption helper mints identity. Path-mismatched or malformed identity still requires repair instead of hand editing.
 
 ## Quick Use
 
@@ -105,7 +109,7 @@ For a new project, ask:
 Set up m-pact for this project.
 ```
 
-The agent should first confirm `.AgentMemoryRoot/` exists. If it is missing, it should run provider runtime setup, then add the project scaffold: `.AgentMemory/`. It should not run refresh after bootstrap unless you also ask it to refresh, load, or verify. Provider-global shims should invoke M-PACT for configured runtimes; project bootstrap does not write project instruction files.
+The project bootstrap helper ensures required user-root setup before adding the project scaffold: `.AgentMemory/` with its project identity sentinel. It should not run refresh after bootstrap unless you also ask it to refresh, load, or verify. Provider-global shims should invoke M-PACT for configured runtimes; project bootstrap does not write project instruction files.
 
 At the start of a new context, ask the agent:
 
@@ -113,7 +117,7 @@ At the start of a new context, ask the agent:
 Use $m-pact and refresh memory.
 ```
 
-The agent should run the bundled refresh procedure. If no project `.AgentMemory/` exists, refresh should stop before any receipt and ask whether to add project scaffolding. If you answer no, it should rerun user-root-only refresh and emit that receipt. Refresh is intended only for actual new context/session startup, completed context loss with concrete evidence, or explicit refresh requests. It should not run in anticipation of compaction or merely because visible context seems small after startup. If the refresh bundle hits the size limit, the script emits a partial bundle with `LimitHit: true`; the agent should keep going with the warning visible and use targeted lookup for anything omitted.
+The agent should run the bundled refresh procedure without separately probing `.AgentMemoryRoot/` first. If the user root is truly missing, refresh performs provider runtime setup mechanics and continues. If no project `.AgentMemory/` exists, refresh should stop before any receipt and ask whether to add project scaffolding. If you answer no, it should rerun user-root-only refresh and emit that receipt. Refresh is intended only for actual new context/session startup, completed context loss with concrete evidence, or explicit refresh requests. It should not run in anticipation of compaction or merely because visible context seems small after startup. If the refresh bundle hits the size limit, the script emits a partial bundle with `LimitHit: true`; the agent should keep going with the warning visible and use targeted lookup for anything omitted.
 
 After the receipt, refresh is complete. Agents should not scan memory folders merely to verify refresh; targeted lookup is for specific follow-up needs.
 
@@ -164,6 +168,7 @@ m-pact/
 - Sessions, task logs, and summaries are context, not prompts or task assignments.
 - Task logs are append-only.
 - The current task specification is the highest-numbered member of `specification.zip`.
+- Durable project-root writes require the project ID from the latest refresh or successful helper receipt. Helper receipts include `projectPath` beside `projectId` so humans can verify the target project.
 - Bootstrap, task creation, task close/reopen, ambiguous durable rules, deletion, and non-local writes require explicit Director approval.
 
 ## Documentation

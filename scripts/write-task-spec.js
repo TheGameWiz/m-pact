@@ -3,6 +3,7 @@
 
 const path = require("path");
 const { withDirectoryLock } = require("./lib/directory-lock");
+const { validateProjectWrite } = require("./lib/project-identity");
 const {
   appendMember,
 } = require("./lib/zip-record-store");
@@ -55,6 +56,8 @@ function readLogBody(input, args, title) {
 
 function main({ args, input }) {
   const taskPath = resolveTaskPath(input, args, { allowedStates: ["A"] });
+  const rootPath = path.dirname(path.dirname(taskPath));
+  const identity = validateProjectWrite({ rootPath, input, args });
   const content = readContent(input, args);
   const title = input.title || input.slugHint || args.title || args["slug-hint"] || "specification";
   const agent = input.agent || args.agent || "agent";
@@ -103,6 +106,9 @@ function main({ args, input }) {
     return {
       ok: true,
       operation: "write-task-spec",
+      projectId: identity.projectId,
+      projectPath: identity.projectPath,
+      crossProject: identity.crossProject || undefined,
       taskPath,
       record: specAppend.record,
       member: specAppend.member,

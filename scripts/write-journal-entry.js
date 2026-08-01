@@ -10,6 +10,7 @@ const {
   runCli,
   sanitizeSlug,
 } = require("./lib/helper-common");
+const { validateProjectWrite } = require("./lib/project-identity");
 
 function cappedSlug(title, prefix, suffix) {
   const max = 128 - prefix.length - suffix.length;
@@ -18,6 +19,7 @@ function cappedSlug(title, prefix, suffix) {
 
 function main({ args, input }) {
   const rootPath = resolveRootPath(input, args);
+  const identity = validateProjectWrite({ rootPath, input, args });
   const title = input.title || input.slugHint || args.title || args["slug-hint"] || "journal entry";
   const body = input.body;
   if (!body || !String(body).trim()) {
@@ -45,7 +47,7 @@ function main({ args, input }) {
     ].filter((line) => line !== null).join("\n");
     const zipPath = path.join(rootPath, "journal.zip");
     appendGeneratedMember(zipPath, member, content, now);
-    return { ok: true, operation: "write-journal-entry", rootPath, zipPath, member, timestamp: timestamp.body };
+    return { ok: true, operation: "write-journal-entry", rootPath, projectId: identity.projectId, projectPath: identity.projectPath, crossProject: identity.crossProject || undefined, zipPath, member, timestamp: timestamp.body };
   });
 }
 
