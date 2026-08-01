@@ -4,7 +4,9 @@
 const fs = require("fs");
 const path = require("path");
 const {
+  assertKnownFlags,
   assertMpactAllowedInCurrentSession,
+  assertStringFlagValues,
   parseArgs,
 } = require("./lib/helper-common");
 const {
@@ -12,9 +14,11 @@ const {
   defaultUserRoot,
 } = require("./lib/project-identity");
 
+const ACCEPTED_FLAGS = ["root", "project", "user-root"];
+
 function fail(message) {
   process.stderr.write(`ERROR: ${message}\n`);
-  process.exit(1);
+  process.exitCode = 1;
 }
 
 function activeProjectRoot(startPath = process.cwd()) {
@@ -37,8 +41,11 @@ function activeProjectRoot(startPath = process.cwd()) {
 
 function main() {
   assertMpactAllowedInCurrentSession();
-  const args = parseArgs(process.argv.slice(2));
-  const userRoot = path.resolve(args["user-root"] || args.userRoot || defaultUserRoot());
+  const argv = process.argv.slice(2);
+  assertKnownFlags(argv, ACCEPTED_FLAGS);
+  const args = parseArgs(argv);
+  assertStringFlagValues(args, ["root", "project", "user-root"]);
+  const userRoot = path.resolve(args["user-root"] || defaultUserRoot());
   const rootArg = args.root || args.project;
   const rootPath = rootArg
     ? (path.basename(path.resolve(rootArg)) === ".AgentMemory" ? path.resolve(rootArg) : path.join(path.resolve(rootArg), ".AgentMemory"))
@@ -58,4 +65,5 @@ try {
   main();
 } catch (error) {
   fail(error.message);
+  process.exit(error.exitCode || process.exitCode || 1);
 }

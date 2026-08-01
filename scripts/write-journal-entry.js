@@ -12,6 +12,19 @@ const {
 } = require("./lib/helper-common");
 const { validateProjectWrite } = require("./lib/project-identity");
 
+const ACCEPTED_FLAGS = [
+  "root",
+  "project-id",
+  "cross-project",
+  "user-root",
+  "input",
+  "title",
+  "slug-hint",
+  "project",
+  "phase",
+  "key-insight",
+];
+
 function cappedSlug(title, prefix, suffix) {
   const max = 128 - prefix.length - suffix.length;
   return (sanitizeSlug(title) || "journal-entry").slice(0, max).replace(/-+$/g, "") || "journal-entry";
@@ -20,12 +33,12 @@ function cappedSlug(title, prefix, suffix) {
 function main({ args, input }) {
   const rootPath = resolveRootPath(input, args);
   const identity = validateProjectWrite({ rootPath, input, args });
-  const title = input.title || input.slugHint || args.title || args["slug-hint"] || "journal entry";
+  const title = args.title || args["slug-hint"] || "journal entry";
   const body = input.body;
   if (!body || !String(body).trim()) {
     throw new Error("body is required");
   }
-  const project = input.project || args.project || path.basename(path.resolve(rootPath, ".."));
+  const project = args.project || path.basename(path.resolve(rootPath, ".."));
   return withDirectoryLock(rootPath, () => {
     const now = new Date();
     const timestamp = localTimestamp(now);
@@ -36,13 +49,13 @@ function main({ args, input }) {
       `# ${title}`,
       "",
       `Project: ${project}`,
-      input.phase || args.phase ? `Phase: ${input.phase || args.phase}` : null,
+      args.phase ? `Phase: ${args.phase}` : null,
       `Date: ${timestamp.date}`,
       "Author: director",
       "",
       String(body).trim(),
       "",
-      input.keyInsight || args["key-insight"] ? `Key Insight: ${input.keyInsight || args["key-insight"]}` : null,
+      args["key-insight"] ? `Key Insight: ${args["key-insight"]}` : null,
       "",
     ].filter((line) => line !== null).join("\n");
     const zipPath = path.join(rootPath, "journal.zip");
@@ -51,4 +64,4 @@ function main({ args, input }) {
   });
 }
 
-runCli(main);
+runCli(main, { acceptedFlags: ACCEPTED_FLAGS, stringFlags: ["root", "project-id", "user-root", "input", "title", "slug-hint", "project", "phase", "key-insight"] });

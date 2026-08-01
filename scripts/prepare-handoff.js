@@ -9,13 +9,10 @@ const {
   resolveContainer,
   withContainerOperationLock,
 } = require("./lib/container-state");
-const { assertMpactAllowedInCurrentSession, parseArgs, resolveTaskPath } = require("./lib/helper-common");
+const { assertKnownFlags, assertMpactAllowedInCurrentSession, parseArgs, resolveTaskPath } = require("./lib/helper-common");
 
 const DEFAULT_BUDGET_BYTES = 50 * 1024;
-
-function summaryBoundary(summaryMembers) {
-  return [...summaryMembers].sort((a, b) => b.name.localeCompare(a.name))[0] || null;
-}
+const ACCEPTED_FLAGS = ["root", "task", "task-path", "cursor", "read-cursor"];
 
 function recommendedSpan(logMembers, cursor) {
   if (Number.isFinite(cursor)) {
@@ -52,25 +49,24 @@ function memberTable(members) {
 
 function main() {
   assertMpactAllowedInCurrentSession();
-  const args = parseArgs(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  assertKnownFlags(argv, ACCEPTED_FLAGS);
+  const args = parseArgs(argv);
   const taskPath = resolveTaskPath({}, args, { allowedStates: ["A", "C"] });
   const cursorValue = args.cursor || args["read-cursor"];
   const cursor = cursorValue === undefined ? NaN : Number.parseInt(cursorValue, 10);
 
-  const specContext = resolveContainer({ taskPath, container: "specification" }, {});
-  const logContext = resolveContainer({ taskPath, container: "task-log" }, {});
-  const summaryContext = resolveContainer({ taskPath, container: "task-summary" }, {});
+  const specContext = resolveContainer({}, { "task-path": taskPath, container: "specification" });
+  const logContext = resolveContainer({}, { "task-path": taskPath, container: "task-log" });
 
   const plan = withContainerOperationLock(logContext, () => {
     const specMembers = listContainerMembers(specContext);
     const logMembers = listContainerMembers(logContext);
-    const summaryMembers = listContainerMembers(summaryContext);
-    return { specMembers, logMembers, summaryMembers };
+    return { specMembers, logMembers };
   });
 
-  const { specMembers, logMembers, summaryMembers } = plan;
+  const { specMembers, logMembers } = plan;
   const latestSpec = latestMember(specMembers, specContext.container);
-  const boundary = summaryBoundary(summaryMembers);
   const span = recommendedSpan(logMembers, cursor);
   const collisions = collisionGroups(logMembers);
   const totalLogBytes = logMembers.reduce((sum, member) => sum + member.size, 0);
@@ -82,7 +78,6 @@ function main() {
     `Task: ${path.basename(taskPath)}`,
     `TaskPath: ${taskPath}`,
     `CurrentSpecification: ${latestSpec ? `${latestSpec.name} (${latestSpec.size} bytes)` : "(none)"}`,
-    `SummaryBoundary: ${boundary ? `${boundary.name} (${boundary.size} bytes)` : "(none)"}`,
     `Cursor: ${Number.isFinite(cursor) ? cursor : "(none supplied)"}`,
     `TotalLogBytes: ${totalLogBytes}`,
     `RecommendedSpanBytes: ${spanBytes}`,
@@ -90,10 +85,6 @@ function main() {
     "## Log Members",
     "",
     memberTable(logMembers),
-    "",
-    "## Summary Members",
-    "",
-    memberTable(summaryMembers),
     "",
     "## Recommended Span",
     "",
@@ -110,11 +101,15 @@ function main() {
     "- Read `task.md`.",
     latestSpec ? `- Read current specification \`${latestSpec.name}\`.` : "- No specification snapshot is present.",
     span.length > 0 ? "- Read recommended log span in listed order, or use `scripts/read-member-span.js --container task-log --after <cursor>` for direct catch-up." : "- No log records are recommended by the supplied cursor.",
-    boundary ? "- Treat the summary boundary as background context only; later log records still need direct reading." : "- No summary boundary was found.",
     "",
   ];
 
   process.stdout.write(`${lines.join("\n")}\n`);
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  process.stderr.write(`ERROR: ${error.message}\n`);
+  process.exit(error.exitCode || 1);
+}

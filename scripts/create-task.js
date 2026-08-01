@@ -18,6 +18,25 @@ const {
 const { setCurrentTask: replaceCurrentTask } = require("./lib/task-state");
 
 const VALID_PRIORITIES = new Set(["p1", "p2", "p3", "p4", "px"]);
+const ACCEPTED_FLAGS = [
+  "root",
+  "project-id",
+  "cross-project",
+  "user-root",
+  "input",
+  "title",
+  "task",
+  "priority",
+  "source",
+  "owner",
+  "context",
+  "acceptance",
+  "agent",
+  "log-title",
+  "director-intent",
+  "source-input",
+  "no-current",
+];
 
 function tasksPathForRoot(rootPath) {
   return path.join(rootPath, "tasks");
@@ -75,19 +94,19 @@ function buildTaskMarkdown({ timestamp, source, owner, priority, title, context,
 function main({ args, input }) {
   const rootPath = resolveRootPath(input, args);
   const identity = validateProjectWrite({ rootPath, input, args });
-  const title = input.title || args.title || input.task || args.task;
+  const title = args.title || args.task;
   if (!title || !String(title).trim()) {
     throw new Error("title or task is required");
   }
-  const priority = String(input.priority || args.priority || "px").toLowerCase();
+  const priority = String(args.priority || "px").toLowerCase();
   if (!VALID_PRIORITIES.has(priority)) {
     throw new Error("priority must be one of p1, p2, p3, p4, or px");
   }
-  const source = input.source || args.source || "director";
-  const owner = input.owner || args.owner || "shared";
-  const context = input.context || args.context || "";
-  const acceptance = input.acceptance || args.acceptance || "";
-  const agent = input.agent || args.agent || "agent";
+  const source = args.source || "director";
+  const owner = args.owner || "shared";
+  const context = args.context || "";
+  const acceptance = args.acceptance || "";
+  const agent = args.agent || "agent";
   const initialLogBody = input.body || "";
 
   const tasksPath = tasksPathForRoot(rootPath);
@@ -115,19 +134,17 @@ function main({ args, input }) {
       member = memberName({
         number: 1,
         source: agent,
-        title: input.logTitle || input.log_title || args["log-title"] || "initial-task-handoff",
+        title: args["log-title"] || "initial-task-handoff",
         extension: ".md",
         includeSource: true,
       });
       const logContent = buildTaskLogMarkdown({
         input: {
-          ...input,
           agent,
-          title: input.logTitle || input.log_title || args["log-title"] || "Initial Task Handoff",
+          title: args["log-title"] || "Initial Task Handoff",
           body: String(initialLogBody),
-          directorIntent: input.directorIntent || input.director_intent || args["director-intent"],
-          sourceInput: input.sourceInput || input.source_input || args["source-input"],
-          noSpecUpdateNeededBecause: input.noSpecUpdateNeededBecause || input.no_spec_update_needed_because,
+          directorIntent: args["director-intent"],
+          sourceInput: args["source-input"],
         },
         timestamp,
         record: 1,
@@ -152,4 +169,4 @@ function main({ args, input }) {
   });
 }
 
-runCli(main);
+runCli(main, { acceptedFlags: ACCEPTED_FLAGS, stringFlags: ["root", "project-id", "user-root", "input", "title", "task", "priority", "source", "owner", "context", "acceptance", "agent", "log-title", "director-intent", "source-input"] });

@@ -8,11 +8,13 @@ Default target is active root `case-studies.zip`. Use user root only when the Di
 
 ## Procedure
 
+The helper generates frontmatter and `# <title>`. Supply only the narrative body that belongs under that title; do not reproduce the generated title or frontmatter.
+
 1. Use case studies for explanatory narrative: context, what changed, root cause, fix, and lesson.
 2. Extract a short rule separately only when the case study reveals reusable behavior.
 3. Call `scripts/write-case-study.js` once with direct helper arguments plus raw/plain stdin body text.
 
-If stdin body delivery fails, follow the fallback in `helper-write-conventions.md`.
+For body delivery, follow `helper-write-conventions.md`: use stdin only for short shell-simple text, and use OS-temp `--input <file>` for long or multi-line markdown.
 
 Example:
 

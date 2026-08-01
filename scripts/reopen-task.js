@@ -10,6 +10,15 @@ const {
 } = require("./lib/helper-common");
 const { setCurrentTask, transitionTaskState } = require("./lib/task-state");
 
+const ACCEPTED_FLAGS = [
+  "root",
+  "project-id",
+  "cross-project",
+  "user-root",
+  "task",
+  "task-path",
+];
+
 function main({ args, input }) {
   const taskPath = resolveTaskPath(input, args, { allowedStates: ["C"] });
   const rootPath = path.dirname(path.dirname(taskPath));
@@ -29,4 +38,4 @@ function main({ args, input }) {
   });
 }
 
-runCli(main);
+runCli(main, { acceptedFlags: ACCEPTED_FLAGS, stringFlags: ["root", "project-id", "user-root", "task", "task-path"] });

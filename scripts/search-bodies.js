@@ -10,13 +10,15 @@ const {
 } = require("./lib/container-state");
 const { runCli } = require("./lib/helper-common");
 
-function main({ args, input }) {
-  const query = input.query || args.query;
+const ACCEPTED_FLAGS = ["root", "task", "task-path", "container", "query"];
+
+function main({ args }) {
+  const query = args.query;
   const tokens = tokenizeQuery(query);
   if (tokens.length === 0) {
     throw new Error("query is required");
   }
-  const context = resolveContainer(input, args, { allowedStates: ["A", "C"] });
+  const context = resolveContainer({}, args, { allowedStates: ["A", "C"] });
   return withContainerOperationLock(context, () => {
     const matches = readContainerEntries(context)
       .map((entry) => ({
@@ -40,4 +42,4 @@ function main({ args, input }) {
   });
 }
 
-runCli(main);
+runCli(main, { acceptedFlags: ACCEPTED_FLAGS, stringFlags: ["root", "task", "task-path", "container", "query"] });

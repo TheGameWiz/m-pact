@@ -8,8 +8,18 @@ const { booleanArg, resolveRootPath, runCli } = require("./lib/helper-common");
 const { validateProjectWrite } = require("./lib/project-identity");
 const { clearCurrentSentinels, setCurrentTask, validateTaskPath } = require("./lib/task-state");
 
+const ACCEPTED_FLAGS = [
+  "root",
+  "project-id",
+  "cross-project",
+  "user-root",
+  "task",
+  "task-path",
+  "clear",
+];
+
 function resolveTaskFolder(rootPath, args, input) {
-  const value = input.task || input.taskPath || args.task || args["task-path"];
+  const value = args.task || args["task-path"];
   if (!value) {
     throw new Error("task is required");
   }
@@ -61,4 +71,4 @@ function main({ args, input }) {
   });
 }
 
-runCli(main);
+runCli(main, { acceptedFlags: ACCEPTED_FLAGS, stringFlags: ["root", "project-id", "user-root", "task", "task-path"] });

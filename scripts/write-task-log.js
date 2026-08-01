@@ -17,6 +17,24 @@ const {
   runCli,
 } = require("./lib/helper-common");
 
+const ACCEPTED_FLAGS = [
+  "root",
+  "project-id",
+  "cross-project",
+  "user-root",
+  "input",
+  "task",
+  "task-path",
+  "agent",
+  "title",
+  "slug-hint",
+  "design-change",
+  "spec-member",
+  "no-spec-update-needed-because",
+  "director-intent",
+  "source-input",
+];
+
 function hasCurrentSpecification(taskPath) {
   const specZip = path.join(taskPath, "specification.zip");
   return hasMembers(specZip);
@@ -26,11 +44,11 @@ function main({ args, input }) {
   const taskPath = resolveTaskPath(input, args, { allowedStates: ["A"] });
   const rootPath = path.dirname(path.dirname(taskPath));
   const identity = validateProjectWrite({ rootPath, input, args });
-  const agent = input.agent || args.agent || "agent";
-  const title = input.title || input.slugHint || args.title || args["slug-hint"] || "task-log-entry";
-  const designChange = Boolean(input.designChange || input.design_change || booleanArg(args, "design-change"));
-  const specMember = input.specMember || input.spec_member || args["spec-member"];
-  const noSpecUpdateReason = input.noSpecUpdateNeededBecause || input.no_spec_update_needed_because || args["no-spec-update-needed-because"];
+  const agent = args.agent || "agent";
+  const title = args.title || args["slug-hint"] || "task-log-entry";
+  const designChange = booleanArg(args, "design-change");
+  const specMember = args["spec-member"];
+  const noSpecUpdateReason = args["no-spec-update-needed-because"];
   return withDirectoryLock(taskPath, () => {
     if (designChange && hasCurrentSpecification(taskPath) && !specMember && !noSpecUpdateReason) {
       throw new Error("design-changing log entry requires specMember or noSpecUpdateNeededBecause because this task has a current specification");
@@ -51,11 +69,11 @@ function main({ args, input }) {
         record,
         timestamp,
         input: {
-          ...input,
           agent,
           title,
-          directorIntent: input.directorIntent || input.director_intent || args["director-intent"],
-          sourceInput: input.sourceInput || input.source_input || args["source-input"],
+          body: input.body,
+          directorIntent: args["director-intent"],
+          sourceInput: args["source-input"],
           specMember,
           noSpecUpdateNeededBecause: noSpecUpdateReason,
         },
@@ -78,4 +96,4 @@ function main({ args, input }) {
   });
 }
 
-runCli(main);
+runCli(main, { acceptedFlags: ACCEPTED_FLAGS, stringFlags: ["root", "project-id", "user-root", "input", "task", "task-path", "agent", "title", "slug-hint", "spec-member", "no-spec-update-needed-because", "director-intent", "source-input"] });

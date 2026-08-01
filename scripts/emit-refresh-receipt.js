@@ -4,13 +4,18 @@
 const childProcess = require("child_process");
 const fs = require("fs");
 const path = require("path");
-const { assertMpactAllowedInCurrentSession } = require("./lib/helper-common");
-
-assertMpactAllowedInCurrentSession();
+const { REFRESH_ACCEPTED_FLAGS, assertKnownFlags, assertMpactAllowedInCurrentSession } = require("./lib/helper-common");
 
 function fail(message) {
   console.error(message);
   process.exit(1);
+}
+
+try {
+  assertMpactAllowedInCurrentSession();
+  assertKnownFlags(process.argv.slice(2), REFRESH_ACCEPTED_FLAGS);
+} catch (error) {
+  fail(error.message);
 }
 
 function finalLine(text) {

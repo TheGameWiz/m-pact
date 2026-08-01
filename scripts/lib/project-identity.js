@@ -13,6 +13,7 @@ const ADOPTION_NOTICE_BEGIN = "M-PACT PROJECT ADOPTION REQUIRED";
 const ADOPTION_NOTICE_END = "END M-PACT PROJECT ADOPTION REQUIRED";
 const IDENTITY_NOTICE_BEGIN = "M-PACT PROJECT IDENTITY REQUIRED";
 const IDENTITY_NOTICE_END = "END M-PACT PROJECT IDENTITY REQUIRED";
+const IDENTITY_NOTICE_EXIT_CODE = 4;
 
 function notice(message) {
   const error = new Error(message);
@@ -21,7 +22,7 @@ function notice(message) {
     message,
     IDENTITY_NOTICE_END,
   ].join("\n");
-  error.exitCode = 1;
+  error.exitCode = IDENTITY_NOTICE_EXIT_CODE;
   return error;
 }
 
@@ -38,7 +39,7 @@ function adoptionNotice(rootPath) {
     "If no: no identity will be written; reads may continue, but durable project writes to this root will keep halting for adoption.",
     ADOPTION_NOTICE_END,
   ].join("\n");
-  error.exitCode = 1;
+  error.exitCode = IDENTITY_NOTICE_EXIT_CODE;
   error.adoptionRequired = true;
   return error;
 }
@@ -253,6 +254,18 @@ function writeProjectSentinel(rootPath, projectId) {
   return { name, sentinelPath };
 }
 
+function pruneProjectSentinels(rootPath, keepName) {
+  const removed = [];
+  for (const existing of listSentinels(rootPath, PROJECT_PREFIX)) {
+    if (existing === keepName) {
+      continue;
+    }
+    fs.unlinkSync(path.join(rootPath, existing));
+    removed.push(existing);
+  }
+  return removed;
+}
+
 function initializeProjectIdentity(rootPath, userRoot = defaultUserRoot()) {
   const resolvedRoot = fs.realpathSync(rootPath);
   return withDirectoryLock(userRoot, () => {
@@ -319,17 +332,37 @@ function repairProjectIdentity(rootPath, userRoot = defaultUserRoot()) {
   }
   return withDirectoryLock(userRoot, () => {
     return withDirectoryLock(resolvedRoot, () => {
+      const counterState = ensureCounterReadyUnlocked(userRoot);
       const existing = readProjectSentinel(resolvedRoot);
       if (existing.state === "valid") {
         return { repaired: false, projectId: existing.projectId, rootPath: resolvedRoot, sentinel: existing.name };
       }
-      if (existing.state !== "path-mismatch") {
-        fail(`project identity repair requires a path-mismatched sentinel, found: ${existing.state}`);
+      if (existing.state === "multiple") {
+        const expectedName = expectedProjectSentinelName(resolvedRoot);
+        if (existing.names.includes(expectedName)) {
+          const sentinelPath = path.join(resolvedRoot, expectedName);
+          let projectId;
+          try {
+            projectId = parseBareInteger(fs.readFileSync(sentinelPath, "utf8"), "project sentinel contents");
+          } catch (error) {
+            fail(`matching project identity sentinel is malformed: ${error.message}`);
+          }
+          if (projectId > counterState.counter.value) {
+            fail("matching project identity is above the counter high-water mark; repair project identity state before retrying");
+          }
+          const removed = pruneProjectSentinels(resolvedRoot, expectedName);
+          return { repaired: removed.length > 0, projectId, rootPath: resolvedRoot, removed: removed.join(", "), sentinel: expectedName };
+        }
+        const projectId = mintProjectIdUnlocked(userRoot);
+        const written = writeProjectSentinel(resolvedRoot, projectId);
+        return { repaired: true, projectId, rootPath: resolvedRoot, removed: existing.names.join(", "), sentinel: written.name };
       }
-      ensureCounterReadyUnlocked(userRoot);
+      if (existing.state !== "path-mismatch") {
+        fail(`project identity repair requires a path-mismatched or multiple sentinel state, found: ${existing.state}`);
+      }
       const projectId = mintProjectIdUnlocked(userRoot);
       const written = writeProjectSentinel(resolvedRoot, projectId);
-      return { repaired: true, projectId, rootPath: resolvedRoot, oldSentinel: existing.name, sentinel: written.name };
+      return { repaired: true, projectId, rootPath: resolvedRoot, removed: existing.name, sentinel: written.name };
     });
   });
 }
@@ -342,7 +375,32 @@ function mismatchMessage(projectPath) {
 }
 
 function pathMismatchMessage(rootPath) {
-  return `Project identity path does not match project root ${path.dirname(rootPath)}. Run the project identity repair helper, refresh, then retry.`;
+  const projectPath = path.dirname(rootPath);
+  return [
+    `Project identity path does not match project root ${projectPath}.`,
+    "This usually means the project was renamed. It can also happen after a move or copy.",
+    "Repair will repoint the project sentinel at the current location and assign a new project ID.",
+    "Question: Is the current project location intended? Answer yes or no.",
+    "If yes: run the project identity repair helper for this root, refresh, then retry the original operation.",
+    "If no: change directory back to the intended project or open the intended session before retrying.",
+  ].join("\n");
+}
+
+function multipleSentinelMessage(rootPath, names) {
+  return [
+    `Multiple project identity sentinels were found under ${rootPath}: ${names.join(", ")}.`,
+    "Run the project identity repair helper for this root, then refresh and retry.",
+  ].join("\n");
+}
+
+function foreignSentinelMessage(rootPath, names) {
+  return [
+    `Project identity sentinels belonging to other locations were found under ${rootPath}: ${names.join(", ")}.`,
+    "None matches this root's current location. Repair will remove those sentinels and assign a new project identity.",
+    "Question: Assign a new project identity for this current root? Answer yes or no.",
+    "If yes: run the project identity repair helper for this root, refresh, then retry the original operation.",
+    "If no: change directory back to the intended project or stop before writing durable project memory.",
+  ].join("\n");
 }
 
 function projectIdFromInput(input = {}, args = {}) {
@@ -360,7 +418,10 @@ function validateProjectRootHealth(rootPath, userRoot = defaultUserRoot()) {
     throw adoptionNotice(resolvedRoot);
   }
   if (identity.state === "multiple") {
-    fail(`multiple project identity sentinels found: ${identity.names.join(", ")}`);
+    const expectedName = expectedProjectSentinelName(resolvedRoot);
+    throw notice(identity.names.includes(expectedName)
+      ? multipleSentinelMessage(resolvedRoot, identity.names)
+      : foreignSentinelMessage(resolvedRoot, identity.names));
   }
   if (identity.state === "empty" || identity.state === "invalid-content") {
     fail(`project identity sentinel is malformed: ${identity.state}`);
@@ -389,7 +450,10 @@ function ensureProjectRootHealth(rootPath, userRoot = defaultUserRoot()) {
       if (identity.state === "missing") {
         throw adoptionNotice(resolvedRoot);
       } else if (identity.state === "multiple") {
-        fail(`multiple project identity sentinels found: ${identity.names.join(", ")}`);
+        const expectedName = expectedProjectSentinelName(resolvedRoot);
+        throw notice(identity.names.includes(expectedName)
+          ? multipleSentinelMessage(resolvedRoot, identity.names)
+          : foreignSentinelMessage(resolvedRoot, identity.names));
       } else if (identity.state === "empty" || identity.state === "invalid-content") {
         fail(`project identity sentinel is malformed: ${identity.state}`);
       } else if (identity.state === "path-mismatch") {
@@ -406,7 +470,10 @@ function ensureProjectRootHealth(rootPath, userRoot = defaultUserRoot()) {
 }
 
 function userRootFromInput(input = {}, args = {}, fallback = defaultUserRoot()) {
-  return path.resolve(input.userRoot || input.user_root || args.userRoot || args["user-root"] || fallback);
+  if (Object.prototype.hasOwnProperty.call(args, "user-root") && typeof args["user-root"] !== "string") {
+    fail("--user-root requires a value");
+  }
+  return path.resolve(args["user-root"] || fallback);
 }
 
 function validateProjectWrite({ rootPath, input = {}, args = {}, userRoot = null }) {

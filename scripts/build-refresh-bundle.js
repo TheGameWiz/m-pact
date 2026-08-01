@@ -6,14 +6,13 @@ const os = require("os");
 const path = require("path");
 const crypto = require("crypto");
 const { listMembers, readMember } = require("./lib/zip-record-store");
-const { assertMpactAllowedInCurrentSession } = require("./lib/helper-common");
-const { installMpactRuntime } = require("./lib/install-runtime");
+const { REFRESH_ACCEPTED_FLAGS, assertKnownFlags, assertMpactAllowedInCurrentSession } = require("./lib/helper-common");
+const { installMpactRuntime, isUserRootComplete } = require("./lib/install-runtime");
 const { adoptionNotice, defaultUserRoot, ensureCounterInitialized, readCounterSentinel, readProjectSentinel } = require("./lib/project-identity");
 
 const MIN_NODE_MAJOR = 18;
 const EOL = os.EOL;
 const RECENT_SESSION_BUDGET_BYTES = 25 * 1024;
-const RECENT_SESSION_SUMMARY_LIMIT = 4;
 const TRUNCATION_NOTICE = "\n\n[Truncated to fit the 25KB recent-session refresh budget.]";
 
 function parseArgs(argv) {
@@ -147,40 +146,6 @@ function describeProjectIdentity(activeRoot, userRoot) {
   };
 }
 
-function splitLines(text) {
-  return text.split(/\r?\n/);
-}
-
-function getSummarySlice(filePath) {
-  const text = readText(filePath);
-  return getSummarySliceFromText(text);
-}
-
-function getSummarySliceFromText(text) {
-  const lines = splitLines(text);
-  if (lines.length > 0 && lines[lines.length - 1] === "") {
-    lines.pop();
-  }
-
-  const summaryLine = lines.findIndex((line) => line === "## Summary");
-  if (summaryLine === -1) {
-    return { text, fallbackFull: true };
-  }
-
-  let endExclusive = lines.length;
-  for (let i = summaryLine + 1; i < lines.length; i++) {
-    if (lines[i].startsWith("## ")) {
-      endExclusive = i;
-      break;
-    }
-  }
-
-  return {
-    text: lines.slice(0, endExclusive).join(EOL),
-    fallbackFull: false,
-  };
-}
-
 function listSessionArtifacts(root) {
   const artifacts = [];
   const sessionsZip = path.join(root, "sessions.zip");
@@ -190,7 +155,6 @@ function listSessionArtifacts(root) {
         name: member.name,
         label: `${sessionsZip}#${member.name}`,
         readFull: () => readMember(sessionsZip, member.name).toString("utf8"),
-        readSummary: () => getSummarySliceFromText(readMember(sessionsZip, member.name).toString("utf8")),
       });
     }
   }
@@ -356,6 +320,19 @@ function listDirectories(dirPath, prefix) {
     .sort((a, b) => a.localeCompare(b));
 }
 
+function taskNumberValue(taskName) {
+  const match = /-t(\d{4})-/.exec(taskName);
+  return match ? Number.parseInt(match[1], 10) : -1;
+}
+
+function orderActiveTasks(taskNames, currentTask) {
+  const sorted = [...taskNames].sort((a, b) => taskNumberValue(b) - taskNumberValue(a) || a.localeCompare(b));
+  if (!currentTask || !sorted.includes(currentTask)) {
+    return sorted;
+  }
+  return [currentTask, ...sorted.filter((taskName) => taskName !== currentTask)];
+}
+
 function generatedTimestamp() {
   const now = new Date();
   const pad = (value) => String(value).padStart(2, "0");
@@ -386,7 +363,9 @@ function main() {
   assertMpactAllowedInCurrentSession();
   assertSupportedNode();
 
-  const options = parseArgs(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  assertKnownFlags(argv, REFRESH_ACCEPTED_FLAGS);
+  const options = parseArgs(argv);
   const failures = [];
   const sessionReads = [];
   const bundle = [];
@@ -396,6 +375,8 @@ function main() {
   const skillDir = path.dirname(scriptDir);
   const startupContractPath = path.join(skillDir, "references", "startup-contract.md");
   let refreshInstallResults = null;
+  let refreshExternalActions = [];
+  let refreshSetupFailed = false;
   let startupContractText = null;
   let activeTaskNames = [];
   let startupTaskRead = "(none)";
@@ -426,14 +407,17 @@ function main() {
   }
 
   const userRoot = defaultUserRoot();
-  if (!existsDir(userRoot)) {
+  if (!isUserRootComplete(userRoot)) {
     try {
-      refreshInstallResults = installMpactRuntime({ skillRoot: skillDir, userRoot }).results;
+      const setup = installMpactRuntime({ skillRoot: skillDir, userRoot });
+      refreshInstallResults = setup.results;
+      refreshExternalActions = setup.externalActions || [];
     } catch (error) {
+      refreshSetupFailed = true;
       failures.push(`Failed to initialize missing user root ${userRoot}: ${error.message}`);
     }
   }
-  if (!existsDir(userRoot)) {
+  if (!refreshSetupFailed && !existsDir(userRoot)) {
     failures.push(`Required user root is missing after setup attempt: ${userRoot}`);
   }
 
@@ -485,48 +469,23 @@ function main() {
 
   let sessionBudgetUsed = 0;
   let sessionBudgetTruncated = false;
-  let sessionBudgetOmitted = 0;
 
   if (activeRoot) {
-    const activeSessions = listSessionArtifacts(activeRoot).slice(0, RECENT_SESSION_SUMMARY_LIMIT + 1);
-
-    for (let i = 0; i < activeSessions.length; i++) {
-      const file = activeSessions[i];
+    const file = listSessionArtifacts(activeRoot)[0];
+    if (file) {
       try {
-        let text;
-        let mode;
-        if (i === 0) {
-          text = file.readFull();
-          mode = "full";
-          let artifactBytes = getArtifactByteCount(mode, file.label, text);
-          if (artifactBytes > RECENT_SESSION_BUDGET_BYTES) {
-            mode = "full-truncated";
-            const overheadBytes = getArtifactByteCount(mode, file.label, "");
-            text = truncateTextToByteBudget(text, RECENT_SESSION_BUDGET_BYTES - overheadBytes);
-            artifactBytes = getArtifactByteCount(mode, file.label, text);
-            sessionBudgetTruncated = true;
-          }
-
-          sessionReads.push({ root: activeRoot, path: file.label, mode, text });
-          sessionBudgetUsed += artifactBytes;
-        } else {
-          const slice = file.readSummary();
-          text = slice.text;
-          if (slice.fallbackFull) {
-            mode = "full-fallback";
-          } else {
-            mode = "summary";
-          }
-
-          const artifactBytes = getArtifactByteCount(mode, file.label, text);
-          if (sessionBudgetUsed + artifactBytes > RECENT_SESSION_BUDGET_BYTES) {
-            sessionBudgetOmitted = activeSessions.length - i;
-            break;
-          }
-
-          sessionReads.push({ root: activeRoot, path: file.label, mode, text });
-          sessionBudgetUsed += artifactBytes;
+        let text = file.readFull();
+        let mode = "full";
+        let artifactBytes = getArtifactByteCount(mode, file.label, text);
+        if (artifactBytes > RECENT_SESSION_BUDGET_BYTES) {
+          mode = "full-truncated";
+          const overheadBytes = getArtifactByteCount(mode, file.label, "");
+          text = truncateTextToByteBudget(text, RECENT_SESSION_BUDGET_BYTES - overheadBytes);
+          artifactBytes = getArtifactByteCount(mode, file.label, text);
+          sessionBudgetTruncated = true;
         }
+        sessionReads.push({ root: activeRoot, path: file.label, mode, text });
+        sessionBudgetUsed += artifactBytes;
       } catch (error) {
         failures.push(`Failed to read selected active-root session: ${file.label} (${error.message})`);
       }
@@ -563,6 +522,8 @@ function main() {
         missingOrAmbiguous.push(`multiple current task sentinels found: ${currentPointers.join(", ")}; no current task selected`);
       }
 
+      activeTaskNames = orderActiveTasks(activeTaskNames, selectedTask);
+
       if (selectedTask) {
         const taskMd = path.join(tasksDir, selectedTask, "task.md");
         if (existsFile(taskMd)) {
@@ -594,6 +555,7 @@ function main() {
   const receiptLines = [
     "M-PACT MEMORY REFRESH",
     `activeProjectRoot=${activeDisplay}; ${projectIdentityDisplay.receipt}`,
+    ...refreshExternalActions.map((action) => `providerSetup=${action}`),
     "audit=PASS; bundle=loaded; output-complete=END REFRESH BUNDLE",
   ];
   const startupContractCoverage = getStartupContractCoverage(skillDir, startupContractText);
@@ -628,9 +590,9 @@ function main() {
   addLine(bundle, projectIdentityDisplay.manifest);
   addLine(bundle, `- Memory chain, broad-to-specific: ${chainDisplay}`);
   addLine(bundle, `- Missing or ambiguous: ${missingOrAmbiguousDisplay}`);
-  addLine(bundle, "- Startup session selection: active root only by filename descending; newest session full or truncated, then up to four summaries, with rendered session artifacts capped at 25KB total.");
+  addLine(bundle, "- Startup session selection: active root only by filename descending; newest session full or truncated, with rendered session artifact capped at 25KB.");
   addLine(bundle, "- Startup task selection: active root only, read task.md only when exactly one zero-byte tasks/current__<task-folder> sentinel points to an active task; never infer a replacement current task.");
-  addLine(bundle, "- Startup exclusions: rule bodies, task specification snapshots, task logs, task summaries, journals, and case studies.");
+  addLine(bundle, "- Startup exclusions: rule bodies, task specification snapshots, task logs, journals, and case studies.");
   addLine(bundle);
   addLine(bundle, "## Protocol References Loaded Or Verified");
   addLine(bundle);
@@ -659,9 +621,6 @@ function main() {
   addLine(bundle, `Budget: ${formatKB(RECENT_SESSION_BUDGET_BYTES)}KB rendered session artifacts; used ${formatKB(sessionBudgetUsed)}KB.`);
   if (sessionBudgetTruncated) {
     addLine(bundle, "Newest session was truncated to fit the recent-session budget.");
-  }
-  if (sessionBudgetOmitted > 0) {
-    addLine(bundle, `${sessionBudgetOmitted} selected session summary candidate(s) omitted because they did not fit the recent-session budget.`);
   }
   addLine(bundle);
   if (sessionReads.length === 0) {
@@ -718,4 +677,9 @@ function main() {
   console.log("END REFRESH BUNDLE");
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  console.error(`ERROR: ${error.message}`);
+  process.exit(1);
+}

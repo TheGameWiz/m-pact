@@ -10,8 +10,19 @@ const {
 } = require("./lib/container-state");
 const { runCli } = require("./lib/helper-common");
 
-function main({ args, input }) {
-  const context = resolveContainer(input, args, { allowedStates: ["A", "C"] });
+const ACCEPTED_FLAGS = [
+  "root",
+  "task",
+  "task-path",
+  "container",
+  "member",
+  "name",
+  "record",
+  "latest",
+];
+
+function main({ args }) {
+  const context = resolveContainer({}, args, { allowedStates: ["A", "C"] });
   return withContainerOperationLock(context, () => {
     const members = listContainerMembers(context);
     const selected = selectMember(members, context.container, args);
@@ -28,4 +39,4 @@ function main({ args, input }) {
   });
 }
 
-runCli(main);
+runCli(main, { acceptedFlags: ACCEPTED_FLAGS, stringFlags: ["root", "task", "task-path", "container", "member", "name", "record"] });

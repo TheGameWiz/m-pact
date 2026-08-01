@@ -6,19 +6,32 @@ const { listMembers, readMember, replaceMember } = require("./lib/zip-record-sto
 const { booleanArg, localTimestamp, resolveRootPath, runCli, sanitizeSlug } = require("./lib/helper-common");
 const { validateProjectWrite } = require("./lib/project-identity");
 
-function selectMember(members, input, args) {
-  if (input.member || args.member) {
-    const member = input.member || args.member;
+const ACCEPTED_FLAGS = [
+  "root",
+  "project-id",
+  "cross-project",
+  "user-root",
+  "input",
+  "member",
+  "latest",
+  "query",
+  "replace",
+  "append",
+];
+
+function selectMember(members, args) {
+  if (args.member) {
+    const member = args.member;
     const selected = members.find((candidate) => candidate.name === member);
     if (!selected) {
       throw new Error(`journal entry not found: ${member}`);
     }
     return selected;
   }
-  if (input.latest || booleanArg(args, "latest")) {
+  if (booleanArg(args, "latest")) {
     return [...members].sort((a, b) => b.name.localeCompare(a.name))[0] || null;
   }
-  const query = input.query || args.query;
+  const query = args.query;
   if (!query) {
     throw new Error("member, latest, or query is required");
   }
@@ -38,13 +51,13 @@ function main({ args, input }) {
   const identity = validateProjectWrite({ rootPath, input, args });
   const zipPath = path.join(rootPath, "journal.zip");
   const members = listMembers(zipPath);
-  const selected = selectMember(members, input, args);
+  const selected = selectMember(members, args);
   if (!selected) {
     throw new Error("journal entry not found");
   }
   const replace = booleanArg(args, "replace");
-  const appendText = input.append || args.append || (!replace ? input.body : null);
-  const replacement = input.content || (replace ? input.body : null);
+  const appendText = args.append || (!replace ? input.body : null);
+  const replacement = replace ? input.body : null;
   if (!appendText && !replacement) {
     throw new Error("append or content is required");
   }
@@ -57,4 +70,4 @@ function main({ args, input }) {
   return { ok: true, operation: "modify-journal-entry", rootPath, projectId: identity.projectId, projectPath: identity.projectPath, crossProject: identity.crossProject || undefined, zipPath, member: selected.name, timestamp: timestamp.body };
 }
 
-runCli(main);
+runCli(main, { acceptedFlags: ACCEPTED_FLAGS, stringFlags: ["root", "project-id", "user-root", "input", "member", "query", "append"] });

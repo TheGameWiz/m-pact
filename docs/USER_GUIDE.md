@@ -2,7 +2,7 @@
 
 M-PACT helps local coding agents share memory. It was designed and validated for Codex, Claude Code, and Gemini CLI. Its goal is simple: let agents remember useful project information, share it with each other, and pick up work without depending on one chat window to hold everything.
 
-M-PACT stores memory at two levels: global memory that can follow you across projects, and project memory that belongs to one workspace. That memory can include shared rules, session notes, project tasks, task logs, task specifications, task summaries, case studies, and project journals.
+M-PACT stores memory at two levels: global memory that can follow you across projects, and project memory that belongs to one workspace. That memory can include shared rules, session notes, project tasks, task logs, task specifications, case studies, and project journals.
 
 This makes it possible to use more than one agent on the same project at the same time. One agent can work on a design, another can review it, another can implement it, and another can verify the code. They can hand work back and forth through task logs and specifications instead of trying to reconstruct state from chat history.
 
@@ -21,7 +21,7 @@ At the simplest level, M-PACT lets you:
 
 - Create shared rules that teach agents your coding style, preferences, project habits, and recurring lessons.
 - Write session entries that preserve a handoff when you are switching agents, switching providers, or approaching the end of a context window.
-- Create project tasks with logs, specifications, and summaries so agents can design, implement, review, test, and verify work in a structured loop.
+- Create project tasks with logs and specifications so agents can design, implement, review, test, and verify work in a structured loop.
 - Create case studies for important successes, failures, investigations, and lessons that you want future agents to remember.
 - Write journal entries for project notes you want to keep but do not want to turn into rules, tasks, or case studies.
 
@@ -248,10 +248,9 @@ tasks/
     task.md
     specification.zip
     log.zip
-    summary.zip
 ```
 
-The shape is lazy. A new project bootstrap creates `.AgentMemory/` and its `project__<path-slug>` identity sentinel only. `rules/`, `tasks/`, `sessions.zip`, `case-studies.zip`, and `journal.zip` appear only when first used. A new task folder starts with `task.md`; its specification, log, and summary ZIPs appear only when those records are written.
+The shape is lazy. A new project bootstrap creates `.AgentMemory/` and its `project__<path-slug>` identity sentinel only. `rules/`, `tasks/`, `sessions.zip`, `case-studies.zip`, and `journal.zip` appear only when first used. A new task folder starts with `task.md`; its specification and log ZIPs appear only when those records are written.
 
 Project identity sentinels are helper-owned. New project bootstrap mints identity automatically. Existing pre-identity roots use lazy confirmed adoption: they are considered only when encountered by refresh or a durable write, and identity is minted only after you answer yes to the adoption question. If a moved or copied project reports a path mismatch, use the repair helper instead of hand-editing sentinel files.
 
@@ -467,11 +466,11 @@ Use sessions when something happened outside a single task, or when future agent
 
 ### How To Use Them
 
-Ask for a session entry when you are ending a work period, approaching context limits, switching providers, or recording a project-wide decision. The agent should write a concise but useful handoff with a strong summary so the next refresh can orient the next agent quickly.
+Ask for a session entry when you are ending a work period, approaching context limits, switching providers, or recording a project-wide decision. The agent should write a detailed handoff with the current state, decisions, evidence, files touched, risks, and next move so the next refresh can orient the next agent quickly.
 
 ### Startup Behavior
 
-Startup refresh reads the newest active-root session in full and selected older sessions by summary. Put startup-relevant context in `## Summary`.
+Startup refresh reads the newest active-root session in full, capped at 25KB. Put resume-critical context at the start of `## Summary`.
 
 ### What They Are Not
 
@@ -489,7 +488,7 @@ Read the newest session in full.
 
 ### What They Are
 
-Tasks are folders under `tasks/`. They store durable task state, ordered logs, optional current specifications, and summaries.
+Tasks are folders under `tasks/`. They store durable task state, ordered logs, and optional current specifications.
 
 Task folder names encode status, priority, task number, and slug:
 
@@ -504,7 +503,7 @@ C__px-t0010-old-investigation/
 
 Use tasks when work needs structured continuity across agents or sessions. Tasks are the right tool for multi-step implementation, investigations, reviews, and handoffs.
 
-Tasks can also be useful for standing workstreams, such as UI polish or article refinement, where the subject stays stable but individual passes are small. In that case, use summaries to keep the task readable instead of creating a new task for every small pass.
+Tasks can also be useful for standing workstreams, such as UI polish or article refinement, where the subject stays stable but individual passes are small.
 
 ### How To Use Them
 
@@ -553,7 +552,7 @@ Reopen t0008 because we found follow-up work.
 
 ### What They Are
 
-A task handoff is a read/analyze/evaluate/report operation for an existing task. The agent reads `task.md`, the latest `specification.zip` member when present, relevant summaries when useful, and the ordered log span needed for continuity. The expected output is not just a summary: the agent should evaluate the current handoff span for feasibility, risks, assumptions, implementation or specification issues, and recommend the best next path when evidence supports one.
+A task handoff is a read/analyze/evaluate/report operation for an existing task. The agent reads `task.md`, the latest `specification.zip` member when present, and the ordered log span needed for continuity. The expected output is not just a summary: the agent should evaluate the current handoff span for feasibility, risks, assumptions, implementation or specification issues, and recommend the best next path when evidence supports one.
 
 ### Why Use Them
 
@@ -561,7 +560,7 @@ Use handoffs when one agent or session needs to understand current task state be
 
 ### How To Use Them
 
-Ask the receiving agent to take the current task handoff when you want it to understand the task before acting. The agent should read the task, current spec, relevant summaries, and the needed ordered log span, then report state, risks, assumptions, and recommended next steps. Ask it to implement, edit, or log separately if you want it to continue beyond analysis.
+Ask the receiving agent to take the current task handoff when you want it to understand the task before acting. The agent should read the task, current spec, and the needed ordered log span, then report state, risks, assumptions, and recommended next steps. Ask it to implement, edit, or log separately if you want it to continue beyond analysis.
 
 You can also use a handoff phrase to create the handoff task from the current conversation:
 
@@ -600,10 +599,9 @@ Default behavior now starts with the handoff read-plan helper:
 1. Run scripts/prepare-handoff.js for the current or named task.
 2. Pass any conversation-known read cursor.
 3. Read task.md, the current specification snapshot, and the recommended log span in order.
-4. Treat summaries as background boundaries, not replacements for later log records.
 ```
 
-The helper owns the byte-budget and collision checks. A cursor or summary boundary should prevent old logs from being treated as current. The agent may still read older logs as background context when useful, but it should not act on them as live state when later records have superseded them. When it does not read all logs, it should say what range it read as the current span, what boundary it used, and what older history it loaded only as background or skipped.
+The helper owns the byte-budget and collision checks. A cursor should prevent old logs from being treated as current. The agent may still read older logs as background context when useful, but it should not act on them as live state when later records have superseded them. When it does not read all logs, it should say what range it read as the current span, what cursor it used, and what older history it loaded only as background or skipped.
 
 ### Important Limit
 
@@ -672,41 +670,6 @@ Agents should not write a new specification snapshot unless you instruct them to
 ```text
 Write the task specification with this decision and write the paired log.
 Fold these requirements into the current spec.
-```
-
-## Task Summaries
-
-### What They Are
-
-Task summaries live in `summary.zip`. They are generated on demand to compress long task histories, capture current state, or create a compact handoff map. A task has no summary container until the first summary is written.
-
-### Why Use Them
-
-Use summaries when the log is long enough that future agents need a compact map before reading targeted log records. They are especially useful for standing tasks that stay open across many small passes, such as recurring UI cleanup, polish, article refinement, or ongoing investigation.
-
-### How To Use Them
-
-Ask for a summary when a task has enough logs that handoff is getting expensive or when you want a compact checkpoint before switching agents. The agent should summarize the relevant log range and leave later handoffs free to read only the summary plus newer logs.
-
-### Default Range
-
-When you ask for a task summary without naming a range, the agent should write an incremental summary. It summarizes from the first log record after the latest relevant summary through the newest log record.
-
-If there is no prior relevant summary, the agent summarizes from the first log record. If you want the whole history, ask for a complete, full, or from-the-beginning summary.
-
-The latest relevant summary matters. A thematic summary such as `open-questions` should not become the range boundary for a general current-state or handoff summary unless it really covers that span.
-
-### Important Limit
-
-Summaries do not automatically replace unseen log records during handoff. They help orientation, but the agent may still need the ordered log span for continuity.
-
-### Common Requests
-
-```text
-Write a task summary.
-Summarize the current task since the last relevant summary.
-Write a handoff summary through the latest log entry.
-Write a complete summary of this task from the beginning.
 ```
 
 ## Case Studies
@@ -815,9 +778,8 @@ Place M-PACT in each provider's normal skill or extension folder, then run provi
 1. Create a task with priority and clear acceptance.
 2. Keep current state in `specification.zip` snapshots when the task has evolving requirements.
 3. Write task logs for decisions, implementations, reviews, and handoffs.
-4. Use task summaries to compress long or standing task histories.
-5. Tell the next agent to take the task handoff.
-6. Close the task only when you explicitly decide it is done.
+4. Tell the next agent to take the task handoff.
+5. Close the task only when you explicitly decide it is done.
 
 ### Context Hygiene
 
@@ -856,8 +818,6 @@ Use a task when structured work needs state, logs, or handoffs.
 Use a task log when a task-scoped event or decision needs an append-only record.
 
 Use a task specification when a task needs a mutable current source of truth.
-
-Use a task summary when long logs need compression.
 
 Use a case study when the lesson needs a narrative.
 

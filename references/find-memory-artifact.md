@@ -14,10 +14,10 @@ Artifact folders and ZIP containers are lazy. Treat a missing selected folder or
 
 ZIP-backed memory is helper-owned. Do not inspect, extract, or write ZIP containers directly; use the standard helpers:
 
-- `scripts/list-members.js --container <sessions|case-studies|journal|task-log|task-summary|specification>`
+- `scripts/list-members.js --container <sessions|case-studies|journal|task-log|specification>`
 - `scripts/read-member.js --container <name> --member <filename>` or `--record <n>` or `--latest`
 - `scripts/search-bodies.js --container <name> --query <tokens>`
-- `scripts/read-member-span.js --container <task-log|task-summary|specification> --after <record>` for numbered catch-up reads
+- `scripts/read-member-span.js --container <task-log|specification> --after <record>` for numbered catch-up reads
 
 ## Scope
 
@@ -61,9 +61,9 @@ Do not scan sibling projects unless the Director names them. Normal memory looku
 - Show active tasks by default; include closed tasks only when requested.
 - Within a root: Active before Closed, then priority, then newest task number first.
 - For topic lookup such as "the task where we discussed modeling clay," search task folder names first. If multiple folder-name matches remain and the Director asks for the most recent one, use the highest matching task number in that root unless the Director specifies latest modified log or another recency meaning.
-- If task folder names are inconclusive, search `task.md`, then the current specification snapshot, `summary.zip`, and `log.zip` only as needed to narrow the candidate set.
-- For a specific task lookup, read `task.md` first. Read the current specification, `log.zip`, or `summary.zip` only when the request needs them.
-- For handoff, resume, continue, or "pick up this task" requests, use `take-task-handoff.md` and `scripts/prepare-handoff.js`. Missing `specification.zip`, `log.zip`, or `summary.zip` means that category is empty, not invalid.
+- If task folder names are inconclusive, search `task.md`, then the current specification snapshot and `log.zip` only as needed to narrow the candidate set.
+- For a specific task lookup, read `task.md` first. Read the current specification or `log.zip` only when the request needs them.
+- For handoff, resume, continue, or "pick up this task" requests, use `take-task-handoff.md` and `scripts/prepare-handoff.js`. Missing `specification.zip` or `log.zip` means that category is empty, not invalid.
 - Use the zero-byte `tasks/current__<active-task-folder>` sentinel as the current-task pointer, not as a task index. If multiple `current__*` sentinels exist, report ambiguity, leave them in place, and treat the root as having no current task. Cleanup is an explicit current-task repair operation.
 
 ### Case Studies

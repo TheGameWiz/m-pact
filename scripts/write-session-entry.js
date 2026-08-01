@@ -7,19 +7,43 @@ const { withDirectoryLock } = require("./lib/directory-lock");
 const { localTimestamp, resolveRootPath, runCli, sanitizeSlug } = require("./lib/helper-common");
 const { validateProjectWrite } = require("./lib/project-identity");
 
+const ACCEPTED_FLAGS = [
+  "root",
+  "project-id",
+  "cross-project",
+  "user-root",
+  "input",
+  "agent",
+  "type",
+  "title",
+];
+
+function stripDuplicateGeneratedHeading(body, heading) {
+  const text = String(body || "");
+  const match = /^(?:[ \t]*(?:\r\n|\n|\r))*([^\r\n]*)(\r\n|\n|\r|$)/.exec(text);
+  if (!match) {
+    return text;
+  }
+  const firstLine = match[1].replace(/[ \t]+$/g, "");
+  if (firstLine !== heading) {
+    return text;
+  }
+  return text.slice(match[0].length).replace(/^(?:[ \t]*(?:\r\n|\n|\r))+/, "");
+}
+
 function main({ args, input }) {
   const rootPath = resolveRootPath(input, args);
   const identity = validateProjectWrite({ rootPath, input, args });
-  const agent = input.agent || args.agent || "agent";
-  const type = input.type || args.type || "session";
-  const summary = input.summary || input.body;
+  const agent = args.agent || "agent";
+  const type = args.type || "session";
+  const summary = stripDuplicateGeneratedHeading(input.body, "## Summary");
   if (!summary || !String(summary).trim()) {
     throw new Error("summary is required");
   }
   return withDirectoryLock(rootPath, () => {
     const now = new Date();
     const timestamp = localTimestamp(now);
-    const slug = (sanitizeSlug(input.title || args.title || type) || "session").slice(0, 60).replace(/-+$/g, "");
+    const slug = (sanitizeSlug(args.title || type) || "session").slice(0, 60).replace(/-+$/g, "");
     const member = `${timestamp.filename}-${sanitizeSlug(agent) || "agent"}-${slug}.md`;
     const content = [
       "# Session Entry",
@@ -31,8 +55,6 @@ function main({ args, input }) {
       "## Summary",
       String(summary).trim(),
       "",
-      input.context ? "## Context" : null,
-      input.context ? String(input.context).trim() : null,
       "",
     ].filter((line) => line !== null).join("\n");
     const zipPath = path.join(rootPath, "sessions.zip");
@@ -41,4 +63,4 @@ function main({ args, input }) {
   });
 }
 
-runCli(main);
+runCli(main, { acceptedFlags: ACCEPTED_FLAGS, stringFlags: ["root", "project-id", "user-root", "input", "agent", "type", "title"] });

@@ -16,9 +16,29 @@ const {
   runCli,
 } = require("./lib/helper-common");
 
+const ACCEPTED_FLAGS = [
+  "root",
+  "project-id",
+  "cross-project",
+  "user-root",
+  "input",
+  "task",
+  "task-path",
+  "content-file",
+  "log-input",
+  "log-body-file",
+  "log-body",
+  "title",
+  "slug-hint",
+  "agent",
+  "log-title",
+  "director-intent",
+  "source-input",
+];
+
 function readContent(input, args) {
-  const contentFile = input.contentFile || input.content_file || args["content-file"];
-  const content = contentFile ? readInputFile(path.resolve(contentFile)) : input.content || input.body;
+  const contentFile = args["content-file"];
+  const content = contentFile ? readInputFile(path.resolve(contentFile)) : input.body;
   if (typeof content !== "string" || content.length === 0) {
     throw new Error("specification content is required");
   }
@@ -33,10 +53,10 @@ function defaultLogBody(title) {
   ].join("\n");
 }
 
-function readLogBody(input, args, title) {
-  const logInput = input.logInput || input.log_input || args["log-input"];
-  const logBodyFile = input.logBodyFile || input.log_body_file || args["log-body-file"];
-  const logBody = input.logBody || input.log_body || args["log-body"];
+function readLogBody(args, title) {
+  const logInput = args["log-input"];
+  const logBodyFile = args["log-body-file"];
+  const logBody = args["log-body"];
   const body = logInput || logBodyFile
     ? readInputFile(path.resolve(logInput || logBodyFile))
     : logBody;
@@ -59,10 +79,10 @@ function main({ args, input }) {
   const rootPath = path.dirname(path.dirname(taskPath));
   const identity = validateProjectWrite({ rootPath, input, args });
   const content = readContent(input, args);
-  const title = input.title || input.slugHint || args.title || args["slug-hint"] || "specification";
-  const agent = input.agent || args.agent || "agent";
-  const logTitle = input.logTitle || input.log_title || args["log-title"] || "Specification Update";
-  const logBody = readLogBody(input, args, title);
+  const title = args.title || args["slug-hint"] || "specification";
+  const agent = args.agent || "agent";
+  const logTitle = args["log-title"] || "Specification Update";
+  const logBody = readLogBody(args, title);
 
   return withDirectoryLock(taskPath, () => {
     const now = new Date();
@@ -91,12 +111,11 @@ function main({ args, input }) {
         record,
         timestamp,
         input: {
-          ...input,
           agent,
           title: logTitle,
           body: logBody.body,
-          directorIntent: input.directorIntent || input.director_intent || args["director-intent"] || "Write task specification snapshot and paired task log.",
-          sourceInput: input.sourceInput || input.source_input || args["source-input"],
+          directorIntent: args["director-intent"] || "Write task specification snapshot and paired task log.",
+          sourceInput: args["source-input"],
           specMember: specAppend.member,
         },
       });
@@ -120,4 +139,4 @@ function main({ args, input }) {
   });
 }
 
-runCli(main);
+runCli(main, { acceptedFlags: ACCEPTED_FLAGS, stringFlags: ["root", "project-id", "user-root", "input", "task", "task-path", "content-file", "log-input", "log-body-file", "log-body", "title", "slug-hint", "agent", "log-title", "director-intent", "source-input"] });

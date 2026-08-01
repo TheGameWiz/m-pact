@@ -2,19 +2,30 @@
 "use strict";
 
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
 const {
+  assertKnownFlags,
   assertMpactAllowedInCurrentSession,
+  assertStringFlagValues,
   booleanArg,
   parseArgs,
 } = require("./lib/helper-common");
 const { installMpactRuntime } = require("./lib/install-runtime");
-const { initializeProjectIdentity } = require("./lib/project-identity");
+const { defaultUserRoot, initializeProjectIdentity } = require("./lib/project-identity");
+
+const ACCEPTED_FLAGS = [
+  "project",
+  "user-root",
+  "init-user-root",
+  "skip-starter-rules",
+  "home",
+  "provider",
+  "providers",
+];
 
 function fail(message) {
   process.stderr.write(`ERROR: ${message}\n`);
-  process.exit(1);
+  process.exitCode = 1;
 }
 
 function ensureDir(dirPath) {
@@ -31,13 +42,16 @@ function printReceipt(operation, rootPath, results) {
 
 function main() {
   assertMpactAllowedInCurrentSession();
-  const args = parseArgs(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  assertKnownFlags(argv, ACCEPTED_FLAGS);
+  const args = parseArgs(argv);
+  assertStringFlagValues(args, ["project", "user-root", "home", "provider", "providers"]);
   const skillRoot = path.dirname(__dirname);
-  const userRootMode = booleanArg(args, "user-root");
+  const userRootMode = booleanArg(args, "init-user-root");
   const skipStarterRules = booleanArg(args, "skip-starter-rules");
 
   if (userRootMode) {
-    const userRoot = path.resolve(args.root || args.project || path.join(os.homedir(), ".AgentMemoryRoot"));
+    const userRoot = path.resolve(args["user-root"] || defaultUserRoot());
     const runtimeArgs = { ...args, "user-root": userRoot };
     if (skipStarterRules) {
       runtimeArgs["skip-starter-rules"] = true;
@@ -48,7 +62,7 @@ function main() {
   }
 
   const projectRoot = path.resolve(args.project || process.cwd());
-  const userRoot = path.resolve(args.root || path.join(os.homedir(), ".AgentMemoryRoot"));
+  const userRoot = path.resolve(args["user-root"] || defaultUserRoot());
   const results = [];
   if (!fs.existsSync(userRoot)) {
     results.push("runtime-setup:required:user-root-missing");
@@ -71,4 +85,5 @@ try {
   main();
 } catch (error) {
   fail(error.message);
+  process.exit(error.exitCode || process.exitCode || 1);
 }

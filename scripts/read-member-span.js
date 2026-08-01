@@ -9,6 +9,16 @@ const {
 } = require("./lib/container-state");
 const { runCli } = require("./lib/helper-common");
 
+const ACCEPTED_FLAGS = [
+  "root",
+  "task",
+  "task-path",
+  "container",
+  "after",
+  "through",
+  "max-bytes",
+];
+
 function integerArg(args, name, fallback = null) {
   if (args[name] === undefined) {
     return fallback;
@@ -20,8 +30,8 @@ function integerArg(args, name, fallback = null) {
   return value;
 }
 
-function main({ args, input }) {
-  const context = resolveContainer(input, args, { allowedStates: ["A", "C"] });
+function main({ args }) {
+  const context = resolveContainer({}, args, { allowedStates: ["A", "C"] });
   if (!context.container.recordsExpected) {
     throw new Error(`read-member-span requires a numbered container; ${context.container.name} is not numbered`);
   }
@@ -78,4 +88,4 @@ function main({ args, input }) {
   });
 }
 
-runCli(main);
+runCli(main, { acceptedFlags: ACCEPTED_FLAGS, stringFlags: ["root", "task", "task-path", "container", "after", "through", "max-bytes"] });

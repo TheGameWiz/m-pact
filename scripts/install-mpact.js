@@ -2,12 +2,21 @@
 "use strict";
 
 const path = require("path");
-const { assertMpactAllowedInCurrentSession, parseArgs } = require("./lib/helper-common");
-const { installMpactRuntime } = require("./lib/install-runtime");
+const { assertKnownFlags, assertMpactAllowedInCurrentSession, assertStringFlagValues, booleanArg, parseArgs } = require("./lib/helper-common");
+const { installMpactRuntime, removeMpactShims } = require("./lib/install-runtime");
+
+const ACCEPTED_FLAGS = [
+  "home",
+  "provider",
+  "providers",
+  "user-root",
+  "skip-starter-rules",
+  "remove-shims",
+];
 
 function fail(message) {
   process.stderr.write(`ERROR: ${message}\n`);
-  process.exit(1);
+  process.exitCode = 1;
 }
 
 function printReceipt(results) {
@@ -21,8 +30,16 @@ function printReceipt(results) {
 
 function main() {
   assertMpactAllowedInCurrentSession();
-  const args = parseArgs(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  assertKnownFlags(argv, ACCEPTED_FLAGS);
+  const args = parseArgs(argv);
+  assertStringFlagValues(args, ["home", "provider", "providers", "user-root"]);
   const skillRoot = path.dirname(__dirname);
+  if (booleanArg(args, "remove-shims")) {
+    const { results } = removeMpactShims({ args, skillRoot });
+    printReceipt(results);
+    return;
+  }
   const { results } = installMpactRuntime({ args, skillRoot });
   printReceipt(results);
 }
@@ -31,4 +48,5 @@ try {
   main();
 } catch (error) {
   fail(error.message);
+  process.exit(error.exitCode || process.exitCode || 1);
 }

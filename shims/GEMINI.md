@@ -1,3 +1,4 @@
+<!-- BEGIN M-PACT SHIM -->
 ## M-PACT: Multi-Provider Agent Context Toolkit
 
 On new context, use the installed M-PACT Gemini CLI extension and run its refresh procedure. If the extension exposes `/m-pact:fast-refresh`, that command is the preferred deterministic refresh path. `/m-pact:refresh` is the compatibility path.
@@ -17,3 +18,4 @@ Do not reinterpret generic Gemini memory requests such as `refresh memory`, `sho
 If the environment variable `MPACT_SUPPRESS` is set to a truthy value (for example `1`), the launching environment owns context here: do not invoke M-PACT and do not run its refresh.
 
 If M-PACT is unavailable, stop and report that the extension or skill is missing.
+<!-- END M-PACT SHIM -->

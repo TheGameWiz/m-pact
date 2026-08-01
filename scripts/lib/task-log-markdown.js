@@ -2,15 +2,27 @@
 "use strict";
 
 const {
-  yamlBlockList,
   yamlList,
   yamlScalar,
 } = require("./helper-common");
 
+function stripDuplicateGeneratedHeading(body, heading) {
+  const text = String(body || "");
+  const match = /^(?:[ \t]*(?:\r\n|\n|\r))*([^\r\n]*)(\r\n|\n|\r|$)/.exec(text);
+  if (!match) {
+    return text;
+  }
+  const firstLine = match[1].replace(/[ \t]+$/g, "");
+  if (firstLine !== heading) {
+    return text;
+  }
+  return text.slice(match[0].length).replace(/^(?:[ \t]*(?:\r\n|\n|\r))+/, "");
+}
+
 function buildTaskLogMarkdown({ input, record, timestamp }) {
   const agent = input.agent || "agent";
   const title = input.title || input.slugHint || "Task Log Entry";
-  const body = input.body || input.contribution || "";
+  const body = stripDuplicateGeneratedHeading(input.body || input.contribution || "", `## Agent Response: ${agent}`);
   if (!body.trim()) {
     throw new Error("body is required");
   }
@@ -27,9 +39,6 @@ function buildTaskLogMarkdown({ input, record, timestamp }) {
     lines.push(`source_input: ${yamlScalar(input.sourceInput || input.source_input)}`);
   }
 
-  lines.push(...yamlBlockList("files_involved", input.filesInvolved || input.files_involved || []));
-  lines.push(...yamlBlockList("decisions", input.decisions || []));
-  lines.push(...yamlBlockList("tool_evidence", input.toolEvidence || input.tool_evidence || []));
   if (input.specMember || input.spec_member) {
     lines.push(`spec_member: ${yamlScalar(input.specMember || input.spec_member)}`);
   }

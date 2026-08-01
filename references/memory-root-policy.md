@@ -4,7 +4,11 @@ Use this reference when Director intent depends on which memory root should be r
 
 Helpers know the mechanics: active root discovery, explicit `--root`, task lookup, user-root validation, chain order, and sentinel rules. Agents should not reimplement those mechanics by listing folders or calculating roots themselves.
 
-Project identity is helper-owned. New project bootstrap mints identity automatically. Existing pre-identity roots use lazy confirmed adoption: refresh or a durable write reports `M-PACT PROJECT ADOPTION REQUIRED`, asks the Director whether to adopt that one root, and mints identity only through `scripts/adopt-project-identity.js` after a yes. Use `scripts/repair-project-identity.js` when a helper reports a path-mismatched project sentinel. Do not hand-edit `project__*` or `project-count__*` sentinels.
+Project identity is helper-owned. New project bootstrap mints identity automatically. Existing pre-identity roots use lazy confirmed adoption: refresh or a durable write reports `M-PACT PROJECT ADOPTION REQUIRED`, asks the Director whether to adopt that one root, and mints identity only through `scripts/adopt-project-identity.js` after a yes. Use `scripts/repair-project-identity.js` when a helper reports a path-mismatched or multiple project sentinel state. Do not hand-edit `project__*` or `project-count__*` sentinels.
+
+Identity halts use exit code 4 and print a structured stdout notice. `validateProjectWrite` and `validateProjectRootHealth` throw on identity halts; callers that want a verdict must catch the error and inspect `error.mpactNotice` and `error.adoptionRequired`.
+
+Project sentinel names are path slugs. They fold case and collapse runs of non-alphanumeric characters, so distinct paths can produce the same sentinel name. This limitation is accepted to avoid changing the sentinel scheme and migrating existing roots.
 
 ## Routing Principles
 

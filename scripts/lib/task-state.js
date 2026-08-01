@@ -41,7 +41,7 @@ function findActiveRoot(startPath = process.cwd()) {
 }
 
 function resolveRootPath(input = {}, args = {}) {
-  const explicit = input.rootPath || input.root || args.root;
+  const explicit = args.root;
   if (explicit) {
     const resolved = path.resolve(explicit);
     if (!isDirectory(resolved)) {
@@ -158,7 +158,7 @@ function currentTaskPath(tasksPath) {
 
 function resolveTaskPath(input = {}, args = {}, options = {}) {
   const allowedStates = options.allowedStates || ["A", "C"];
-  const explicitTask = input.taskPath || input.task || args.task || args["task-path"];
+  const explicitTask = args.task || args["task-path"];
   const rootPath = resolveRootPath(input, args);
   const tasksPath = path.join(rootPath, "tasks");
   let candidate;

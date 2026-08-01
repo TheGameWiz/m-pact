@@ -16,6 +16,20 @@ const { validateProjectWrite } = require("./lib/project-identity");
 
 const RULE_NAME_MAX = 96;
 const CATEGORIES = new Set(["core", "behavior", "format", "director", "user"]);
+const ACCEPTED_FLAGS = [
+  "root",
+  "project-id",
+  "cross-project",
+  "user-root",
+  "input",
+  "category",
+  "title",
+  "filename",
+  "description",
+  "type",
+  "replace",
+  "update",
+];
 
 function cappedRuleFilename(category, title) {
   const prefix = `${category}-`;
@@ -34,16 +48,16 @@ function main({ args, input }) {
   const rootPath = resolveRootPath(input, args);
   const identity = validateProjectWrite({ rootPath, input, args });
   const rulesPath = path.join(rootPath, "rules");
-  const category = String(input.category || args.category || "behavior").replace(/-$/, "");
+  const category = String(args.category || "behavior").replace(/-$/, "");
   if (!CATEGORIES.has(category) && !/^[a-z][a-z0-9]+$/.test(category)) {
     throw new Error("category must be a simple lowercase rule prefix");
   }
 
-  const title = input.title || args.title || input.filename || args.filename || input.description || args.description;
+  const title = args.title || args.filename || args.description;
   if (!title || !String(title).trim()) {
     throw new Error("title, filename, or description is required");
   }
-  let filename = input.filename || args.filename || cappedRuleFilename(category, title);
+  let filename = args.filename || cappedRuleFilename(category, title);
   if (!filename.endsWith(".md")) {
     filename = `${filename}.md`;
   }
@@ -54,8 +68,8 @@ function main({ args, input }) {
     throw new Error("rule filename must not include a path");
   }
 
-  const description = input.description || args.description || "";
-  const type = input.type || args.type || "behavior";
+  const description = args.description || "";
+  const type = args.type || "behavior";
   const body = input.body || "";
   if (!String(body).trim()) {
     throw new Error("body is required");
@@ -89,4 +103,4 @@ function main({ args, input }) {
   });
 }
 
-runCli(main);
+runCli(main, { acceptedFlags: ACCEPTED_FLAGS, stringFlags: ["root", "project-id", "user-root", "input", "category", "title", "filename", "description", "type"] });

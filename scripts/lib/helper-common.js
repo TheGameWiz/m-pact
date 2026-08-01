@@ -14,6 +14,14 @@ const MEMBER_NAME_MAX = 128;
 const MPACT_SUPPRESS_BEGIN = "M-PACT SUPPRESSED";
 const MPACT_SUPPRESS_END = "END M-PACT SUPPRESSED";
 const MPACT_SUPPRESS_EXIT_CODE = 3;
+const REFRESH_ACCEPTED_FLAGS = [
+  "StartPath",
+  "-StartPath",
+  "start-path",
+  "AllowUserRootOnly",
+  "-AllowUserRootOnly",
+  "allow-user-root-only",
+];
 
 function assertNodeVersion() {
   const nodeMajor = Number.parseInt(process.versions.node.split(".")[0], 10);
@@ -63,6 +71,36 @@ function parseArgs(argv) {
     }
   }
   return args;
+}
+
+function assertKnownFlags(argv, acceptedFlags = []) {
+  assertNoHelpProbe(argv);
+  const accepted = new Set(acceptedFlags);
+  for (const arg of argv) {
+    const flag = arg.startsWith("--")
+      ? arg.slice(2)
+      : accepted.has(arg)
+        ? arg
+        : null;
+    if (flag === null) {
+      continue;
+    }
+    if (!accepted.has(flag)) {
+      throw new Error(`unrecognized flag: ${arg}`);
+    }
+  }
+}
+
+function assertStringFlagValues(args, flags = []) {
+  for (const flag of flags) {
+    if (!Object.prototype.hasOwnProperty.call(args, flag)) {
+      continue;
+    }
+    const value = args[flag];
+    if (typeof value !== "string" || value.length === 0) {
+      throw new Error(`--${flag} requires a value`);
+    }
+  }
 }
 
 function booleanArg(args, name) {
@@ -273,13 +311,14 @@ function yamlBlockList(name, values) {
   ];
 }
 
-function runCli(main) {
+function runCli(main, options = {}) {
   try {
     assertNodeVersion();
     assertMpactAllowedInCurrentSession();
     const argv = process.argv.slice(2);
-    assertNoHelpProbe(argv);
+    assertKnownFlags(argv, options.acceptedFlags || []);
     const args = parseArgs(argv);
+    assertStringFlagValues(args, options.stringFlags || []);
     const input = readInput(args);
     const result = main({ args, input });
     writeReceipt(result);
@@ -298,8 +337,11 @@ module.exports = {
   MPACT_SUPPRESS_BEGIN,
   MPACT_SUPPRESS_END,
   MPACT_SUPPRESS_EXIT_CODE,
+  REFRESH_ACCEPTED_FLAGS,
   assertMpactAllowedInCurrentSession,
   assertNoHelpProbe,
+  assertKnownFlags,
+  assertStringFlagValues,
   booleanArg,
   isMpactSuppressed,
   localTimestamp,

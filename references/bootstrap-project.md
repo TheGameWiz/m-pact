@@ -35,12 +35,12 @@ After approved project bootstrap, reply with one concise user-level sentence. Me
 Run:
 
 ```bash
-node scripts/bootstrap-project.js --user-root
+node scripts/bootstrap-project.js --init-user-root
 ```
 
 Optional flags:
 
-- `--root <user-root>` targets a non-default user root when explicitly needed.
+- `--user-root <path>` targets a non-default user root when explicitly needed.
 - `--skip-starter-rules true` creates only the root.
 
 Starter rules are installed only during initial user-root bootstrap. If a destination rule file already exists, the helper skips it instead of overwriting.

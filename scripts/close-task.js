@@ -10,6 +10,15 @@ const {
 } = require("./lib/helper-common");
 const { transitionTaskState } = require("./lib/task-state");
 
+const ACCEPTED_FLAGS = [
+  "root",
+  "project-id",
+  "cross-project",
+  "user-root",
+  "task",
+  "task-path",
+];
+
 function removeCurrentSentinel(tasksPath, folder) {
   const fs = require("fs");
   const pointerPath = path.join(tasksPath, `current__${folder}`);
@@ -37,4 +46,4 @@ function main({ args, input }) {
   });
 }
 
-runCli(main);
+runCli(main, { acceptedFlags: ACCEPTED_FLAGS, stringFlags: ["root", "project-id", "user-root", "task", "task-path"] });

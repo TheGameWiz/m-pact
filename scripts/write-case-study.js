@@ -7,6 +7,18 @@ const { withDirectoryLock } = require("./lib/directory-lock");
 const { localTimestamp, resolveRootPath, runCli, sanitizeSlug } = require("./lib/helper-common");
 const { validateProjectWrite } = require("./lib/project-identity");
 
+const ACCEPTED_FLAGS = [
+  "root",
+  "project-id",
+  "cross-project",
+  "user-root",
+  "input",
+  "title",
+  "slug-hint",
+  "topic",
+  "related-rule",
+];
+
 function cappedSlug(title, prefix, suffix) {
   const max = 128 - prefix.length - suffix.length;
   return (sanitizeSlug(title) || "case-study").slice(0, max).replace(/-+$/g, "") || "case-study";
@@ -21,13 +33,13 @@ function memberName(timestamp, title) {
 function main({ args, input }) {
   const rootPath = resolveRootPath(input, args);
   const identity = validateProjectWrite({ rootPath, input, args });
-  const title = input.title || input.slugHint || args.title || args["slug-hint"] || "Case Study";
+  const title = args.title || args["slug-hint"] || "Case Study";
   const body = input.body;
   if (!body || !String(body).trim()) {
     throw new Error("body is required");
   }
-  const topic = input.topic || args.topic || "general";
-  const relatedRule = input.relatedRule || input.related_rule || args["related-rule"] || null;
+  const topic = args.topic || "general";
+  const relatedRule = args["related-rule"] || null;
   return withDirectoryLock(rootPath, () => {
     const now = new Date();
     const timestamp = localTimestamp(now);
@@ -52,4 +64,4 @@ function main({ args, input }) {
   });
 }
 
-runCli(main);
+runCli(main, { acceptedFlags: ACCEPTED_FLAGS, stringFlags: ["root", "project-id", "user-root", "input", "title", "slug-hint", "topic", "related-rule"] });

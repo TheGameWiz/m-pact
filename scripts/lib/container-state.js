@@ -42,7 +42,7 @@ function sortMembers(members, container) {
 }
 
 function resolveContainer(input = {}, args = {}, options = {}) {
-  const container = getContainer(input.container || args.container);
+  const container = getContainer(args.container);
   if (container.scope === "task") {
     const taskPath = resolveTaskPath(input, args, { allowedStates: options.allowedStates || ["A", "C"] });
     return {

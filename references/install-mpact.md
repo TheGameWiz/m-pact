@@ -32,12 +32,12 @@ Optional flags:
 - `--provider codex|claude|gemini` installs one provider-global shim when provider inference is not available or when an explicit provider is needed.
 - `--providers codex,claude,gemini` is accepted for explicit multi-provider shim setup, but normal provider installs should use a single provider.
 - `--skip-starter-rules true` creates `.AgentMemoryRoot/` without starter rules.
-- `--force-shims true` replaces provider-global startup shims instead of preserving existing M-PACT shims.
-- `--home <path>` targets a non-default user home when explicitly needed.
+- `--remove-shims` removes the marked M-PACT shim block from the detected or requested provider config without touching other content. With no `--provider`, removal targets only the detected installed provider; from a source checkout, detection normally finds no provider and removes nothing.
+- `--home <path>` targets provider shim files under a non-default home when explicitly needed. It does not isolate the M-PACT user root; pass `--user-root <path>` too when testing or installing against a non-default memory root.
 - `--user-root <path>` targets a non-default M-PACT user root when explicitly needed.
 
 Do not create a project `.AgentMemory/` during install. Project setup is a separate operation handled by `references/bootstrap-project.md`.
 
-If a provider-global shim already exists and does not mention M-PACT, the helper appends the M-PACT shim while preserving existing content. If it already mentions M-PACT, the helper leaves it unchanged unless `--force-shims true` is supplied.
+Provider-global shims are written inside literal `BEGIN M-PACT SHIM` / `END M-PACT SHIM` markers. If a provider-global file already exists and has no marked M-PACT block, the helper appends the marked shim while preserving existing content. If exactly one marked block exists, the helper replaces only that block. If markers are malformed or duplicated, the helper reports the shim write as blocked instead of guessing.
 
 The helper prints a short activation note. The installing agent should treat M-PACT runtime setup as complete immediately in the current session. Other already-open sessions may still need a provider-specific reload or a new session before they see shim changes.

@@ -30,13 +30,6 @@ const CONTAINERS = {
     defaultSort: "record-asc",
     recordsExpected: true,
   },
-  "task-summary": {
-    name: "task-summary",
-    scope: "task",
-    zipFilename: "summary.zip",
-    defaultSort: "record-asc",
-    recordsExpected: true,
-  },
   specification: {
     name: "specification",
     scope: "task",
@@ -55,9 +48,6 @@ const ALIASES = new Map([
   ["journal", "journal"],
   ["task-log", "task-log"],
   ["log", "task-log"],
-  ["task-summary", "task-summary"],
-  ["summary", "task-summary"],
-  ["summaries", "task-summary"],
   ["spec", "specification"],
   ["specification", "specification"],
   ["specifications", "specification"],
