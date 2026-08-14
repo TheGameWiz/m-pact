@@ -2,19 +2,17 @@
 
 Task reopen is Director-orchestrated only.
 
-Use `scripts/reopen-task.js`. The helper owns the task state update and current-task selection.
+Use `scripts/reopen-task.js`. The helper owns the task state update and current-task selection. The folder prefix is authoritative for task state; reopen does not write a `Status:` field to `task.md`.
+
+For tasks closed by the new close-status path, the reopen receipt surfaces `reopenUnfinished` and `reopenClearedUnresolved`. Reopen does not automatically return those items to `## Active Items`; the first task log after reopen must seed the active list deliberately. This obligation is mirrored in `write-task-log.md`.
 
 ## Procedure
 
-1. Confirm explicit Director instruction to reopen the task.
-2. Read the task folder's `task.md` and verify current status is `Closed`.
-3. Call `scripts/reopen-task.js` once with direct helper arguments.
-4. Reply with one concise user-level sentence, such as `Reopened t0005.` Do not report paths, storage changes, log members, sentinels, or other helper internals unless the Director asks for debugging details.
+1. Call `scripts/reopen-task.js` once with direct helper arguments.
+2. Reply with one concise user-level sentence, such as `Reopened t0005.` If the receipt reports unfinished or cleared-unresolved item versions, state that those were surfaced and not auto-reactivated. Do not report paths, storage changes, log members, sentinels, or other helper internals unless the Director asks for debugging details.
 
 Example shape:
 
 ```bash
-node scripts/reopen-task.js --task t0001 --project-id 7
+node <this-skill>/scripts/reopen-task.js --task t0001 --project-id 7
 ```
-
-Use the project ID from the latest refresh or successful write receipt. Do not reopen a task based only on agent judgment.

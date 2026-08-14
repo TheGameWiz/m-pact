@@ -48,12 +48,12 @@ function fail(message) {
   throw new Error(message);
 }
 
-function defaultUserRoot() {
-  if (process.env.MPACT_USER_ROOT && process.env.MPACT_USER_ROOT.trim()) {
-    return path.resolve(process.env.MPACT_USER_ROOT);
+function defaultUserRoot(env = process.env) {
+  if (env.MPACT_USER_ROOT && env.MPACT_USER_ROOT.trim()) {
+    return path.resolve(env.MPACT_USER_ROOT);
   }
-  const homePath = process.platform === "win32" && process.env.USERPROFILE && process.env.USERPROFILE.trim()
-    ? process.env.USERPROFILE
+  const homePath = process.platform === "win32" && env.USERPROFILE && env.USERPROFILE.trim()
+    ? env.USERPROFILE
     : os.homedir();
   return path.join(homePath, ".AgentMemoryRoot");
 }
@@ -73,6 +73,45 @@ function normalizeCompare(filePath) {
 
 function samePath(a, b) {
   return normalizeCompare(a) === normalizeCompare(b);
+}
+
+function pathContains(parentPath, childPath) {
+  const parent = normalizeCompare(parentPath);
+  const child = normalizeCompare(childPath);
+  const relative = path.relative(parent, child);
+  return relative === "" || (!!relative && !relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+function setupLocationRefusalMessage({ projectPath, userRoot, home }) {
+  const candidate = path.resolve(projectPath);
+  const user = path.resolve(userRoot);
+  const homePath = path.resolve(home || os.homedir());
+  if (pathContains(candidate, user)) {
+    return `Project memory cannot be created at ${candidate} because the user root occupies that level: ${user}. Project memory belongs in a project folder.`;
+  }
+  if (samePath(candidate, homePath)) {
+    return `Project memory cannot be created at the home directory ${candidate}. Project memory belongs in a project folder.`;
+  }
+  if (samePath(candidate, path.parse(candidate).root)) {
+    return `Project memory cannot be created at filesystem root ${candidate}. Project memory belongs in a project folder.`;
+  }
+  return null;
+}
+
+function validateProjectMemorySetupLocationVerdict({ projectPath, userRoot = defaultUserRoot(), home = os.homedir() } = {}) {
+  const message = setupLocationRefusalMessage({ projectPath, userRoot, home });
+  if (message) {
+    return { ok: false, message };
+  }
+  return { ok: true, projectPath: path.resolve(projectPath), userRoot: path.resolve(userRoot), home: path.resolve(home) };
+}
+
+function validateProjectMemorySetupLocation(options) {
+  const verdict = validateProjectMemorySetupLocationVerdict(options);
+  if (!verdict.ok) {
+    fail(verdict.message);
+  }
+  return verdict;
 }
 
 // The slug must describe the root's canonical location, so the root has to exist.
@@ -226,13 +265,6 @@ function ensureCounterInitialized(userRoot) {
   });
 }
 
-function mintProjectId(userRoot) {
-  fs.mkdirSync(userRoot, { recursive: true });
-  return withDirectoryLock(userRoot, () => {
-    return mintProjectIdUnlocked(userRoot);
-  });
-}
-
 function mintProjectIdUnlocked(userRoot) {
   const counter = readCounterSentinel(userRoot);
   assertCounter(counter);
@@ -285,7 +317,7 @@ function initializeProjectIdentity(rootPath, userRoot = defaultUserRoot()) {
         };
       }
       if (existing.state !== "missing") {
-        fail(`project identity sentinel is malformed: ${existing.state}`);
+        assertProjectIdentityCanProceed(resolvedRoot, existing);
       }
       const projectId = mintProjectIdUnlocked(userRoot);
       const written = writeProjectSentinel(resolvedRoot, projectId);
@@ -357,8 +389,8 @@ function repairProjectIdentity(rootPath, userRoot = defaultUserRoot()) {
         const written = writeProjectSentinel(resolvedRoot, projectId);
         return { repaired: true, projectId, rootPath: resolvedRoot, removed: existing.names.join(", "), sentinel: written.name };
       }
-      if (existing.state !== "path-mismatch") {
-        fail(`project identity repair requires a path-mismatched or multiple sentinel state, found: ${existing.state}`);
+      if (existing.state !== "path-mismatch" && existing.state !== "empty" && existing.state !== "invalid-content") {
+        fail(`project identity repair requires a path-mismatched, multiple, empty, or invalid-content sentinel state, found: ${existing.state}`);
       }
       const projectId = mintProjectIdUnlocked(userRoot);
       const written = writeProjectSentinel(resolvedRoot, projectId);
@@ -403,38 +435,92 @@ function foreignSentinelMessage(rootPath, names) {
   ].join("\n");
 }
 
+function corruptSentinelMessage(rootPath, identity) {
+  const detail = identity.state === "invalid-content" && identity.message
+    ? ` (${identity.message})`
+    : "";
+  return [
+    `Project identity sentinel is corrupt under ${rootPath}: ${identity.state}${detail}.`,
+    "Repair will remove the corrupt sentinel and assign a new project identity for this current root.",
+    "Question: Assign a new project identity for this current root? Answer yes or no.",
+    "If yes: run the project identity repair helper for this root, refresh, then retry the original operation.",
+    "If no: stop before writing durable project memory.",
+  ].join("\n");
+}
+
+function classifyProjectIdentity(rootPath, identity) {
+  if (identity.state === "valid") {
+    return { state: "valid", action: "proceed" };
+  }
+  if (identity.state === "missing") {
+    return { state: "missing", action: "adopt", error: adoptionNotice(rootPath) };
+  }
+  if (identity.state === "multiple") {
+    const expectedName = expectedProjectSentinelName(rootPath);
+    return {
+      state: "multiple",
+      action: "repair",
+      error: notice(identity.names.includes(expectedName)
+        ? multipleSentinelMessage(rootPath, identity.names)
+        : foreignSentinelMessage(rootPath, identity.names)),
+    };
+  }
+  if (identity.state === "empty" || identity.state === "invalid-content") {
+    return { state: identity.state, action: "repair", error: notice(corruptSentinelMessage(rootPath, identity)) };
+  }
+  if (identity.state === "path-mismatch") {
+    return { state: "path-mismatch", action: "repair", error: notice(pathMismatchMessage(rootPath)) };
+  }
+  return { state: identity.state, action: "error", error: new Error(`project identity sentinel is malformed: ${identity.state}`) };
+}
+
+function assertProjectIdentityCanProceed(rootPath, identity) {
+  const classification = classifyProjectIdentity(rootPath, identity);
+  if (classification.action !== "proceed") {
+    throw classification.error;
+  }
+  return classification;
+}
+
+function launcherProjectPathFromEnv() {
+  const value = process.env.MPACT_LAUNCHER_PROJECT_PATH;
+  return value && String(value).trim() ? path.resolve(String(value).trim()) : null;
+}
+
+function rootFromProjectLikePath(projectPath) {
+  const resolved = path.resolve(projectPath);
+  return path.basename(resolved) === ".AgentMemory"
+    ? resolved
+    : path.join(resolved, ".AgentMemory");
+}
+
+function launcherMismatchMessage({ launcherPath, projectPath }) {
+  return [
+    `Launcher reports current project path ${launcherPath}, but this write targets ${projectPath}.`,
+    "This can happen when an existing agent session is resumed from a different visible workspace.",
+    "Question: Is this write intended for the session's target project? Answer yes or no.",
+    "If yes: unset or correct MPACT_LAUNCHER_PROJECT_PATH for this run, then retry.",
+    "If no: open or resume the agent session for the intended project before writing durable memory.",
+  ].join("\n");
+}
+
+function assertLauncherProjectIntent(resolvedRoot, projectPath) {
+  const launcherPath = launcherProjectPathFromEnv();
+  if (!launcherPath) {
+    return;
+  }
+  const launcherRoot = rootFromProjectLikePath(launcherPath);
+  if (!samePath(launcherRoot, resolvedRoot)) {
+    throw notice(launcherMismatchMessage({ launcherPath, projectPath }));
+  }
+}
+
 function projectIdFromInput(input = {}, args = {}) {
   const value = args["project-id"];
   if (value === undefined || value === null || value === "") {
     return null;
   }
   return parseBareInteger(value, "project ID declaration");
-}
-
-function validateProjectRootHealth(rootPath, userRoot = defaultUserRoot()) {
-  const resolvedRoot = fs.realpathSync(rootPath);
-  const identity = readProjectSentinel(resolvedRoot);
-  if (identity.state === "missing") {
-    throw adoptionNotice(resolvedRoot);
-  }
-  if (identity.state === "multiple") {
-    const expectedName = expectedProjectSentinelName(resolvedRoot);
-    throw notice(identity.names.includes(expectedName)
-      ? multipleSentinelMessage(resolvedRoot, identity.names)
-      : foreignSentinelMessage(resolvedRoot, identity.names));
-  }
-  if (identity.state === "empty" || identity.state === "invalid-content") {
-    fail(`project identity sentinel is malformed: ${identity.state}`);
-  }
-  if (identity.state === "path-mismatch") {
-    throw notice(pathMismatchMessage(resolvedRoot));
-  }
-  const counter = readCounterSentinel(userRoot);
-  assertCounter(counter);
-  if (identity.projectId > counter.value) {
-    fail("project identity is above the counter high-water mark; repair project identity state before retrying");
-  }
-  return { identity, counter };
 }
 
 function ensureProjectRootHealth(rootPath, userRoot = defaultUserRoot()) {
@@ -447,18 +533,7 @@ function ensureProjectRootHealth(rootPath, userRoot = defaultUserRoot()) {
       let { counter, initialized: counterInitialized } = ensureCounterReadyUnlocked(userRoot);
       let identity = readProjectSentinel(resolvedRoot);
 
-      if (identity.state === "missing") {
-        throw adoptionNotice(resolvedRoot);
-      } else if (identity.state === "multiple") {
-        const expectedName = expectedProjectSentinelName(resolvedRoot);
-        throw notice(identity.names.includes(expectedName)
-          ? multipleSentinelMessage(resolvedRoot, identity.names)
-          : foreignSentinelMessage(resolvedRoot, identity.names));
-      } else if (identity.state === "empty" || identity.state === "invalid-content") {
-        fail(`project identity sentinel is malformed: ${identity.state}`);
-      } else if (identity.state === "path-mismatch") {
-        throw notice(pathMismatchMessage(resolvedRoot));
-      }
+      assertProjectIdentityCanProceed(resolvedRoot, identity);
 
       if (identity.projectId > counter.value) {
         fail("project identity is above the counter high-water mark; repair project identity state before retrying");
@@ -476,6 +551,10 @@ function userRootFromInput(input = {}, args = {}, fallback = defaultUserRoot()) 
   return path.resolve(args["user-root"] || fallback);
 }
 
+// Library contract (relocated from references/memory-root-policy.md): callers of
+// validateProjectWrite must catch identity-halt errors and surface error.mpactNotice
+// to the Director rather than printing a raw stack; the notice carries the
+// structured halt question the protocol expects.
 function validateProjectWrite({ rootPath, input = {}, args = {}, userRoot = null }) {
   userRoot = userRootFromInput(input, args, userRoot || defaultUserRoot());
   const resolvedRoot = fs.realpathSync(rootPath);
@@ -488,6 +567,7 @@ function validateProjectWrite({ rootPath, input = {}, args = {}, userRoot = null
   const explicitCrossProject = booleanArg(args, "cross-project");
   const { identity } = ensureProjectRootHealth(resolvedRoot, userRoot);
   const projectPath = path.dirname(resolvedRoot);
+  assertLauncherProjectIntent(resolvedRoot, projectPath);
   const discoveredRoot = findActiveRoot(process.cwd());
   const differsFromDiscovery = !discoveredRoot || !samePath(discoveredRoot, resolvedRoot);
   const declared = projectIdFromInput(input, args);
@@ -509,6 +589,20 @@ function validateProjectWrite({ rootPath, input = {}, args = {}, userRoot = null
   return { rootPath: resolvedRoot, projectId: identity.projectId, projectPath, userRoot: false, crossProject: false };
 }
 
+function validateProjectWriteVerdict(options) {
+  try {
+    return { ok: true, value: validateProjectWrite(options) };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error.message,
+      mpactNotice: error.mpactNotice || null,
+      exitCode: error.exitCode || 1,
+      error,
+    };
+  }
+}
+
 module.exports = {
   ADOPTION_NOTICE_BEGIN,
   ADOPTION_NOTICE_END,
@@ -518,19 +612,21 @@ module.exports = {
   PROJECT_PREFIX,
   adoptProjectIdentity,
   adoptionNotice,
+  classifyProjectIdentity,
   defaultUserRoot,
   ensureCounterInitialized,
   expectedProjectSentinelName,
   initializeProjectIdentity,
   isProjectRoot,
   isUserRoot,
-  mintProjectId,
   readCounterSentinel,
   readProjectSentinel,
   repairProjectIdentity,
   ensureProjectRootHealth,
-  validateProjectRootHealth,
   validateProjectWrite,
+  validateProjectMemorySetupLocation,
+  validateProjectMemorySetupLocationVerdict,
+  validateProjectWriteVerdict,
   writeCounterSentinel,
   writeProjectSentinel,
 };

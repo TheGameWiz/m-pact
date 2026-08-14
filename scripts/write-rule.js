@@ -22,6 +22,7 @@ const ACCEPTED_FLAGS = [
   "cross-project",
   "user-root",
   "input",
+  "from-stdin",
   "category",
   "title",
   "filename",
@@ -30,6 +31,8 @@ const ACCEPTED_FLAGS = [
   "replace",
   "update",
 ];
+const REQUIRED_FLAGS = [];
+const REQUIRED_ONE_OF = [["title", "filename", "description"]];
 
 function cappedRuleFilename(category, title) {
   const prefix = `${category}-`;
@@ -54,9 +57,6 @@ function main({ args, input }) {
   }
 
   const title = args.title || args.filename || args.description;
-  if (!title || !String(title).trim()) {
-    throw new Error("title, filename, or description is required");
-  }
   let filename = args.filename || cappedRuleFilename(category, title);
   if (!filename.endsWith(".md")) {
     filename = `${filename}.md`;
@@ -103,4 +103,10 @@ function main({ args, input }) {
   });
 }
 
-runCli(main, { acceptedFlags: ACCEPTED_FLAGS, stringFlags: ["root", "project-id", "user-root", "input", "category", "title", "filename", "description", "type"] });
+runCli(main, {
+  acceptedFlags: ACCEPTED_FLAGS,
+  stringFlags: ["root", "project-id", "user-root", "input", "category", "title", "filename", "description", "type"],
+  requiredFlags: REQUIRED_FLAGS,
+  requiredOneOf: REQUIRED_ONE_OF,
+  stdinFlags: ["from-stdin"],
+});

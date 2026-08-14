@@ -7,7 +7,7 @@ const {
   resolveContainer,
   withContainerOperationLock,
 } = require("./lib/container-state");
-const { runCli } = require("./lib/helper-common");
+const { DEFAULT_UNSUPPORTED_OPERATION_FLAGS, runCli } = require("./lib/helper-common");
 
 const ACCEPTED_FLAGS = [
   "root",
@@ -18,6 +18,8 @@ const ACCEPTED_FLAGS = [
   "through",
   "max-bytes",
 ];
+const REQUIRED_FLAGS = ["container"];
+const REQUIRED_ONE_OF = [];
 
 function integerArg(args, name, fallback = null) {
   if (args[name] === undefined) {
@@ -44,13 +46,14 @@ function main({ args }) {
 
   return withContainerOperationLock(context, () => {
     const entries = readContainerEntries(context);
-    const selected = entries.filter((entry) => entry.record !== null && entry.record > after && entry.record <= through);
+    const inRange = entries.filter((entry) => entry.record !== null && entry.record > after && entry.record <= through);
     const collisionNames = new Set(collisionGroups(entries).flatMap(([, group]) => group.map((member) => member.name)));
     const output = [];
     const members = [];
     let bytes = 0;
     let truncated = false;
-    for (const entry of selected) {
+    let lastConsideredRecord = after;
+    for (const entry of inRange) {
       const text = entry.content.toString("utf8");
       const nextBytes = Buffer.byteLength(text, "utf8");
       if (maxBytes !== null && output.length > 0 && bytes + nextBytes > maxBytes && !collisionNames.has(entry.name)) {
@@ -60,8 +63,9 @@ function main({ args }) {
       output.push(`## ${entry.name}\n\n${text.replace(/\s*$/, "")}\n`);
       members.push(entry);
       bytes += nextBytes;
+      lastConsideredRecord = entry.record;
       if (maxBytes !== null && bytes >= maxBytes) {
-        const next = selected[selected.indexOf(entry) + 1];
+        const next = inRange[inRange.indexOf(entry) + 1];
         if (!next || !collisionNames.has(next.name)) {
           truncated = Boolean(next);
           break;
@@ -70,7 +74,7 @@ function main({ args }) {
     }
     const nextCursor = members.length > 0
       ? Math.max(...members.map((member) => member.record).filter((record) => record !== null))
-      : after;
+      : lastConsideredRecord;
     return {
       ok: true,
       operation: "read-member-span",
@@ -88,4 +92,10 @@ function main({ args }) {
   });
 }
 
-runCli(main, { acceptedFlags: ACCEPTED_FLAGS, stringFlags: ["root", "task", "task-path", "container", "after", "through", "max-bytes"] });
+runCli(main, {
+  acceptedFlags: ACCEPTED_FLAGS,
+  stringFlags: ["root", "task", "task-path", "container", "after", "through", "max-bytes"],
+  requiredFlags: REQUIRED_FLAGS,
+  requiredOneOf: REQUIRED_ONE_OF,
+  unsupportedFlags: DEFAULT_UNSUPPORTED_OPERATION_FLAGS,
+});

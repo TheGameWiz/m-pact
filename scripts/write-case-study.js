@@ -13,11 +13,14 @@ const ACCEPTED_FLAGS = [
   "cross-project",
   "user-root",
   "input",
+  "from-stdin",
   "title",
   "slug-hint",
   "topic",
   "related-rule",
 ];
+const REQUIRED_FLAGS = [];
+const REQUIRED_ONE_OF = [];
 
 function cappedSlug(title, prefix, suffix) {
   const max = 128 - prefix.length - suffix.length;
@@ -64,4 +67,10 @@ function main({ args, input }) {
   });
 }
 
-runCli(main, { acceptedFlags: ACCEPTED_FLAGS, stringFlags: ["root", "project-id", "user-root", "input", "title", "slug-hint", "topic", "related-rule"] });
+runCli(main, {
+  acceptedFlags: ACCEPTED_FLAGS,
+  stringFlags: ["root", "project-id", "user-root", "input", "title", "slug-hint", "topic", "related-rule"],
+  requiredFlags: REQUIRED_FLAGS,
+  requiredOneOf: REQUIRED_ONE_OF,
+  stdinFlags: ["from-stdin"],
+});

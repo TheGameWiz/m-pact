@@ -115,8 +115,17 @@ function lockMetadata(zipPath) {
 }
 
 function readLock(lockPath) {
+  let text;
   try {
-    return JSON.parse(fs.readFileSync(lockPath, "utf8"));
+    text = fs.readFileSync(lockPath, "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
+  try {
+    return JSON.parse(text);
   } catch {
     return null;
   }
@@ -129,9 +138,20 @@ function cleanupTemp(zipPath) {
   }
 }
 
-function acquireLock(zipPath) {
+function ensureZipParent(zipPath, options = {}) {
+  const parent = path.dirname(zipPath);
+  if (options.requireExistingParent) {
+    if (!fs.existsSync(parent) || !fs.statSync(parent).isDirectory()) {
+      throw new Error(`ZIP parent directory does not exist; task may have been renamed concurrently, re-resolve and retry: ${parent}`);
+    }
+    return;
+  }
+  fs.mkdirSync(parent, { recursive: true });
+}
+
+function acquireLock(zipPath, options = {}) {
   const targetLockPath = lockPathForZip(zipPath);
-  fs.mkdirSync(path.dirname(targetLockPath), { recursive: true });
+  ensureZipParent(zipPath, options);
   for (let attempt = 0; attempt <= LOCK_RETRY_COUNT; attempt++) {
     try {
       const fd = fs.openSync(targetLockPath, "wx");
@@ -143,13 +163,24 @@ function acquireLock(zipPath) {
       if (error.code !== "EEXIST") {
         throw error;
       }
-      const stat = fs.statSync(targetLockPath);
+      let stat;
+      try {
+        stat = fs.statSync(targetLockPath);
+      } catch (statError) {
+        if (statError.code === "ENOENT") {
+          continue;
+        }
+        throw statError;
+      }
       const ageMs = Date.now() - stat.mtimeMs;
       if (ageMs > LOCK_STALE_MS) {
         const metadata = readLock(targetLockPath);
         try {
           fs.unlinkSync(targetLockPath);
         } catch (unlinkError) {
+          if (unlinkError.code === "ENOENT") {
+            continue;
+          }
           throw new Error(`stale ZIP lock older than ${LOCK_STALE_MS}ms could not be removed: ${targetLockPath}${metadata ? ` ${JSON.stringify(metadata)}` : ""}; ${unlinkError.message}`);
         }
         continue;
@@ -607,9 +638,9 @@ function writeCentralDirectoryToFd(fd, entries, centralOffset) {
   return endOffset;
 }
 
-function recoverCatalogUnlocked(zipPath) {
+function recoverCatalogUnlocked(zipPath, options = {}) {
   const { entries, localEnd } = walkLocalHeadersUnlocked(zipPath, { validateContent: true });
-  fs.mkdirSync(path.dirname(zipPath), { recursive: true });
+  ensureZipParent(zipPath, options);
   const fd = fs.openSync(zipPath, fs.existsSync(zipPath) ? "r+" : "w+");
   try {
     writeCentralDirectoryToFd(fd, entries, localEnd);
@@ -619,7 +650,7 @@ function recoverCatalogUnlocked(zipPath) {
   return entries;
 }
 
-function readCatalogUnlocked(zipPath) {
+function readCatalogUnlocked(zipPath, options = {}) {
   if (!fs.existsSync(zipPath)) {
     return [];
   }
@@ -627,43 +658,30 @@ function readCatalogUnlocked(zipPath) {
   if (catalog) {
     return catalog;
   }
-  return recoverCatalogUnlocked(zipPath);
+  return recoverCatalogUnlocked(zipPath, options);
 }
 
-function readCatalog(zipPath) {
-  const targetLockPath = acquireLock(zipPath);
+function readCatalog(zipPath, options = {}) {
+  const targetLockPath = acquireLock(zipPath, options);
   try {
-    return readCatalogUnlocked(zipPath);
+    return readCatalogUnlocked(zipPath, options);
   } finally {
     releaseLock(targetLockPath);
   }
 }
 
-function listMembers(zipPath) {
-  return readCatalog(zipPath).map((entry) => ({
+function listMembers(zipPath, options = {}) {
+  return readCatalog(zipPath, options).map((entry) => ({
     name: entry.name,
     size: entry.uncompressedSize,
     modified: entry.modified.toISOString(),
   }));
 }
 
-function hasMembers(zipPath) {
-  const targetLockPath = acquireLock(zipPath);
+function readMember(zipPath, memberName, options = {}) {
+  const targetLockPath = acquireLock(zipPath, options);
   try {
-    const metadata = readAppendMetadataFromEocdUnlocked(zipPath);
-    if (metadata) {
-      return metadata.totalEntries > 0;
-    }
-    return walkLocalHeadersUnlocked(zipPath, { validateContent: false }).entries.length > 0;
-  } finally {
-    releaseLock(targetLockPath);
-  }
-}
-
-function readMember(zipPath, memberName) {
-  const targetLockPath = acquireLock(zipPath);
-  try {
-    const entry = readCatalogUnlocked(zipPath).find((candidate) => candidate.name === memberName);
+    const entry = readCatalogUnlocked(zipPath, options).find((candidate) => candidate.name === memberName);
     if (!entry) {
       throw new Error(`ZIP member not found: ${memberName}`);
     }
@@ -738,10 +756,10 @@ function appendGeneratedMemberLocked(zipPath, memberName, content, modified) {
     : appendGeneratedMemberFromLocalScan(zipPath, memberName, content, modified);
 }
 
-function appendGeneratedMember(zipPath, memberName, content, modified = new Date()) {
+function appendGeneratedMember(zipPath, memberName, content, modified = new Date(), options = {}) {
   validateMemberName(memberName);
-  fs.mkdirSync(path.dirname(zipPath), { recursive: true });
-  const targetLockPath = acquireLock(zipPath);
+  ensureZipParent(zipPath, options);
+  const targetLockPath = acquireLock(zipPath, options);
   try {
     return appendGeneratedMemberLocked(zipPath, memberName, content, modified);
   } finally {
@@ -823,12 +841,12 @@ function appendMemberFromLocalScan(zipPath, buildMember, modified) {
   }
 }
 
-function appendMember(zipPath, buildMember, modified = new Date()) {
+function appendMember(zipPath, buildMember, modified = new Date(), options = {}) {
   if (typeof buildMember !== "function") {
     throw new Error("numbered ZIP append requires a member builder function");
   }
-  fs.mkdirSync(path.dirname(zipPath), { recursive: true });
-  const targetLockPath = acquireLock(zipPath);
+  ensureZipParent(zipPath, options);
+  const targetLockPath = acquireLock(zipPath, options);
   try {
     const metadata = readAppendMetadataFromEocdUnlocked(zipPath);
     return metadata
@@ -871,10 +889,10 @@ function copyRangeSync(sourceFd, targetFd, start, length, targetStart) {
   }
 }
 
-function replaceMember(zipPath, memberName, content, modified = new Date()) {
+function replaceMember(zipPath, memberName, content, modified = new Date(), options = {}) {
   validateMemberName(memberName);
-  fs.mkdirSync(path.dirname(zipPath), { recursive: true });
-  const targetLockPath = acquireLock(zipPath);
+  ensureZipParent(zipPath, options);
+  const targetLockPath = acquireLock(zipPath, options);
   const tmpPath = tempPathForZip(zipPath);
   try {
     const entries = readCatalogUnlocked(zipPath);
@@ -936,10 +954,91 @@ function replaceMember(zipPath, memberName, content, modified = new Date()) {
   }
 }
 
+function appendGeneratedMembers(zipPath, members, modified = new Date(), options = {}) {
+  if (!Array.isArray(members) || members.length === 0) {
+    throw new Error("appendGeneratedMembers requires at least one member");
+  }
+  ensureZipParent(zipPath, options);
+  const targetLockPath = acquireLock(zipPath, options);
+  const tmpPath = tempPathForZip(zipPath);
+  try {
+    const entries = readCatalogUnlocked(zipPath);
+    const existingNames = new Set(entries.map((entry) => entry.name));
+    const nextNames = new Set();
+    const prepared = members.map((member) => {
+      const memberName = member.member || member.memberName || member.name;
+      validateMemberName(memberName);
+      if (existingNames.has(memberName) || nextNames.has(memberName)) {
+        throw new Error(`ZIP member already exists: ${memberName}`);
+      }
+      nextNames.add(memberName);
+      return entryForContent(memberName, member.content, modified);
+    });
+    if (fs.existsSync(tmpPath)) {
+      fs.unlinkSync(tmpPath);
+    }
+    const sourceExists = fs.existsSync(zipPath);
+    const sourceFd = sourceExists ? fs.openSync(zipPath, "r") : null;
+    const targetFd = fs.openSync(tmpPath, "wx");
+    try {
+      const sourceSize = sourceFd === null ? 0 : fs.fstatSync(sourceFd).size;
+      const nextEntries = [];
+      let offset = 0;
+      for (const entry of entries) {
+        const bounds = localRecordBounds(sourceFd, entry, sourceSize);
+        copyRangeSync(sourceFd, targetFd, bounds.start, bounds.end - bounds.start, offset);
+        nextEntries.push({ ...entry, localOffset: offset });
+        offset += bounds.end - bounds.start;
+      }
+      for (const preparedMember of prepared) {
+        preparedMember.entry.localOffset = offset;
+        const record = buildLocalRecord(preparedMember.entry, preparedMember.compressed);
+        fs.writeSync(targetFd, record, 0, record.length, offset);
+        nextEntries.push(preparedMember.entry);
+        offset += record.length;
+      }
+      const endOffset = writeCentralDirectoryToFd(targetFd, nextEntries, offset);
+      if (sourceFd !== null) {
+        fs.closeSync(sourceFd);
+      }
+      fs.closeSync(targetFd);
+      if (typeof options.beforeRename === "function") {
+        options.beforeRename();
+      }
+      fs.renameSync(tmpPath, zipPath);
+      return {
+        bytes: endOffset,
+        strategy: "temp-raw-copy-append-batch",
+        attempts: 1,
+        members: prepared.map((member) => member.entry.name),
+      };
+    } catch (error) {
+      try {
+        if (sourceFd !== null) {
+          fs.closeSync(sourceFd);
+        }
+      } catch {
+        // Already closed.
+      }
+      try {
+        fs.closeSync(targetFd);
+      } catch {
+        // Already closed.
+      }
+      if (fs.existsSync(tmpPath)) {
+        fs.unlinkSync(tmpPath);
+      }
+      throw error;
+    }
+  } finally {
+    releaseLock(targetLockPath);
+  }
+}
+
 module.exports = {
   appendGeneratedMember,
+  appendGeneratedMembers,
   appendMember,
-  hasMembers,
   listMembers,
   readCatalog,
   readCatalogUnlocked,

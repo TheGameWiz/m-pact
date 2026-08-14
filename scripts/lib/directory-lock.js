@@ -24,8 +24,17 @@ function lockMetadata(targetPath) {
 }
 
 function readLock(lockPath) {
+  let text;
   try {
-    return JSON.parse(fs.readFileSync(lockPath, "utf8"));
+    text = fs.readFileSync(lockPath, "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
+  try {
+    return JSON.parse(text);
   } catch {
     return null;
   }
@@ -45,11 +54,27 @@ function acquireDirectoryLock(targetPath) {
       if (error.code !== "EEXIST") {
         throw error;
       }
-      const stat = fs.statSync(lockPath);
+      let stat;
+      try {
+        stat = fs.statSync(lockPath);
+      } catch (statError) {
+        if (statError.code === "ENOENT") {
+          continue;
+        }
+        throw statError;
+      }
       const ageMs = Date.now() - stat.mtimeMs;
       if (ageMs > LOCK_STALE_MS) {
         const metadata = readLock(lockPath);
-        throw new Error(`stale directory lock older than ${LOCK_STALE_MS}ms: ${lockPath}${metadata ? ` ${JSON.stringify(metadata)}` : ""}`);
+        try {
+          fs.unlinkSync(lockPath);
+        } catch (unlinkError) {
+          if (unlinkError.code === "ENOENT") {
+            continue;
+          }
+          throw new Error(`stale directory lock older than ${LOCK_STALE_MS}ms could not be removed: ${lockPath}${metadata ? ` ${JSON.stringify(metadata)}` : ""}; ${unlinkError.message}`);
+        }
+        continue;
       }
       if (attempt === LOCK_RETRY_COUNT) {
         throw new Error(`directory lock is busy: ${lockPath}`);

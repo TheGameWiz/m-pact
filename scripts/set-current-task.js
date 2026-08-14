@@ -6,7 +6,10 @@ const path = require("path");
 const { withDirectoryLock } = require("./lib/directory-lock");
 const { booleanArg, resolveRootPath, runCli } = require("./lib/helper-common");
 const { validateProjectWrite } = require("./lib/project-identity");
-const { clearCurrentSentinels, setCurrentTask, validateTaskPath } = require("./lib/task-state");
+const { listMembers } = require("./lib/zip-record-store");
+const { withRecordMetadata } = require("./lib/container-state");
+const { formatTaskLogCatalogReceipt } = require("./lib/task-log-catalog");
+const { clearCurrentSentinels, setCurrentTask, taskNumberFromFolder, validateTaskPath } = require("./lib/task-state");
 
 const ACCEPTED_FLAGS = [
   "root",
@@ -17,6 +20,8 @@ const ACCEPTED_FLAGS = [
   "task-path",
   "clear",
 ];
+const REQUIRED_FLAGS = [];
+const REQUIRED_ONE_OF = [["task", "task-path", "clear"]];
 
 function resolveTaskFolder(rootPath, args, input) {
   const value = args.task || args["task-path"];
@@ -67,8 +72,25 @@ function main({ args, input }) {
   const { tasksPath, taskPath, folder } = resolveTaskFolder(rootPath, args, input);
   return withDirectoryLock(tasksPath, () => {
     const sentinel = setCurrentTask(tasksPath, taskPath);
-    return { ok: true, operation: "set-current-task", rootPath, projectId: identity.projectId, projectPath: identity.projectPath, crossProject: identity.crossProject || undefined, taskPath, sentinel };
+    const logMembers = listMembers(path.join(taskPath, "log.zip"), { requireExistingParent: true })
+      .map((member) => withRecordMetadata(member, { recordsExpected: true }));
+    return {
+      ok: true,
+      operation: "set-current-task",
+      rootPath,
+      projectId: identity.projectId,
+      projectPath: identity.projectPath,
+      crossProject: identity.crossProject || undefined,
+      taskPath,
+      sentinel,
+      taskLogCatalog: formatTaskLogCatalogReceipt(logMembers, { taskId: taskNumberFromFolder(folder) }),
+    };
   });
 }
 
-runCli(main, { acceptedFlags: ACCEPTED_FLAGS, stringFlags: ["root", "project-id", "user-root", "task", "task-path"] });
+runCli(main, {
+  acceptedFlags: ACCEPTED_FLAGS,
+  stringFlags: ["root", "project-id", "user-root", "task", "task-path"],
+  requiredFlags: REQUIRED_FLAGS,
+  requiredOneOf: REQUIRED_ONE_OF,
+});

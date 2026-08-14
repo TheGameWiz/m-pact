@@ -4,7 +4,7 @@ When working in this repository with GitHub Copilot CLI or Copilot agent feature
 
 M-PACT may also be called Impact in dictated requests. Treat `refresh Impact`, `Impact refresh`, `load Impact`, `sync Impact`, `use Impact`, `M-PACT refresh`, `m-pact refresh`, `m pact refresh`, `refresh memory`, and explicit shared agent memory requests as M-PACT refresh requests.
 
-For Copilot CLI, prefer the installed `/m-pact` or `m-pact` skill when available. Do not use or mention Gemini-only `/m-pact:fast-refresh`; Copilot uses the normal M-PACT skill refresh.
+For Copilot CLI, prefer the installed `/m-pact` or `m-pact` skill when available. Do not use retired provider-specific custom commands; Copilot uses the normal M-PACT skill refresh.
 
 The skill owns repository-root execution, setup-required handling, bundle verification, compact receipt output, and targeted lookup rules. Do not duplicate the full refresh procedure in this shim.
 

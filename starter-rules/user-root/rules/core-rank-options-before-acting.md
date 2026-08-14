@@ -1,5 +1,5 @@
 ---
-description: Applies across code, design, planning, analysis, debugging, and reviews when more than one reasonable path is available.
+description: Rank plausible options by likelihood and diagnostic value across code, design, planning, analysis, debugging, and reviews when more than one reasonable path is available.
 type: behavior
 source: director
 created: 2026-05-06

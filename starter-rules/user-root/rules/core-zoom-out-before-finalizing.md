@@ -5,6 +5,11 @@ source: director
 created: 2026-04-12
 ---
 
-Ask whether you are too focused on the local symptom, missing an upstream workflow/system issue, choosing the right artifact type, and preserving the Director's actual goal.
+Before finalizing analysis or recommendations, run a quick frame-check:
+
+- Are you too focused on the local symptom?
+- Is there an upstream workflow or system issue you are missing?
+- Is this the right artifact type for the outcome?
+- Does the result still serve the Director's actual goal?
 
 Keep it short; one sentence is often enough.

@@ -10,21 +10,21 @@ Offer project bootstrap when refresh reports `M-PACT PROJECT SETUP REQUIRED`, or
 
 When offering project bootstrap during refresh, ask a hard yes/no question and stop. The question must name the write action: add `.AgentMemory/`. Say artifact folders and ZIP containers are created lazily when first used. Project startup shims are not part of project bootstrap; provider-global shims invoke the skill.
 
-Offer user-root bootstrap when required `.AgentMemoryRoot/` is missing. Tell the Director that approved user-root bootstrap installs bundled starter core rules into `.AgentMemoryRoot/rules/` unless they ask to skip them. Starter rules are editable defaults.
+If the Director answers no to a refresh-raised project setup question, create nothing, run no further helpers, say `M-PACT: no memory root here; refresh skipped`, and stop. User-root-only refresh remains available only as a separate explicit Director request.
 
-Normal runtime setup should already create `.AgentMemoryRoot/` and install starter rules. If the Director asks to install or set up M-PACT for a project and `.AgentMemoryRoot/` is missing, the project bootstrap helper uses the shared provider runtime setup mechanics before creating the project `.AgentMemory/`.
+Offer user-root bootstrap when required `.AgentMemoryRoot/` is missing. Tell the Director that approved user-root bootstrap installs bundled starter core rules into `.AgentMemoryRoot/rules/` unless they ask to skip them. Starter rules are editable defaults. Normal runtime setup should already have created `.AgentMemoryRoot/` and installed starter rules.
 
 ## Project Bootstrap
 
 Run from the project directory or pass `--project <project-root>`:
 
 ```bash
-node scripts/bootstrap-project.js --project <project-root>
+node <this-skill>/scripts/bootstrap-project.js --project <project-root>
 ```
 
 The helper creates `.AgentMemory/` and its `project__<path-slug>` identity sentinel. Artifact folders and ZIP containers are lazy and appear when later helpers need them.
 
-Project bootstrap does not write `AGENTS.md`, `CLAUDE.md`, or `GEMINI.md`. Startup belongs to provider-global shims installed by `references/install-mpact.md`.
+Project bootstrap installs no shims (`SKILL.md` owns that prohibition); startup belongs to provider-global shims installed by `references/install-mpact.md`.
 
 In project mode, `scripts/bootstrap-project.js` checks for the user `.AgentMemoryRoot/`. If it is missing, the helper runs shared provider runtime setup mechanics so the current provider shim, starter rules, identity counter, and `.AgentMemoryRoot/` exist before the project root is created.
 
@@ -35,7 +35,7 @@ After approved project bootstrap, reply with one concise user-level sentence. Me
 Run:
 
 ```bash
-node scripts/bootstrap-project.js --init-user-root
+node <this-skill>/scripts/bootstrap-project.js --init-user-root
 ```
 
 Optional flags:

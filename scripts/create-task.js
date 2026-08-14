@@ -8,14 +8,24 @@ const { withDirectoryLock } = require("./lib/directory-lock");
 const { validateProjectWrite } = require("./lib/project-identity");
 const { buildTaskLogMarkdown } = require("./lib/task-log-markdown");
 const {
+  activeItemReceipt,
+  enforceActiveItemHandoff,
+} = require("./lib/active-items");
+const { mergeStructuredFields } = require("./lib/structured-task-input");
+const {
+  buildTaskMarkdown,
+} = require("./lib/task-markdown");
+const {
   booleanArg,
+  agentTokenValidator,
+  DEFAULT_UNSUPPORTED_OPERATION_FLAGS,
   localTimestamp,
   memberName,
+  resolveAgentToken,
   resolveRootPath,
   runCli,
-  sanitizeSlug,
 } = require("./lib/helper-common");
-const { setCurrentTask: replaceCurrentTask } = require("./lib/task-state");
+const { setCurrentTask: replaceCurrentTask, taskFolderName } = require("./lib/task-state");
 
 const VALID_PRIORITIES = new Set(["p1", "p2", "p3", "p4", "px"]);
 const ACCEPTED_FLAGS = [
@@ -24,11 +34,10 @@ const ACCEPTED_FLAGS = [
   "cross-project",
   "user-root",
   "input",
+  "from-stdin",
   "title",
-  "task",
   "priority",
   "source",
-  "owner",
   "context",
   "acceptance",
   "agent",
@@ -37,6 +46,23 @@ const ACCEPTED_FLAGS = [
   "source-input",
   "no-current",
 ];
+const REQUIRED_FLAGS = ["title"];
+const REQUIRED_ONE_OF = [];
+const FLAG_VALUE_VALIDATORS = {
+  title(value) {
+    if (!String(value || "").trim()) {
+      return "title is required";
+    }
+    return null;
+  },
+  priority(value) {
+    if (!VALID_PRIORITIES.has(String(value || "").toLowerCase())) {
+      return "priority must be one of p1, p2, p3, p4, or px";
+    }
+    return null;
+  },
+  agent: agentTokenValidator,
+};
 
 function tasksPathForRoot(rootPath) {
   return path.join(rootPath, "tasks");
@@ -57,72 +83,31 @@ function nextTaskNumber(tasksPath) {
   return Math.max(0, ...existingTaskNumbers(tasksPath)) + 1;
 }
 
-function cappedTaskSlug(title) {
-  return (sanitizeSlug(title) || "task").slice(0, 72).replace(/-+$/g, "") || "task";
-}
-
-function listFromArgs(value) {
-  if (!value) {
-    return [];
-  }
-  return String(value).split("|").map((item) => item.trim()).filter(Boolean);
-}
-
-function buildTaskMarkdown({ timestamp, source, owner, priority, title, context, acceptance }) {
-  const lines = [
-    "# Task Entry",
-    "",
-    `Timestamp: ${timestamp.body}`,
-    `Source: ${source}`,
-    `Owner: ${owner}`,
-    `Priority: ${priority}`,
-    "Status: Active",
-    "",
-    "## Task",
-    `- ${title}`,
-  ];
-  if (context && context.trim()) {
-    lines.push("", "## Context", context.trim());
-  }
-  if (acceptance && acceptance.trim()) {
-    lines.push("", "## Acceptance", acceptance.trim());
-  }
-  lines.push("");
-  return lines.join("\n");
-}
-
 function main({ args, input }) {
   const rootPath = resolveRootPath(input, args);
   const identity = validateProjectWrite({ rootPath, input, args });
-  const title = args.title || args.task;
-  if (!title || !String(title).trim()) {
-    throw new Error("title or task is required");
-  }
+  const title = args.title;
   const priority = String(args.priority || "px").toLowerCase();
-  if (!VALID_PRIORITIES.has(priority)) {
-    throw new Error("priority must be one of p1, p2, p3, p4, or px");
-  }
   const source = args.source || "director";
-  const owner = args.owner || "shared";
-  const context = args.context || "";
-  const acceptance = args.acceptance || "";
-  const agent = args.agent || "agent";
-  const initialLogBody = input.body || "";
+  const structured = mergeStructuredFields({ args, input });
+  const context = structured.context || "";
+  const acceptance = structured.acceptance || "";
+  const agent = resolveAgentToken(args);
+  const initialLogBody = structured.logBody || "";
 
   const tasksPath = tasksPathForRoot(rootPath);
   fs.mkdirSync(tasksPath, { recursive: true });
   return withDirectoryLock(tasksPath, () => {
     const number = nextTaskNumber(tasksPath);
-    const taskFolder = `A__${priority}-t${String(number).padStart(4, "0")}-${cappedTaskSlug(title)}`;
+    const taskFolder = taskFolderName({ state: "A", priority, number, title });
     const taskPath = path.join(tasksPath, taskFolder);
     fs.mkdirSync(taskPath);
 
     const now = new Date();
     const timestamp = localTimestamp(now);
     fs.writeFileSync(path.join(taskPath, "task.md"), buildTaskMarkdown({
-      timestamp,
+      timestamp: timestamp.body,
       source,
-      owner,
       priority,
       title: String(title).trim(),
       context,
@@ -130,7 +115,14 @@ function main({ args, input }) {
     }), "utf8");
 
     let member = null;
+    let activeSummary = null;
     if (initialLogBody && String(initialLogBody).trim()) {
+      activeSummary = enforceActiveItemHandoff({
+        body: String(initialLogBody),
+        latestRecord: null,
+        latestBody: "",
+      });
+      const recordBody = activeSummary && activeSummary.body ? activeSummary.body : String(initialLogBody);
       member = memberName({
         number: 1,
         source: agent,
@@ -142,7 +134,7 @@ function main({ args, input }) {
         input: {
           agent,
           title: args["log-title"] || "Initial Task Handoff",
-          body: String(initialLogBody),
+          body: recordBody,
           directorIntent: args["director-intent"],
           sourceInput: args["source-input"],
         },
@@ -165,8 +157,17 @@ function main({ args, input }) {
       member,
       sentinel,
       timestamp: timestamp.body,
+      activeItems: activeItemReceipt(activeSummary),
     };
   });
 }
 
-runCli(main, { acceptedFlags: ACCEPTED_FLAGS, stringFlags: ["root", "project-id", "user-root", "input", "title", "task", "priority", "source", "owner", "context", "acceptance", "agent", "log-title", "director-intent", "source-input"] });
+runCli(main, {
+  acceptedFlags: ACCEPTED_FLAGS,
+  stringFlags: ["root", "project-id", "user-root", "input", "title", "priority", "source", "context", "acceptance", "agent", "log-title", "director-intent", "source-input"],
+  requiredFlags: REQUIRED_FLAGS,
+  requiredOneOf: REQUIRED_ONE_OF,
+  flagValueValidators: FLAG_VALUE_VALIDATORS,
+  unsupportedFlags: DEFAULT_UNSUPPORTED_OPERATION_FLAGS,
+  stdinFlags: ["from-stdin"],
+});

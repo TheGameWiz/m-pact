@@ -1,6 +1,6 @@
 # M-PACT: Multi-Provider Agent Context Toolkit User Guide
 
-M-PACT helps local coding agents share memory. It was designed and validated for Codex, Claude Code, and Gemini CLI. Its goal is simple: let agents remember useful project information, share it with each other, and pick up work without depending on one chat window to hold everything.
+M-PACT helps local coding agents share memory. It was designed and validated for Codex and Claude Code, with Antigravity support replacing the retired Gemini CLI extension. Its goal is simple: let agents remember useful project information, share it with each other, and pick up work without depending on one chat window to hold everything.
 
 M-PACT stores memory at two levels: global memory that can follow you across projects, and project memory that belongs to one workspace. That memory can include shared rules, session notes, project tasks, task logs, task specifications, case studies, and project journals.
 
@@ -20,7 +20,7 @@ This guide describes the user-facing operations, what each one is for, and why y
 At the simplest level, M-PACT lets you:
 
 - Create shared rules that teach agents your coding style, preferences, project habits, and recurring lessons.
-- Write session entries that preserve a handoff when you are switching agents, switching providers, or approaching the end of a context window.
+- Write session entries for broad project continuity, and use saved-context files when you explicitly want to preserve same-agent context before compaction or restart.
 - Create project tasks with logs and specifications so agents can design, implement, review, test, and verify work in a structured loop.
 - Create case studies for important successes, failures, investigations, and lessons that you want future agents to remember.
 - Write journal entries for project notes you want to keep but do not want to turn into rules, tasks, or case studies.
@@ -29,12 +29,12 @@ A common task workflow looks like this:
 
 1. Tell one agent to create a task for the work.
 2. Describe the goal and ask it to write a task log or task specification.
-3. Switch to another agent and ask it to take the handoff, review the plan, inspect the codebase, and identify risks or gaps.
+3. Switch to another agent and say `Take Handoff, Review Design`; it should inspect the codebase and identify risks or gaps.
 4. Have that agent write its own log entry back to the task.
 5. Repeat the loop until the design, implementation plan, code, tests, and verification are complete.
 6. Close the task when the work is done.
 
-For context management, you can also ask for a detailed session entry before you compact, clear, or restart a session. After that, run M-PACT refresh in the next context and continue from the saved handoff.
+For same-agent context management, you can explicitly ask the agent to save context before you compact, clear, or restart a session. That writes one saved-context file for the resolved agent under the active memory root `.tmp` directory. After that, run M-PACT refresh in the next context; recent saved context is restored automatically, while older saved context asks whether to restore or discard it.
 
 ## Install Targets
 
@@ -43,33 +43,33 @@ M-PACT is packaged as one folder with native entrypoints for multiple local agen
 ```text
 ~/.codex/skills/m-pact/
 ~/.claude/skills/m-pact/
-~/.gemini/extensions/m-pact/   # or link this repo with gemini extensions link
+~/.gemini/config/skills/m-pact/   # Antigravity
 ```
 
 Copilot CLI may later use `~/.copilot/skills/m-pact/` or `~/.agents/skills/m-pact/`, but that install path remains best-effort and is not enabled by the default helper.
 
-Use `$m-pact` in Codex, `/m-pact` in Claude Code, and `/m-pact:fast-refresh` in Gemini CLI. `/m-pact:refresh` remains a Gemini compatibility command. Copilot CLI may use `/m-pact` or `m-pact` if its runtime exposes the skill, but this path is best-effort until validated. In dictated Gemini requests, `Impact` is the spoken alias for M-PACT, for example `refresh Impact` or `Impact refresh`. Gemini is instructed to route these natural M-PACT requests, including `m-pact refresh`, to `/m-pact:fast-refresh` when possible, then emit only the receipt body and stop. Plain `refresh memory` remains the ordinary refresh wording for Codex, Claude Code, and Copilot-style agents, but Gemini should not treat it as M-PACT unless the request also names Impact or M-PACT.
+Use `$m-pact` in Codex, `/m-pact` in Claude Code, and `/m-pact` in Antigravity when skill invocation is available. Copilot CLI may use `/m-pact` or `m-pact` if its runtime exposes the skill, but this path is best-effort until validated.
 
-Codex and Claude Code use `SKILL.md`. Gemini CLI uses `gemini-extension.json`, root `GEMINI.md`, and `commands/`. Copilot CLI-facing instructions are included for future compatibility, but Copilot CLI has not yet been validated as a first-class supported runtime.
+Codex, Claude Code, and Antigravity use `SKILL.md`. Antigravity additionally uses a provider-global `PreInvocation` hook and a `~/.gemini/GEMINI.md` backstop shim. Gemini CLI is no longer listed as validated. Enterprise Gemini Code Assist licensees may still have a working Gemini CLI, but M-PACT no longer ships a Gemini CLI extension. Copilot CLI-facing instructions are included for future compatibility, but Copilot CLI has not yet been validated as a first-class supported runtime.
 
 ## Compatibility
-M-PACT startup refresh is for local agent runtimes only. Codex CLI, Claude Code, and Gemini CLI are the validated targets. Copilot CLI and other compatible local agents may work if they have shell access, filesystem access, and Node.js 18 or newer, but they are best-effort until tested.
+M-PACT startup refresh is for local agent runtimes only. Codex CLI and Claude Code are validated targets, and Antigravity support uses the local skill and hook surfaces. Copilot CLI and other compatible local agents may work if they have shell access, filesystem access, and Node.js 18 or newer, but they are best-effort until tested.
 
 Web-only ChatGPT or Claude clients may be able to read or install skill instructions in products that support skills, but they cannot refresh local `.AgentMemoryRoot/` or `.AgentMemory/` folders directly. For web-only work, provide an uploaded refresh bundle or uploaded memory artifacts instead of asking the web agent to run local refresh.
 
-### Temporarily Suspend M-PACT
+### Harness Suppression
 
-Set `MPACT_SUPPRESS` to a truthy value, such as `1`, when another launcher, wrapper, or host environment should own startup and runtime context for a session. This is useful for managed sessions that inject their own context and should not also trigger M-PACT refresh.
+Set `MPACT_SUPPRESS` to a truthy value, such as `1`, when another launcher, wrapper, or host environment should own startup and runtime context for a session because its own memory or context system may conflict with M-PACT. ConflabCode is the motivating case. Suppression is a compatibility guard for hosts and harnesses, not the ordinary way a user turns M-PACT off.
 
-When `MPACT_SUPPRESS` is set, provider startup shims should not invoke M-PACT. Helper scripts enforce the same rule themselves: they print `M-PACT SUPPRESSED`, end with `END M-PACT SUPPRESSED`, and exit nonzero before reading memory or writing setup state.
+When `MPACT_SUPPRESS` is set, provider startup shims should not invoke M-PACT. Helper scripts enforce the same rule themselves: they print `M-PACT SUPPRESSED`, end with `END M-PACT SUPPRESSED`, and stop before reading memory or writing setup state. Direct helper invocations exit nonzero; installed hook invocations exit cleanly so a launcher-owned session can receive the suppression notice without recording a failed hook run.
 
-To use M-PACT again, unset `MPACT_SUPPRESS`, set it to an empty value, or start a normal session without that environment variable.
+To use M-PACT again in that session model, unset `MPACT_SUPPRESS`, set it to an empty value, or start a normal session without that environment variable. Use disable when you want a user-facing off switch for automatic startup behavior.
 
 ## Quick Start
 
 ### Provider Runtime Setup
 
-Install M-PACT separately for each provider you want to use. After placing M-PACT in that provider's skill or extension folder, run runtime setup from that provider's installed copy:
+Install M-PACT separately for each provider you want to use. After placing M-PACT in that provider's skill folder, run runtime setup from that provider's installed copy:
 
 ```text
 node scripts/install-mpact.js
@@ -80,7 +80,7 @@ Provider skill placement is provider-specific and follows the normal skill model
 ```text
 ~/.codex/skills/m-pact/
 ~/.claude/skills/m-pact/
-~/.gemini/extensions/m-pact/   # or link this repo with gemini extensions link
+~/.gemini/config/skills/m-pact/   # Antigravity
 ```
 
 The runtime setup helper does not copy itself across provider roots. It creates or preserves `.AgentMemoryRoot/`, creates or preserves the `project-count__<n>` identity counter, installs starter user-root rules without overwriting existing rule files, and installs only the current or explicitly requested provider-global startup shim:
@@ -91,7 +91,21 @@ The runtime setup helper does not copy itself across provider roots. It creates 
 ~/.gemini/GEMINI.md
 ```
 
-Install does not create project `.AgentMemory/` roots or project-local instruction files. Repeat provider placement and runtime setup for Codex, Claude, and Gemini separately when you want all three configured.
+Install does not create project `.AgentMemory/` roots or project-local instruction files. Repeat provider placement and runtime setup for Codex, Claude, and Antigravity separately when you want all three configured.
+
+Lifecycle commands:
+
+```text
+node scripts/install-mpact.js --disable
+node scripts/install-mpact.js --enable
+node scripts/uninstall-mpact.js
+```
+
+Disable removes provider-global M-PACT shim blocks and M-PACT-owned startup hooks while leaving installed skill directories and all memory in place. The skill stays available for explicit invocation, but automatic startup refresh stops. Enable restores those shim and hook entries. Disable and enable keep the suppression gate because they are setup commands.
+
+Uninstall removes provider shims, M-PACT-owned hooks, provider permission entries for the resolved M-PACT user root, and installed M-PACT skill directories. It defaults to Codex, Claude, and Antigravity, and it is available even when `MPACT_SUPPRESS` is set because it reads and writes no memory. Pass `--user-root <path>` when removing an install that used a non-default user root. Uninstall stops future automatic behavior, but it does not delete memory.
+
+Deleting memory is a separate manual action. The memory targets are `.AgentMemoryRoot/` and project `.AgentMemory/` folders. Provider homes such as `.codex/`, `.claude/`, and `.gemini/` also contain non-M-PACT provider configuration, so leave them alone unless you intend to remove that broader configuration too.
 
 ### New Project Setup
 
@@ -133,9 +147,9 @@ The agent should run the skill's refresh procedure. If a project memory root exi
 
 For project roots with identity, the refresh receipt also includes the active project root and project ID. If an older project root has no identity sentinel yet, refresh reports `projectIdentity=adoption-required` and prints a `M-PACT PROJECT ADOPTION REQUIRED` question. If you answer yes, the agent runs the one-root adoption helper, refreshes again, and then passes that ID back to durable project-root write helpers as `--project-id <n>`.
 
-After the receipt, the agent should not scan `.AgentMemory`, sessions, rules, tasks, or the generated bundle just to verify the refresh. The bundle is already the verified startup context. Ask for targeted lookup when you want a specific memory artifact.
+After the receipt, refresh itself is complete. If the same message included work beyond refresh, the agent should continue with that work using the loaded context. The agent should not scan `.AgentMemory`, sessions, rules, tasks, or the generated bundle just to verify the refresh. The bundle is already the verified startup context. Ask for targeted lookup when you want a specific memory artifact.
 
-This startup refresh is the practical bridge for multi-provider work. A Codex tab, a Claude Code tab, and a Gemini CLI session can all begin from the same memory chain instead of acting like separate isolated chats. Copilot CLI is a plausible future target, but the current project should describe it as unvalidated best-effort support.
+This startup refresh is the practical bridge for multi-provider work. A Codex tab, a Claude Code tab, and an Antigravity session can all begin from the same memory chain instead of acting like separate isolated chats. Copilot CLI is a plausible future target, but the current project should describe it as unvalidated best-effort support.
 
 If no project `.AgentMemory/` exists, normal refresh should stop before emitting a receipt and ask whether to create project scaffolding. If you answer yes, the agent should add `.AgentMemory/` and then run refresh again. Artifact folders and ZIP containers remain absent until an approved operation needs them. If you answer no, the agent should run user-root-only refresh and emit that receipt.
 
@@ -147,7 +161,7 @@ Refresh is only for:
 
 Do not refresh just because a task is large. Use targeted lookup, task handoffs, and checkpoints while the current context is still intact.
 
-If refresh hits the bundle size limit, it should still return a partial bundle with a visible `LimitHit: true` warning. Treat that as usable startup context, then ask for targeted lookup when omitted details matter.
+The refresh bundle is complete when emitted. The recent-session section has a byte budget and may truncate the rendered newest session artifact inside the complete bundle; ask for targeted lookup when omitted session detail matters.
 
 Common lookup requests:
 
@@ -165,7 +179,7 @@ Handoff.
 Handoff to Claude.
 Make this a task.
 Create a task from this conversation.
-Take the current task handoff and report the state.
+Take Handoff, Review.
 Write a task log checkpoint for what we just decided.
 Write the task specification with this decision and write the paired log.
 Close this task as complete.
@@ -175,6 +189,7 @@ Reopen task t0007 because there is follow-up work.
 Common durable-context requests:
 
 ```text
+Save context for this task before compaction.
 Write a session entry summarizing this project-wide decision.
 Create a case study for this debugging incident.
 Add a user-level rule that agents must verify X before doing Y.
@@ -264,7 +279,7 @@ This matters because memory should be cheap to scan. A good filename tells the a
 
 ### What It Does
 
-Refresh loads startup context from the memory chain. It resolves roots, loads the full memory contract, loads core rules, notes non-core rule filenames, reads selected recent sessions, notes active tasks, and reports what was loaded.
+Refresh loads startup context from the memory chain. It resolves roots, inlines the compact startup contract, lists core rule filenames without loading rule bodies, notes non-core rule filenames, reads the newest active-root session under the recent-session budget, notes active tasks, reads the pointed current task when one is valid, and reports what was loaded.
 
 ### Why Use It
 
@@ -290,13 +305,9 @@ Use $m-pact and refresh memory.
 
 ### What To Expect
 
-The agent should emit the compact stdout refresh receipt body, starting with `M-PACT MEMORY REFRESH` and excluding internal begin/end marker lines. It must still verify the bundle at `BundlePath` before emitting the receipt. After the receipt, the refresh flow is done; the agent should not self-verify by scanning memory folders. If refresh succeeds with `LimitHit: true`, the agent should say the bundle is partial and use targeted lookup for omitted content when needed. If refresh fails with `AUDIT: FAIL`, the agent should stop and report the exact failure instead of pretending memory loaded.
+The agent should emit the compact stdout refresh receipt body, starting with `M-PACT MEMORY REFRESH` and excluding internal begin/end marker lines. It must still verify the bundle at `BundlePath` before emitting the receipt. After the receipt, the refresh flow is done; the agent should not self-verify by scanning memory folders. If refresh fails with `AUDIT: FAIL`, the agent should stop and report the exact failure instead of pretending memory loaded.
 
-Gemini CLI uses `scripts/emit-refresh-bundle.js` for `/m-pact:fast-refresh` and `/m-pact:refresh`. That wrapper generates, validates, and injects the whole refresh bundle as one startup-context document, then Gemini should emit only the receipt body and stop. `/m-pact:fast-refresh` exists to test whether natural Impact requests can be routed into the faster custom-command path. Gemini custom slash commands are still model-mediated, so this may be slower than Codex or Claude Code if Gemini stays in a normal model turn. Inline `!node ...` can also make Gemini continue thinking after the receipt is printed, and Gemini CLI v0.40.1 on Windows did not reliably accept `!` as a standalone shell-mode toggle during testing. For a fast terminal-only receipt outside Gemini's agent turn, run this from PowerShell in the project root:
-
-```powershell
-node scripts\emit-refresh-receipt.js
-```
+Antigravity startup refresh is installed as a provider-global `PreInvocation` hook named `m-pact-refresh` in `~/.gemini/config/hooks.json`. The hook runs `scripts/antigravity-refresh-hook.js` from the installed skill, passes exactly one reported workspace path to `build-refresh-bundle.js --hook`, and injects the refresh output as transient context. If Antigravity reports more than one workspace path, the hook refuses to guess which project to refresh and injects a clear notice instead.
 
 ### What Not To Do
 
@@ -332,7 +343,7 @@ Add a task to the Conflab project.
 
 ### What It Does
 
-Bootstrap creates the memory root for a missing `.AgentMemoryRoot/` or `.AgentMemory/`. Project bootstrap does not create local startup shims; provider-global shims should make future Codex, Claude Code, Gemini CLI, and compatible local-agent sessions refresh memory automatically. Artifact folders and ZIP containers are lazy. Copilot-facing shims are included as best-effort future support.
+Bootstrap creates the memory root for a missing `.AgentMemoryRoot/` or `.AgentMemory/`. Project bootstrap does not create local startup shims; provider-global shims and hooks should make future Codex, Claude Code, Antigravity, and compatible local-agent sessions refresh memory automatically. Artifact folders and ZIP containers are lazy. Copilot-facing shims are included as best-effort future support.
 
 ### Why Use It
 
@@ -414,7 +425,7 @@ Search user memory for handoff rules.
 
 Rules are short durable instructions stored in `rules/`. They capture user preferences, behavior constraints, incident-driven lessons, and project-specific operating rules.
 
-Core rules use `core-*.md` filenames and are loaded during refresh. Non-core rules are discovered by filename and read on demand.
+Core rules use `core-*.md` filenames. Refresh lists core rule filenames and notes non-core rule filenames; it does not load any rule body. Read a rule body with targeted lookup when that rule may affect the current work.
 
 ### Why Use Them
 
@@ -466,7 +477,7 @@ Use sessions when something happened outside a single task, or when future agent
 
 ### How To Use Them
 
-Ask for a session entry when you are ending a work period, approaching context limits, switching providers, or recording a project-wide decision. The agent should write a detailed handoff with the current state, decisions, evidence, files touched, risks, and next move so the next refresh can orient the next agent quickly.
+Ask for a session entry when you are recording project-wide continuity, cross-task context, or a decision that does not belong to one task. For same-agent compaction or restart, ask to save context instead; that writes a saved-context file restored for the same agent during refresh.
 
 ### Startup Behavior
 
@@ -479,7 +490,8 @@ Session entries are not prompts, task assignments, or implementation directives.
 ### Common Requests
 
 ```text
-Write a session entry summarizing today's M-PACT changes.
+Save context for this task before compaction.
+Write a session entry summarizing today's project-wide M-PACT decisions.
 List recent active project sessions.
 Read the newest session in full.
 ```
@@ -533,7 +545,7 @@ If you say only "add a task" or "create a task," the agent may ask a short clari
 
 ### Current Task Pointer
 
-The current task pointer is a zero-byte sentinel named `tasks/current__<active-task-folder>`. The pointer is entirely in the filename and has no extension or body. It is an attention pointer, not a task index, queue, activity timestamp, or log cursor. If there is no current task, no `current__*` file should exist. If multiple `current__*` files exist, agents should delete all of them and proceed as if there is no current task.
+The current task pointer is a zero-byte sentinel named `tasks/current__<active-task-folder>`. The pointer is entirely in the filename and has no extension or body. It is an attention pointer, not a task index, queue, activity timestamp, or log cursor. If there is no current task, no `current__*` file should exist. If multiple `current__*` files exist, agents should report ambiguity, leave them in place, and proceed as if there is no current task until explicit repair.
 
 ### Task Close And Reopen
 
@@ -560,7 +572,7 @@ Use handoffs when one agent or session needs to understand current task state be
 
 ### How To Use Them
 
-Ask the receiving agent to take the current task handoff when you want it to understand the task before acting. The agent should read the task, current spec, and the needed ordered log span, then report state, risks, assumptions, and recommended next steps. Ask it to implement, edit, or log separately if you want it to continue beyond analysis.
+Ask the receiving agent to use an anchored receiving form such as `Take Handoff, Review Design` when you want it to understand the task before acting. The agent should read the task, current spec, and the needed ordered log span, then report state, risks, assumptions, and recommended next steps. Ask it to implement, edit, or log separately if you want it to continue beyond analysis.
 
 You can also use a handoff phrase to create the handoff task from the current conversation:
 
@@ -597,7 +609,7 @@ Default behavior now starts with the handoff read-plan helper:
 
 ```text
 1. Run scripts/prepare-handoff.js for the current or named task.
-2. Pass any conversation-known read cursor.
+2. Pass any conversation-known read-cursor.
 3. Read task.md, the current specification snapshot, and the recommended log span in order.
 ```
 
@@ -610,7 +622,7 @@ The helper owns the byte-budget and collision checks. A cursor should prevent ol
 ### Common Requests
 
 ```text
-Take the current task handoff and tell me the state.
+Take Handoff, Review.
 Resume task A__p1-t0004-example from log 0008 onward.
 Read enough log history to reconstruct the current task state.
 ```
@@ -651,7 +663,7 @@ Write a handoff log entry for the next agent.
 
 ### What They Are
 
-`specification.zip` stores numbered specification snapshots. The highest-numbered member is the current state of the task. A task has no specification container until the first approved specification write.
+`specification.zip` stores the task design specification. Legacy tasks use numbered full snapshots. New-format tasks use one current narrative blob plus immutable item members, and may also have a helper-maintained editable `specification.md` narrative mirror. A task has no specification container until the first approved specification write.
 
 ### Why Use It
 
@@ -659,11 +671,11 @@ Use the task specification when the current task has an evolving source of truth
 
 ### How To Use It
 
-Ask for a task specification when requirements, design decisions, acceptance criteria, or implementation plans need one current written version. The helper writes a new numbered spec snapshot and a paired task log so the task history explains why the spec changed.
+Ask for a task specification when requirements, design decisions, acceptance criteria, or implementation plans need one current written version. The helper writes or updates new-format specification members and a paired task log so the task history explains why the spec changed.
 
 ### Approval Gate
 
-Agents should not write a new specification snapshot unless you instruct them to update the spec or fold approved decisions into it.
+Agents should not write a task specification unless you instruct them to update the spec or fold approved decisions into it.
 
 ### Common Requests
 
@@ -746,17 +758,17 @@ Starter rules are not immutable policy. They are editable defaults. Review each 
 
 ### What They Are
 
-The package includes small `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` shims. Their job is to tell compatible agents to invoke M-PACT and run refresh on new context.
+The package includes small `AGENTS.md`, `CLAUDE.md`, and `ANTIGRAVITY.md` shim templates. Their job is to tell compatible agents to invoke M-PACT and run refresh on new context.
 
 ### Why Use Them
 
 Use provider-global shims when you want a runtime to invoke M-PACT on startup.
 
-Project bootstrap does not install these shims. Provider runtime setup writes the current provider's shim to a provider-global location such as `~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`, or `~/.gemini/GEMINI.md`. `shims/copilot-instructions.md` is available as optional best-effort material if the Director wants GitHub Copilot custom instructions.
+Project bootstrap does not install these shims. Provider runtime setup writes the current provider's shim to a provider-global location such as `~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`, or `~/.gemini/GEMINI.md`. For Antigravity, the source template is `shims/ANTIGRAVITY.md` and the installed target remains `~/.gemini/GEMINI.md`. `shims/copilot-instructions.md` is available as optional best-effort material if the Director wants GitHub Copilot custom instructions.
 
 ### How To Use Them
 
-Place M-PACT in each provider's normal skill or extension folder, then run provider runtime setup from that provider's installed copy. The setup helper installs only that provider's global shim. Repeat the same process separately for Codex, Claude Code, and Gemini CLI when you want all of them configured.
+Place M-PACT in each provider's normal skill folder, then run provider runtime setup from that provider's installed copy. The setup helper installs only that provider's global shim and startup hook support. Repeat the same process separately for Codex, Claude Code, and Antigravity when you want all of them configured.
 
 ## Recommended Workflows
 
@@ -776,7 +788,7 @@ Place M-PACT in each provider's normal skill or extension folder, then run provi
 ### Multi-Agent Task
 
 1. Create a task with priority and clear acceptance.
-2. Keep current state in `specification.zip` snapshots when the task has evolving requirements.
+2. Keep current state in task specifications when the task has evolving requirements.
 3. Write task logs for decisions, implementations, reviews, and handoffs.
 4. Tell the next agent to take the task handoff.
 5. Close the task only when you explicitly decide it is done.
@@ -785,7 +797,7 @@ Place M-PACT in each provider's normal skill or extension folder, then run provi
 
 1. Refresh only at actual startup, completed compaction/context loss with concrete evidence, or explicit request.
 2. Use targeted lookup while context is intact.
-3. Mention session preservation only when continuity risk is high.
+3. Use save-context only when you explicitly want a same-agent compaction/restart checkpoint.
 4. Store narrative lessons as case studies, not long rules.
 5. Store durable behavior as short rules, not long sessions.
 

@@ -4,7 +4,7 @@
 const path = require("path");
 const { appendGeneratedMember } = require("./lib/zip-record-store");
 const { withDirectoryLock } = require("./lib/directory-lock");
-const { localTimestamp, resolveRootPath, runCli, sanitizeSlug } = require("./lib/helper-common");
+const { agentTokenValidator, localTimestamp, resolveAgentToken, resolveRootPath, runCli, sanitizeSlug } = require("./lib/helper-common");
 const { validateProjectWrite } = require("./lib/project-identity");
 
 const ACCEPTED_FLAGS = [
@@ -13,10 +13,13 @@ const ACCEPTED_FLAGS = [
   "cross-project",
   "user-root",
   "input",
+  "from-stdin",
   "agent",
   "type",
   "title",
 ];
+const REQUIRED_FLAGS = [];
+const REQUIRED_ONE_OF = [];
 
 function stripDuplicateGeneratedHeading(body, heading) {
   const text = String(body || "");
@@ -34,7 +37,7 @@ function stripDuplicateGeneratedHeading(body, heading) {
 function main({ args, input }) {
   const rootPath = resolveRootPath(input, args);
   const identity = validateProjectWrite({ rootPath, input, args });
-  const agent = args.agent || "agent";
+  const agent = resolveAgentToken(args);
   const type = args.type || "session";
   const summary = stripDuplicateGeneratedHeading(input.body, "## Summary");
   if (!summary || !String(summary).trim()) {
@@ -63,4 +66,13 @@ function main({ args, input }) {
   });
 }
 
-runCli(main, { acceptedFlags: ACCEPTED_FLAGS, stringFlags: ["root", "project-id", "user-root", "input", "agent", "type", "title"] });
+runCli(main, {
+  acceptedFlags: ACCEPTED_FLAGS,
+  stringFlags: ["root", "project-id", "user-root", "input", "agent", "type", "title"],
+  requiredFlags: REQUIRED_FLAGS,
+  requiredOneOf: REQUIRED_ONE_OF,
+  flagValueValidators: {
+    agent: agentTokenValidator,
+  },
+  stdinFlags: ["from-stdin"],
+});

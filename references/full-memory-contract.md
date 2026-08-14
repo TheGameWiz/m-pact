@@ -1,6 +1,8 @@
 # Memory Contract
 
-This is the full operating protocol for `m-pact`. Load it during refresh, after suspected protocol drift, and before complex memory operations.
+This is the full operating protocol for `m-pact`. Load it after suspected protocol drift, for violation recovery, and before complex memory operations.
+
+Ownership rule: `SKILL.md` owns invocation, dispatch, and the startup fast path. `references/startup-contract.md` owns always-loaded protocol law. Each verb reference owns its operation's complete rules. This contract owns cross-cutting protocol with no other home, and for each operation keeps only a summary: its gate, its owning reference, the artifact it touches, and the likeliest mistake. Every operation summary here is orientation, not sufficient to act on: before performing an operation, read its owning reference.
 
 ## 1. Purpose
 
@@ -19,24 +21,28 @@ Memory roots use this standard layout:
   rules/
   sessions.zip
   case-studies.zip
+  .tmp/
+    .gitignore
   journal.zip
   tasks/
+    .m-pact-task-locks/
     current__<active-task-folder>
     A__p*-t####-*/
       task.md
+      specification.md
       specification.zip
       log.zip
 ```
 
-The layout above is the possible shape after use, not bootstrap output. Artifact folders and ZIP containers are lazy; missing categories mean empty categories unless a helper reports corruption. Task folders start with `task.md`, and task ZIP containers appear later on demand. The current task pointer is an optional zero-byte sentinel file named `current__<active-task-folder>` directly under `tasks/`; absence of `tasks/` or of the sentinel means no current task.
+The layout above is the possible shape after use, not bootstrap output. Artifact folders and ZIP containers are lazy; missing categories mean empty categories unless a helper reports corruption. `.tmp/` is helper-owned scratch for command-only body delivery and refresh bundles, not memory history. Task folders start with `task.md`; task ZIP containers and the `specification.md` mirror appear later on demand. The current task pointer is an optional zero-byte sentinel named `current__<active-task-folder>` directly under `tasks/`; absence of `tasks/` or of the sentinel means no current task. `.m-pact-task-locks/` is helper-owned internal lock state keyed by stable task number, outside mutable task folders.
 
 The user root is required and canonically named `.AgentMemoryRoot/`. Project roots are canonically named `.AgentMemory/`.
 
-Project identity is helper-owned. The user root has exactly one zero-byte `project-count__<n>` counter sentinel containing the local high-water mark in its filename. Each project root has exactly one `project__<path-slug>` sentinel whose filename binds the identity to the resolved project root path and whose contents are the numeric project ID. Agents must not hand-edit, rename, or recreate identity sentinels. Existing pre-identity roots use lazy confirmed adoption: they are considered only when encountered by refresh or a durable write, and identity is minted only after the Director answers yes to `M-PACT PROJECT ADOPTION REQUIRED`. Use the repair helper when a helper reports a path-mismatched project identity.
+Project identity is helper-owned. The user root has exactly one zero-byte `project-count__<n>` counter sentinel holding the local high-water mark in its filename. Each project root has exactly one `project__<path-slug>` sentinel whose filename binds the identity to the resolved project root path and whose contents are the numeric project ID. Agents must not hand-edit, rename, or recreate identity sentinels. Existing pre-identity roots use lazy confirmed adoption: they are considered only when encountered by refresh or a durable write, and identity is minted only after the Director answers yes to `M-PACT PROJECT ADOPTION REQUIRED`. Use the repair helper when a helper reports a path-mismatched project identity.
 
-There is no separate index file. Filenames are the index. Sorted directory listings are the table of contents.
+There is no separate index file. Filenames are the index; sorted directory listings are the table of contents.
 
-ZIP containers are helper-owned black boxes. Agents must not inspect, extract, mutate, or write ZIP files directly. Use `scripts/list-members.js`, `scripts/read-member.js`, `scripts/search-bodies.js`, `scripts/read-member-span.js`, and the append/write helpers so record numbering, operation locks, ZIP locks, and container validation remain consistent.
+ZIP containers are helper-owned black boxes; the rule, the helper list, and the rationale are owned by `references/startup-contract.md`.
 
 ## 3. Roles
 
@@ -51,43 +57,57 @@ ZIP containers are helper-owned black boxes. Agents must not inspect, extract, m
 4. Prepend required user `.AgentMemoryRoot/`.
 5. The nearest project `.AgentMemory/` is active.
 
-If the required user root is missing during startup refresh, the refresh helper performs provider runtime setup mechanics and continues. If that setup fails, refresh must fail before loading memory. Agents must not perform their own user-root preflight before refresh.
+For the startup user-root preflight rule, use `startup-contract.md`; refresh owns missing user-root detection and setup.
 
-Approved provider runtime setup creates or preserves `.AgentMemoryRoot/`, creates or preserves the zero-byte `project-count__<n>` counter sentinel starting at `project-count__0` on fresh installs, installs bundled starter core rules from the skill into `.AgentMemoryRoot/rules/` without overwriting existing rule files, and installs the current or explicitly requested provider-global startup shim. Provider skill placement is provider-specific and happens separately; do not cross-install this package into other provider roots. Approved user-root bootstrap outside install does the same user-root creation, identity-counter initialization, and starter-rule step, unless the Director asks to skip starter rules. Creating `rules/` is appropriate because rule files are being written; otherwise root artifact folders remain lazy. Starter rules are installed only during initial `.AgentMemoryRoot/` creation or when missing during install. Agents must announce the starter rules as editable defaults and tell the Director to review, edit, delete, or replace rules that do not fit their workflow.
+Runtime setup and bootstrap summaries:
 
-Approved project bootstrap for a missing local `.AgentMemory/` uses `scripts/bootstrap-project.js` to create the root folder and mint its project identity sentinel. Before project root creation, check for the user `.AgentMemoryRoot/`; if it is missing, perform provider runtime setup with `scripts/install-mpact.js` first so the current provider shim, starter rules, identity counter, and `.AgentMemoryRoot/` exist. Project bootstrap does not install project startup shims or write project-local instruction files. Provider-global shims should invoke M-PACT for configured runtimes. Root artifact folders and ZIP containers are created later by the write operation that needs them. Do not run refresh after bootstrap unless the Director also asks to refresh, load, or verify.
+- Provider runtime setup: Director-gated per the write gating in `startup-contract.md`; owner `references/install-mpact.md`; creates or preserves `.AgentMemoryRoot/` with scratch, identity counter, starter rules, and the provider-global shim; likeliest mistake: cross-installing the package into other provider roots, which the install helper never does.
+- Project bootstrap: Director-approved only; owner `references/bootstrap-project.md`; creates `.AgentMemory/` with `.tmp/.gitignore` and a minted identity sentinel, nothing else; likeliest mistakes: installing project startup shims (bootstrap never writes them; startup belongs to provider-global shims) or refreshing afterward without a Director ask. If the user root is missing, runtime setup runs first so the shim, starter rules, counter, scratch, and `.AgentMemoryRoot/` exist. Starter rules are installed only during initial user-root creation or when missing during install, never overwriting existing rule files, and agents must announce them as editable defaults for the Director to review, edit, delete, or replace.
 
 Any diagnostic variable, log line, or receipt field named `chain` must use the final broad-to-specific order, not the nearest-first discovery order.
 
 ## 5. Startup Read Contract
 
-Run the full refresh only on actual new context/session startup, after completed compaction/context loss with concrete evidence, or when the Director explicitly says "refresh memory." A system- or tool-provided resumed-context, compacted-context, or conversation-summary block is concrete evidence that compaction/context loss already happened; the Director saying they manually compacted is also concrete evidence. An ordinary assistant-written summary, a handoff, a long thread, or small visible context after startup is not enough. Do not run it merely because visible context is small after startup, compaction may be imminent, a handoff was received, a task is large, confidence is low, work feels risky, or implementation may be coming while context is intact; use targeted retrieval instead.
+Refresh trigger policy, run mechanics, and post-refresh conduct are owned by `startup-contract.md`. Detailed halt and failure handling is owned by `references/refresh-memory.md`. This section covers the mechanics this contract alone records.
 
-Startup refresh has one compliant unattended path: run the invoked skill or extension's `scripts/build-refresh-bundle.js` with Node.js 18 or newer while keeping the shell working directory at the real project root. Do not probe the current project's own `scripts/` directory as a fallback; unrelated projects often have unrelated scripts. Maintainers actively developing M-PACT may run the source-tree script intentionally for verification, but startup refresh instructions for agents should still point at the invoked skill or extension path. Never `cd` into the skill folder to run refresh.
+Startup refresh has one compliant unattended path: the invoked skill's `scripts/build-refresh-bundle.js`, per the run rules in `startup-contract.md`. Maintainers actively developing M-PACT may run the source-tree script intentionally for verification, but startup refresh instructions for agents should still point at the invoked skill path.
 
-Do not probe `.AgentMemoryRoot/` before startup refresh. The refresh helper owns missing user-root detection and runs provider runtime setup mechanics only when the root is truly absent.
+If stdout contains `M-PACT PROJECT SETUP REQUIRED` with literal final line `END PROJECT SETUP REQUIRED`, no refresh bundle was generated; follow the fast path's setup branch. If stdout contains `AUDIT: PASS`, `M-PACT REFRESH BUNDLE MANIFEST`, a `BundlePath:` line, and literal final line `END REFRESH BUNDLE`, read the bundle and proceed only if the bundle file's literal final line is also `END REFRESH BUNDLE`. The stdout manifest alone is not a completed refresh; never stop at the bundle path or ask whether to open or apply the bundle; refresh is not done until the bundle is read and the receipt body is emitted. Any other outcome is a failure: stop and report per `references/refresh-memory.md`; do not improvise a manual refresh. Manual investigation is allowed only when the Director explicitly asks for debugging or repair.
 
-If stdout contains `M-PACT PROJECT SETUP REQUIRED` and its literal final line is `END PROJECT SETUP REQUIRED`, stop before any receipt. No refresh bundle was generated, and user-root-only context has not been accepted by the Director. Ask the setup question from stdout. If the Director says yes, add the missing project scaffolding described in `references/bootstrap-project.md`, then run refresh again. If the Director says no, run refresh again with `--AllowUserRootOnly` and emit that user-root-only receipt.
+The script is the executable startup spec. It:
 
-If stdout contains `AUDIT: PASS`, `M-PACT REFRESH BUNDLE MANIFEST`, a `BundlePath: <absolute path>` line, and its literal final line is `END REFRESH BUNDLE`, read the bundle file at `BundlePath` and proceed only if the bundle file's literal final line is also `END REFRESH BUNDLE`. The stdout manifest alone is not a completed refresh; agents must never stop at the bundle path or ask whether to open/apply the bundle.
+- resolves roots and treats missing lazy folders and ZIP containers as empty
+- runs provider runtime setup mechanics when the required user root is incomplete
+- reports missing active-project identity as `adoption-required` with a `M-PACT PROJECT ADOPTION REQUIRED` question
+- initializes a missing counter when needed
+- reports active-project identity status without repairing path mismatches
+- builds the layered rule index
+- reads and inlines `startup-contract.md`
+- lists core rule names without reading rule bodies
+- selects active-root sessions by filename timestamp
+- includes only the newest session full or truncated under the recent-session budget
+- notes active tasks with the current task first
+- reports active task folders missing `task.md`
+- reports orphaned specification companions for active tasks
+- validates any `tasks/current__<active-task-folder>` sentinel
+- reads the pointed startup task only when exactly one zero-byte sentinel names an active task
+- restores a recent saved-context file for the resolved agent from the active root `.tmp`, or halts for a Director restore/discard decision when that file is older than the automatic threshold
+- reports the resolved agent's task-log read-cursor and unread task-log records for the current task, and includes the agent's cursor record as orientation when one exists
+- degrades instead of failing when the runtime identity cannot be resolved for saved-context restore
+- writes the complete bundle to `.tmp` under the resolved active memory root, or under the user root when no project root is active
+- prints a small stdout manifest only after the bundle is complete
 
-If the script fails, output is truncated, lacks one of the valid final markers (`END PROJECT SETUP REQUIRED` or `END REFRESH BUNDLE`), lacks `AUDIT: PASS` or `BundlePath` for a refresh bundle, cannot produce a readable bundle whose final line is `END REFRESH BUNDLE`, or reports `AUDIT: FAIL`/`END REFRESH FAILURE`, stop and report the exact failure. Do not improvise a manual refresh. Manual investigation is allowed only when the Director explicitly asks for debugging or repair.
+The recent-session section is the startup budget boundary. The refresh bundle is always written complete and well-formed; it is not truncated as a partial success path.
 
-The script is the executable startup spec. It resolves roots, treats missing lazy folders and ZIP containers as empty, runs provider runtime setup mechanics when the required user root is incomplete, reports missing active-project identity as `adoption-required` with a `M-PACT PROJECT ADOPTION REQUIRED` question, initializes a missing counter when needed, reports active-project identity status without repairing path mismatches, builds the layered rule index, reads `startup-contract.md`, verifies whether the invoked skill already carries the matching startup-contract hash, lists core rule names without reading rule bodies, selects active-root sessions by filename timestamp, includes only the newest session full or truncated under the recent-session budget, notes active tasks with the current task first, validates any `tasks/current__<active-task-folder>` sentinel, reads the pointed startup task only when exactly one zero-byte sentinel names an active task, writes the complete bundle to an ephemeral temp file, and prints a small stdout manifest only after the bundle is complete.
+After successful refresh, the verified bundle is the loaded startup context; continue any substantive request in the same message using it. Post-refresh reading conduct (no verification scans, no early unread-record reads) is owned by `startup-contract.md`.
 
-The recent-session section is the startup budget boundary. The overall refresh bundle is always written as a complete, well-formed bundle; it is not truncated as a partial success path.
+If refresh reports `project: (none found)` after running from a skill install directory such as `.codex/skills/m-pact`, `.claude/skills/m-pact`, or `.gemini/config/skills/m-pact`, that result is invalid for the workspace; re-run from the real project root before proposing bootstrap.
 
-After successful refresh, the verified bundle is the loaded startup context. Agents must not read `.AgentMemory`, `.AgentMemoryRoot`, rules, sessions, tasks, journals, case studies, generated temp bundles, or other memory artifacts merely to verify refresh, prove the bundle, or continue startup. The script already selected startup content and audited the bundle. If the same user message includes a substantive request beyond refresh/startup, continue with that request using the loaded context. Additional memory reads after refresh require a targeted lookup need: explicit Director request, a relevant current task need, or a rule/session/task detail that matters to the work.
-
-If an agent has produced a valid manifest with `BundlePath` but has not read the bundle and emitted the stdout receipt body, refresh is not done. Continue the refresh procedure immediately; do not ask the Director for permission to open or apply the bundle.
-
-If refresh reports `project: (none found)` after the agent ran the script from a skill install directory such as `.codex/skills/m-pact`, `.claude/skills/m-pact`, `.copilot/skills/m-pact`, or `.agents/skills/m-pact`, that result is invalid for the workspace. Re-run refresh from the real project root before proposing bootstrap.
-
-Startup does not read task specification snapshots, task `log.zip`, journals, case studies, or non-core rule bodies by default.
+Startup does not load design specifications, task logs, journals, case studies, or non-core rule bodies as context by default. It may inspect design specification and log catalogs, and legacy log frontmatter, to report orphaned specification companions.
 
 ## 6. Refresh Receipt
 
-Every startup load and every Director-requested refresh must emit the script-provided compact stdout receipt body after verifying the bundle. Stdout and the bundle keep internal `BEGIN REFRESH RECEIPT` and `END REFRESH RECEIPT` marker lines for parsing, but those marker lines are not part of the visible receipt. The full startup manifest remains loaded inside the verified bundle; do not print the full manifest merely to prove refresh. Normal successful refresh should be a tiny visible acknowledgement, not a startup report. The first visible lines must be:
+Every startup load and every Director-requested refresh must emit the script-provided receipt body exactly as printed between `BEGIN REFRESH RECEIPT` and `END REFRESH RECEIPT`, after verifying the bundle. The marker lines themselves are not part of the visible receipt. The receipt may carry optional lines (saved context, provider setup, orphaned members) between its fixed lines; emit whatever the script printed, without reconstruction. The common minimal example:
 
 ```text
 M-PACT MEMORY REFRESH
@@ -95,148 +115,110 @@ activeProjectRoot=<active-root>; projectId=<n>; projectIdentity=ok
 audit=PASS; bundle=loaded; output-complete=END REFRESH BUNDLE
 ```
 
-If startup refresh fails with `AUDIT: FAIL`/`END REFRESH FAILURE`, do not emit a successful receipt and do not imply memory is loaded. If refresh succeeds, emit the compact receipt and stop the refresh flow; do not end the turn solely because refresh completed when the same user message includes a substantive request.
+Normal successful refresh is a tiny visible acknowledgement, not a startup report; do not print the full manifest merely to prove refresh. If refresh fails, do not emit a successful receipt and do not imply memory is loaded. If refresh succeeds, emit the receipt and continue the turn; do not end it solely because refresh completed.
 
-Normal startup refresh should not emit a receipt with `project: (none found)` unless the Director already answered no to project setup and the agent reran refresh with `--AllowUserRootOnly`. Without that flag, missing project root must produce `M-PACT PROJECT SETUP REQUIRED` before bundle generation. The setup question must say setup will add `.AgentMemory/`, that artifact folders and ZIP containers are created lazily when first used, and that project startup shims are not part of project bootstrap. Ask the Director to answer yes or no, then stop. Do not create anything without explicit Director approval.
+A `project: (none found)` receipt is valid only for an explicit user-root-only refresh request with `--AllowUserRootOnly`, or for a disallowed setup location where refresh reports `projectSetup=skipped-disallowed-location`. Without that flag or skip condition, a missing project root must produce `M-PACT PROJECT SETUP REQUIRED` before bundle generation; the question content is owned by `references/bootstrap-project.md`, and nothing is created without explicit Director approval. If the Director answers no to the setup question, say `M-PACT: no memory root here; refresh skipped` and stop rather than rerunning refresh.
 
-If startup refresh reports `M-PACT PROJECT ADOPTION REQUIRED` alongside a successful receipt, memory is loaded but the active project root is not adopted. Ask the Director the adoption question from stdout. If yes, run `scripts/adopt-project-identity.js` for that one root, refresh again, and use the new receipt ID for later durable writes. If no, do not mint; reads may continue, but durable writes to that root keep halting for adoption.
+`M-PACT PROJECT ADOPTION REQUIRED` alongside a successful receipt means memory is loaded but the active root is unadopted; the fast path owns the ask. Yes: adopt via `references/adopt-project-identity.md`, refresh again, use the new receipt ID. No: reads continue; durable writes keep halting.
 
 ## 7. Checkpointing
 
 During live context, keep working from current context instead of refreshing merely to preserve state.
 
-- Default user-visible confirmations for helper-backed writes should be short and task-level: say what changed, not how storage changed. Project-write helper receipts intentionally include `projectPath` beside `projectId` so the Director can verify the target project. Do not report other internal paths, folder renames, ZIP member names, sentinel filenames, container names, or timestamps unless the Director asks for debugging details, the operation failed or was partial, ambiguity remains, or another immediate operation needs that internal value. The refresh receipt is the model for normal successful output: compact, clear, and complete enough.
-- Helper scripts own storage placement, record/member numbering, current-task resolution, and ZIP/catalog mechanics. Agents must not list catalogs, inspect folders, or compute placement merely to call a write helper. Appending a task log does not require reading existing log entries; write from the current Director request, current conversation state, and live evidence. Read catalogs and prior records only for lookup, handoff/resume, summarization, explicit history questions, or when the Director explicitly asks to base new work on prior task history.
-- Every durable project-root write must pass the project ID from the latest refresh or successful helper receipt as `--project-id <n>`. Read helpers do not require project ID. User-root writes do not use project IDs. A write to a different project root may proceed when its declared project ID matches the target root. Use `--cross-project` only for explicit Director-approved writes to a project whose ID was not loaded; it lifts only the requirement to supply a declaration, a declaration that contradicts the target still halts, and the target project's identity health is still validated. Never use `--cross-project` to bypass an identity refusal.
-- Do not routinely prompt for session entries or task log entries. The Director knows how to request durable writes.
-- Do not write or suggest session, task, or handoff memory merely because continuity risk is high, compaction may be likely, or context loss may be imminent. Durable memory writes require explicit Director request or an active task procedure that explicitly calls for that write.
-- Do not proactively suggest task log entries. Task logs are Director-controlled task records and should be written only when the Director asks or an active task procedure explicitly requires them.
-- Ask before proceeding only when a mutation is ambiguous, broader than the Director appears to realize, destructive, conflicting with protocol or prior Director intent, or otherwise cannot be done safely without clarification.
-- Re-run refresh only after completed compaction/context loss with concrete evidence, actual new context/session startup, or explicit Director request.
+- Default user-visible confirmations for helper-backed writes are short and task-level: say what changed, not how storage changed. Project-write receipts include `projectPath` beside `projectId` so the Director can verify the target. Do not report other internal paths, member names, sentinel filenames, or timestamps unless the Director asks for debugging detail, the operation failed or was partial, ambiguity remains, or another immediate operation needs the value.
+- Helper scripts own storage placement, record numbering, current-task resolution, and ZIP mechanics. Do not list catalogs, inspect folders, or compute placement merely to call a write helper; appending a task log does not require reading existing entries. Read catalogs and prior records only for lookup, handoff/resume, summarization, explicit history questions, or when the Director explicitly asks to base new work on prior history.
+- Project-ID and `--cross-project` rules are owned by `startup-contract.md`. Never use `--cross-project` to bypass an identity refusal.
+- Do not routinely prompt for, propose, or write session entries, task logs, or preservation handoffs; durable memory writes require explicit Director request or an active task procedure that explicitly calls for them. The Director knows how to request durable writes.
+- Ask before proceeding only when a mutation is ambiguous, broader than the Director appears to realize, destructive, conflicting with protocol or prior Director intent, or otherwise unsafe without clarification.
+- Re-run refresh only when `startup-contract.md` says a new refresh trigger exists.
 
 ## 8. Broad Retrieval
 
 Do not use single-category-only lookup for non-trivial tasks. Read primary and adjacent rules before finalizing direction. If precedent may exist, search `case-studies.zip` member names by topic keyword and read relevant case studies before proposing direction.
 
-Use `find-memory-artifact.md` for on-demand find/list/read requests across rules, sessions, tasks, case studies, and journals. Lookup is lineage-based; do not scan sibling projects unless the Director names them.
+Use `references/find-memory-artifact.md` for on-demand find/list/read requests across rules, sessions, tasks, case studies, and journals. Lookup is lineage-based; do not scan sibling projects unless the Director names them.
 
 ## 9. Durable Rules
 
-Rules are short files in `rules/` with YAML frontmatter. Filenames carry the index meaning; `description` adds scope, triggers, or nuance not already clear from the filename; bodies should not repeat either one. Startup lists core rule filenames only. Read any relevant rule body on demand before relying on it for direction, especially for primary or adjacent rules that may affect the current work.
+Rules are short files in `rules/` with YAML frontmatter. Filenames carry the index meaning as level one of the rules (owner: `startup-contract.md`); `description` adds scope or triggers; bodies are the controlling detail, read on correlate.
 
-Rules:
-
-- Surface all rule creates or updates.
-- Ambiguous, judgment-call, or override rules require Director confirmation.
-- Do not duplicate a rule already present in any chain root.
-- Put broad rules in the highest applicable root; child roots keep narrower project rules.
-- Keep rules short. Put scope, triggers, exceptions, why, or how in the body; long history belongs in case studies or task logs.
-- Rule writes must go through `write-rule.md` and `scripts/write-rule.js`. The helper owns timestamping, frontmatter formatting, filename length checks, lazy `rules/` folder creation, and the file write.
-- Bundled starter rules are defaults, not immutable policy. Install them visibly only during initial user-root creation and instruct the Director to review, edit, delete, or replace them.
+- Rule writes: Director-gated for ambiguous, judgment-call, or override rules; owner `references/write-rule.md`; writes one file in `rules/`; likeliest mistakes: duplicating a rule already in a chain root instead of merging, or writing the file directly instead of through the helper.
+- Surface all rule writes. Put broad rules in the highest applicable root; child roots keep narrower project rules. Long history belongs in case studies, not rule bodies.
+- Bundled starter rules are defaults, not immutable policy.
 
 ## 10. Case Studies
 
-Case studies are narrative write-ups of investigations, decisions, or worked examples.
+Case studies are narrative write-ups of investigations, decisions, or worked examples. Not loaded at startup; read on demand for topic-adjacent research or explicit Director request.
 
-- Default location: active root `case-studies.zip`; use user root only when the Director explicitly wants a user-level or cross-project case study.
-- Startup: not loaded.
-- Load on demand for topic-adjacent research or explicit Director request.
-- Unscoped case-study lookup/list requests mean active root only.
-- Parent/root/named/all/layered scope requests use that scope.
-- All/layered order matches session listing: `.AgentMemoryRoot`, ancestor roots, active root. Do not merge or renumber across roots.
-- Write case studies with `write-case-study.md` and the case-study helper. Project-root writes require the refreshed project ID. A case study may produce a short rule; store that rule in `rules/`.
+- Case-study writes: Director-requested per the durable-write default; owner `references/write-case-study.md`; appends to the active root `case-studies.zip` (user root only on explicit Director want); likeliest mistake: minting a rule from every incident; extract a rule only when the case study reveals reusable behavior.
+- Unscoped lookup means active root only; parent/root/named/all/layered scopes use that scope; all/layered order is `.AgentMemoryRoot`, ancestor roots, active root, never merged or renumbered across roots.
 
 ## 11. Tasks
 
-A task is a folder under `tasks/`. `tasks/` is created only when the first task is created.
+A task is a folder under `tasks/`, created only when the first task is created. Folder-prefix state authority, retired `Status:`/`Owner:` fields, sentinel rules, and container formats are owned by `startup-contract.md`. Task numbering is local to each memory root; do not merge or renumber across roots. Unscoped task-list requests mean active root only: active tasks by default, closed only when requested; Active before Closed, then priority, then newest task number first.
 
-```text
-<A|C>__p<1|2|3|4|x>-t####-<summary-slug>/
-  task.md
-  specification.zip
-  log.zip
-```
+Operation summaries (read the owner before acting):
 
-- A newly-created task folder contains `task.md` only. Create `specification.zip` and `log.zip` only when the corresponding helper writes the first member.
-- `task.md` contains the concise task header, context, and acceptance. Task creation must go through `create-task.md` and `scripts/create-task.js`; project-root task creation requires the refreshed project ID.
-- `specification.zip` contains full numbered specification snapshots. The highest-numbered member is the current specification. Never edit an older specification member.
-- Task specification writes must go through `write-task-spec.md` and `scripts/write-task-spec.js`; project-root writes require the refreshed project ID.
-- `log.zip` is append-only, one ordered member per work record. It is created lazily when the first log entry is written.
-- Task log order is record order, not agent-turn order. Multiple consecutive records may come from the same agent.
-- Task log record numbers are global within one task, not per-agent. Agents must not assign record numbers manually.
-- Task log writes must go through `write-task-log.md` and `scripts/write-task-log.js`; project-root writes require the refreshed project ID.
-- Task log read state is the last-read numeric record in the current conversation. M-PACT does not persist per-agent read cursors.
-- When taking a handoff or resuming task context, use `scripts/prepare-handoff.js` to plan the read span from `task.md`, the current specification snapshot, and `log.zip`. Use `scripts/read-member-span.js --container task-log --after <record>` for direct cursor catch-up. A caller-supplied read cursor is valid only for planning reads; it does not authorize stale write numbering, implementation, specification writes, or log appends. Treat older loaded records as historical background when later records, the current specification snapshot, or the Director have superseded them.
-- Writing a task log entry does not persist or automatically advance a read cursor.
-- A zero-byte `tasks/current__<active-task-folder>` sentinel points to the active task explicitly made current. The pointer is entirely in the filename; agents must not read or write pointer file content. There should be zero or one current sentinel. If multiple `current__*` sentinels exist, report ambiguity, leave them in place, and proceed as if there is no current task until an explicit current-task repair clears or replaces them. The sentinel is an attention pointer, not an index, queue, task activity timestamp, or log cursor, and it does not create, close, reopen, or imply tasks. Appending task logs or writing specification snapshots must not rewrite the sentinel when the task is already current. Agents must never infer a replacement current task from other active tasks. Closing the pointed task removes the sentinel unless the Director explicitly names a valid active replacement.
-- Setting the current task is an explicit pointer replacement operation through `set-current-task.md` and `scripts/set-current-task.js`; project-root pointer changes require the refreshed project ID.
+- Operation verb grammar lives here so individual references do not maintain alias lists: `write` appends a record; `create` births a container; `revise` changes a definition; `modify` edits in place as the controlled exception; `save` snapshots state for restore; `set` moves a pointer. `Update` routes by target: task definitions use `revise-task`, rules use `write-rule --replace`, journal entries use `modify-journal-entry.js` only on explicit Director ask, and everything else uses an appended corrective record because append-only law makes in-place update the exception.
+- Task creation: Director-gated; owner `references/create-task.md`; writes the `A__` folder and `task.md`; likeliest mistake: computing the task number or treating the creator as task authority; the helper assigns numbers and no role seats are created. Director phrases like "handoff", "hand this off", or "make this a task" birth an ordinary task from the live conversation; the phrase boundary is owned by `references/take-task-handoff.md`.
+- Task revision: Director-gated; owner `references/revise-task.md`; rewrites `task.md` with a paired log; likeliest mistake: editing `task.md` directly.
+- Review independence: owned by `references/take-task-handoff.md`; roles are retired descriptive metadata and helpers do not gate writes on seats.
+- Design specification writes: Director-instructed; owner `references/write-design-spec.md`; writes `specification.zip` members plus a paired log, mirrored in `specification.md`; likeliest mistake: treating the mirror as a second source of truth or rerunning after a partial write without reading the projection status rules.
+- Task log writes: owner `references/write-task-log.md`, which also owns active-item and Cleared/Resolved grammar; appends one `log.zip` record; likeliest mistakes: assigning record numbers manually or treating another agent's records as your own; never modify another agent's entry.
+- Taking a handoff: a read/analyze/report operation that authorizes no mutation; owner `references/take-task-handoff.md`, including the `prepare-handoff.js` receipt fields and the evaluation standard (claims to test, not material to summarize; no summary-only responses); likeliest mistake: treating "take this handoff" as permission to implement.
+- Set current task: explicit pointer replacement; owner `references/set-current-task.md`; replaces the `current__*` sentinel; likeliest mistake: inferring a replacement current task; never infer one, and log or spec writes must not move the sentinel.
+- Close and reopen: Director-only; owners `references/close-task.md` and `references/reopen-task.md`; rename the folder prefix; likeliest mistake: closing or reopening on agent judgment, or assuming reopen restores the pre-close active-item list; it does not.
+- Orphaned specification repair: announce, do not ask; owner `references/repair-task-spec-log.md`; appends a derived repair record; likeliest mistake: hand-authoring the missing rationale.
+- Saved context: Director-invoked only; owner `references/context-save-restore.md`; writes one `saved-context-<agent>-<timestamp>.md` in root `.tmp`; likeliest mistake: volunteering a save because context feels long; it is not a task-log record and not a handoff.
 
-Only the Director creates, closes, or reopens tasks. Closure means the task status changes to `Closed`; reopening changes it back to `Active`.
-
-Director phrases such as "handoff," "hand this off," "handoff to <agent>," "create a task from this conversation," and "make this a task" authorize creating an ordinary task from the live conversation. The created task should receive a meaningful derived title and slug when possible, be made current, and include an initial task log entry that preserves enough conversation state for another agent or future context to resume. This is a task birth procedure, not a separate scratch-task type. A named receiving agent may be the same as the current agent; the intent may be a durable context-switch point rather than an agent change. A standalone "handoff" request creates a new task from the live conversation even when a `current__*` sentinel points to an older task. Write a handoff log to an existing task only when the Director explicitly ties the handoff to that task, such as "handoff this task," "write a handoff for the current task," or by naming the task.
-
-Task numbering is local to each memory root. Do not merge or renumber across roots.
-
-Unscoped task-list requests mean active memory root only. Show active tasks by default; show closed only when requested. Within a scope, list Active before Closed, then priority, then newest task number first.
-
-Before writing a task, log entry, summary, or specification, use the corresponding verb reference for the current template.
-
-Taking a task handoff means read, analyze, evaluate, and report for an existing task, usually the task named by the `current__*` sentinel or the Director. It does not authorize modifying source code, specification snapshots, docs, task state, task logs, rules, sessions, or other durable artifacts. A handoff response should not be summary-only unless the Director explicitly asks only for a summary. Evaluate the current handoff span as claims and direction to test: identify what changed, inspect relevant source/spec artifacts when needed, assess feasibility, risks, assumptions, and implementation issues, and recommend the best next path or rank alternatives when no single path is clearly best. For design, exploration, and planning handoffs, evaluate the current plan, spec, and log against Director intent and relevant source materials for consistency, feasibility, ambiguity, missing constraints, implementation risk, and fit. For implementation handoffs, evaluate the implementation against the task, spec, log decisions, and relevant source behavior. For specification-to-implementation handoffs, evaluate whether the spec is implementable, sufficiently constrained, aligned with the codebase, and likely to produce the desired behavior. Do not push the Director to choose immediately.
+Only the Director creates, closes, reopens, or revises tasks.
 
 ## 12. Session Entries
 
-Session entries are append-only concise summaries using the user's local time.
+Session entries are append-only concise project-wide summaries in the user's local time; prefer task logs for single-task continuity.
 
-- Writes default to active root `sessions.zip`.
-- Do not modify another agent's entry.
-- Unscoped session-list requests mean active root only.
-- Prefer task logs for single-task continuity.
-- Use sessions for cross-task, project-wide, or ambiguous-scope notes.
-- Write session entries only when the Director asks or clearly approves. Project-root writes require the refreshed project ID. Do not routinely prompt for them. A light preservation note is appropriate only when continuity risk is high; detailed handoff entries should include summary plus current state, open questions, and recent reasoning.
-- New session entries must lead with startup-relevant continuity under `## Summary`. Refresh reads the newest active-root session in full, capped at 25KB, and no longer loads older session summaries during startup.
+- Session writes: Director-asked or clearly approved; owner `references/write-session-entry.md`; appends to active root `sessions.zip`; likeliest mistake: prompting for one unrequested. Refresh loads only the newest active-root session, capped, and task sections outrank a stale session on disagreement, so new entries must lead with startup-relevant continuity.
+- Unscoped session lists mean active root only. Do not modify another agent's entry.
 
 ## 13. Journal Entries
 
-`journal.zip` holds Director-authored, first-person, reflective entries. It is created lazily on first journal write; if there are no journal entries, no `journal.zip` is required.
+`journal.zip` holds Director-authored, first-person, reflective entries, created lazily, not startup context, and never prompts or task assignments.
 
-Journal entries are not part of the core startup read contract. Use `write-journal-entry.md` only when the Director explicitly asks for it. Default to the active root unless the Director explicitly wants user-level or cross-project placement. Project-root journal writes require the refreshed project ID.
-
-- Unscoped journal lookup/list requests mean active root only.
-- Parent/root/named/all/layered scope requests use that scope.
-- All/layered order matches session listing: `.AgentMemoryRoot`, ancestor roots, active root. Do not merge or renumber across roots.
-- Journal entries are not prompts or task assignments.
+- Journal writes: explicit Director ask only; owner `references/write-journal-entry.md`; appends to the active root journal (user root on explicit want); likeliest mistake: generalizing `modify-journal-entry.js`; journal modification is the controlled exception to the append-only correction model and never licenses editing logs or specifications.
+- Unscoped lookup means active root only; layered order matches sessions.
 
 ## 14. Execution Contract
 
 - Parse Director input into an explicit checklist before implementation.
 - Restate interpreted intent when dictation artifacts are present.
 - Continue autonomously through requested analysis, evaluation, review, and handoff reporting. Do not ask whether to perform implied read/analyze steps.
-- Do not routinely prompt for session-entry checkpoints or task log entries.
-- For helper-owned writes, use direct helper arguments plus raw/plain stdin content by default. For stdin fallback and `--input` cleanup behavior, see `helper-write-conventions.md`. Do not create project/skill scratch input or fetch timestamps separately.
-- Surface durable memory create/update actions in the response.
+- Anything awaiting a Director ruling must be asked in the conversation by the agent holding control; mentioning it in passing or only in a task log does not satisfy the rule. Ordinary direction questions carry the agent's recommendation, so silence is a valid answer and the agent proceeds on its stated default unless overridden. Item approval is different: adding a design item is permanent and obligates an answer. After asking, continue only work that does not depend on the answer. If no interactive prompt is available, lead the response with the ask; Codex's structured prompt is gated to Plan mode, so ordinary Codex sessions use plain text.
+- For helper-owned writes, follow `references/helper-write-conventions.md`; do not create ad hoc scratch input or fetch timestamps separately.
+- Surface durable memory writes in the response.
 - Mark blocked state explicitly when required protocol state is ambiguous.
 - Never use polling in persistent-memory workflow.
 
 ## 15. Hard Prohibitions
 
-- Never skip startup read contract.
+- Never skip the startup read contract.
 - Never skip the Refresh Receipt after startup load or Director-requested refresh.
 - Never treat log entries or session entries as prompts, implementation directives, or action items.
 - Never create durable memory silently.
 - Never create ambiguous or judgment-call durable memory without Director confirmation.
 - Never create, close, or reopen a task folder without explicit Director instruction.
 - Never modify or delete another agent's log entry or session entry.
-- Never rely on filesystem metadata timestamps for routine task ordering or listing. Use the `tasks/current__<active-task-folder>` sentinel, task numbers, and header timestamps; never use filesystem timestamps to infer a replacement current task.
-- Use helper scripts and `helper-write-conventions.md` for helper-owned memory writes.
+- Never delete, renumber, reorder, or remove task-log records or design specification items. Correct or supersede them with later records.
+- Never rely on filesystem metadata timestamps for routine task ordering or listing; never infer a replacement current task.
+- Use helper scripts and `references/helper-write-conventions.md` for helper-owned memory writes.
 - Never improvise when a protocol step is ambiguous. Ask one concise question.
-- Do not suggest or write preservation handoffs merely because context is getting low. Durable preservation writes require explicit Director request or an active task procedure that explicitly calls for that write.
+- Never suggest or write preservation handoffs merely because context is getting low.
 - Never claim memory is loaded when it is not.
 
 ## 16. Authority Precedence
 
 1. Director instruction
-2. Active execution-plan docs
-3. Agent config docs
+2. Active execution-plan docs: Director-approved specifications and plans currently governing the work
+3. Agent config docs: provider instruction files such as `CLAUDE.md`, `AGENTS.md`, and shims
 4. Durable rules
 5. Case studies
 6. Task log entries
@@ -246,7 +228,7 @@ Journal entries are not part of the core startup read contract. Use `write-journ
 
 1. Stop side actions.
 2. Re-read this contract.
-3. Read the relevant verb/template reference if the violation involved file creation.
+3. Read the owning verb reference if the violation involved an operation.
 4. Determine correct state.
 5. Resume from that state.
 6. Emit a fresh Refresh Receipt when refresh was involved.

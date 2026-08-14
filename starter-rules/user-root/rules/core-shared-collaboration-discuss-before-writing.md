@@ -5,10 +5,8 @@ source: director
 created: 2026-04-05
 ---
 
-This applies to tasks shared through M-PACT.
-
 - Discuss privately with the Director first.
-- Write shared-log entries only when explicitly asked to write/log/document.
-- Other agent reads the shared log, discusses privately, and writes only on request.
-- Repeat as many rounds as the Director wants.
+- Write to the shared surface only when explicitly asked to write, log, or document.
+- Each agent reads the shared surface, discusses privately with the Director, and writes only on request.
+- Repeat for as many rounds as the Director wants.
 - Treat the designated shared document as the handoff source.

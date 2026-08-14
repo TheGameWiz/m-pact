@@ -5,19 +5,44 @@ const path = require("path");
 const { withDirectoryLock } = require("./directory-lock");
 const { getContainer } = require("./container-registry");
 const { resolveRootPath, resolveTaskPath, sanitizeSlug } = require("./helper-common");
+const { taskOperationLockPath, withTaskOperationLock } = require("./task-state");
 const {
   listMembers,
   readMember,
 } = require("./zip-record-store");
 
 function recordFromName(name) {
-  const match = /^(\d{4})-(?!\d{2}-)/.exec(name);
+  const match = /^(\d{4})([-_])(?!\d{2}-)/.exec(name);
   return match ? Number.parseInt(match[1], 10) : null;
 }
 
+function recordPartsFromName(name) {
+  const match = /^(\d{4})([-_])(?!\d{2}-)([^-]+)-/.exec(name);
+  if (!match) {
+    return null;
+  }
+  return {
+    record: Number.parseInt(match[1], 10),
+    separator: match[2],
+    author: match[3],
+    identity: `${match[1]}-${match[3]}`,
+    kind: "record",
+  };
+}
+
 function identityFromName(name) {
-  const match = /^(\d{4})-(?!\d{2}-)([^-]+)-/.exec(name);
-  return match ? `${match[1]}-${match[2]}` : null;
+  const parts = recordPartsFromName(name);
+  return parts ? parts.identity : null;
+}
+
+function authorFromName(name) {
+  const parts = recordPartsFromName(name);
+  return parts ? parts.author : null;
+}
+
+function kindFromName(name) {
+  const parts = recordPartsFromName(name);
+  return parts ? parts.kind : null;
 }
 
 function withRecordMetadata(member, container = {}) {
@@ -26,6 +51,8 @@ function withRecordMetadata(member, container = {}) {
     ...member,
     record: recordsExpected ? recordFromName(member.name) : null,
     identity: recordsExpected ? identityFromName(member.name) : null,
+    author: recordsExpected ? authorFromName(member.name) : null,
+    kind: recordsExpected ? kindFromName(member.name) : null,
   };
 }
 
@@ -49,7 +76,9 @@ function resolveContainer(input = {}, args = {}, options = {}) {
       container,
       taskPath,
       zipPath: path.join(taskPath, container.zipFilename),
-      lockTarget: taskPath,
+      lockTarget: taskOperationLockPath(taskPath),
+      taskScoped: true,
+      zipOptions: { requireExistingParent: true },
     };
   }
   const rootPath = resolveRootPath(input, args);
@@ -62,17 +91,20 @@ function resolveContainer(input = {}, args = {}, options = {}) {
 }
 
 function withContainerOperationLock(context, fn) {
+  if (context.taskScoped) {
+    return withTaskOperationLock(context.taskPath, fn);
+  }
   return withDirectoryLock(context.lockTarget, fn);
 }
 
 function listContainerMembers(context) {
-  return sortMembers(listMembers(context.zipPath), context.container);
+  return sortMembers(listMembers(context.zipPath, context.zipOptions), context.container);
 }
 
 function readContainerEntries(context) {
   return listContainerMembers(context).map((member) => ({
     ...member,
-    content: readMember(context.zipPath, member.name),
+    content: readMember(context.zipPath, member.name, context.zipOptions),
   }));
 }
 
@@ -127,7 +159,7 @@ function selectMember(members, container, args = {}) {
 }
 
 function readSelectedMember(context, selected) {
-  return readMember(context.zipPath, selected.name).toString("utf8");
+  return readMember(context.zipPath, selected.name, context.zipOptions).toString("utf8");
 }
 
 function tokenizeQuery(query) {
@@ -175,6 +207,7 @@ function collisionGroups(members) {
 
 module.exports = {
   collisionGroups,
+  authorFromName,
   identityFromName,
   latestMember,
   listContainerMembers,

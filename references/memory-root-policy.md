@@ -6,17 +6,15 @@ Helpers know the mechanics: active root discovery, explicit `--root`, task looku
 
 Project identity is helper-owned. New project bootstrap mints identity automatically. Existing pre-identity roots use lazy confirmed adoption: refresh or a durable write reports `M-PACT PROJECT ADOPTION REQUIRED`, asks the Director whether to adopt that one root, and mints identity only through `scripts/adopt-project-identity.js` after a yes. Use `scripts/repair-project-identity.js` when a helper reports a path-mismatched or multiple project sentinel state. Do not hand-edit `project__*` or `project-count__*` sentinels.
 
-Identity halts use exit code 4 and print a structured stdout notice. `validateProjectWrite` and `validateProjectRootHealth` throw on identity halts; callers that want a verdict must catch the error and inspect `error.mpactNotice` and `error.adoptionRequired`.
-
 Project sentinel names are path slugs. They fold case and collapse runs of non-alphanumeric characters, so distinct paths can produce the same sentinel name. This limitation is accepted to avoid changing the sentinel scheme and migrating existing roots.
 
 ## Routing Principles
 
 - Current-project writes use the active project root by default.
-- Current-project durable writes pass the refreshed project number as `--project-id <n>`. Successful project-write helper receipts include `projectPath` beside `projectId` so the Director can sanity-check the target project.
-- A named project, sibling project, or explicit path may require passing an explicit `--root` to the relevant helper. If that project ID is loaded, pass it as `--project-id <n>` and let the helper verify the target root. Use `--cross-project` only when the Director explicitly approved writing to a project whose ID was not loaded; it lifts the requirement to supply a declaration, and a declaration that contradicts the target still halts.
+- Project-ID declarations (`--project-id`) and `--cross-project` follow the Writes rules in `startup-contract.md`.
+- A named project, sibling project, or explicit path may require passing an explicit `--root` to the relevant helper.
 - User-root writes require explicit user-level, global, or cross-project intent from the Director.
-- Inherited project roots are read-only by default.
+- Inherited project roots are read-only by default; writing to one requires explicit Director instruction.
 - Bootstrap and root creation require explicit Director approval.
 
 ## Agent Responsibilities

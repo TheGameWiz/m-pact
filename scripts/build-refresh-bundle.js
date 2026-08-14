@@ -4,21 +4,57 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const crypto = require("crypto");
 const { listMembers, readMember } = require("./lib/zip-record-store");
-const { REFRESH_ACCEPTED_FLAGS, assertKnownFlags, assertMpactAllowedInCurrentSession } = require("./lib/helper-common");
+const { REFRESH_ACCEPTED_FLAGS, assertKnownFlags, assertMpactAllowedInCurrentSession, isMpactHookContext, resolveAgentIdentity } = require("./lib/helper-common");
+const {
+  latestMember,
+  withRecordMetadata,
+} = require("./lib/container-state");
+const {
+  agentTaskLogPosition,
+  newestAuthoredTaskLogMember,
+} = require("./lib/active-items");
+const { formatTaskLogCatalogLines } = require("./lib/task-log-catalog");
+const {
+  formatOrphanedSpecMembers,
+  orphanedSpecificationMembers,
+} = require("./lib/orphaned-companions");
 const { installMpactRuntime, isUserRootComplete } = require("./lib/install-runtime");
-const { adoptionNotice, defaultUserRoot, ensureCounterInitialized, readCounterSentinel, readProjectSentinel } = require("./lib/project-identity");
+const {
+  adoptionNotice,
+  defaultUserRoot,
+  ensureCounterInitialized,
+  readCounterSentinel,
+  readProjectSentinel,
+  validateProjectMemorySetupLocationVerdict,
+} = require("./lib/project-identity");
+const {
+  pruneScratchDirectory,
+  refreshBundlePath,
+  removeRefreshBundle,
+} = require("./lib/scratch");
+const {
+  SAVED_CONTEXT_STALE_MS,
+  cleanupDuplicateSavedContexts,
+  deleteSavedContext,
+  listSavedContexts,
+  parseSavedContextAnswer,
+  readSavedContext,
+  savedContextAgeMs,
+} = require("./lib/saved-context");
 
 const MIN_NODE_MAJOR = 18;
 const EOL = os.EOL;
 const RECENT_SESSION_BUDGET_BYTES = 25 * 1024;
 const TRUNCATION_NOTICE = "\n\n[Truncated to fit the 25KB recent-session refresh budget.]";
+const HOOK_RECEIPT_EMISSION_NOTE = "M-PACT HOOK NOTE: This refresh output was injected into agent context only. The Director has not seen the receipt. Verify the bundle, emit the receipt body verbatim at the start of the first response, follow any required refresh decision block, then continue the Director's requested work. In Antigravity, injected text is transient and the fast path must complete this turn.";
 
 function parseArgs(argv) {
   const options = {
     startPath: process.cwd(),
     allowUserRootOnly: false,
+    agent: null,
+    savedContext: null,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -29,6 +65,12 @@ function parseArgs(argv) {
       i++;
     } else if (arg === "--AllowUserRootOnly" || arg === "-AllowUserRootOnly" || arg === "--allow-user-root-only") {
       options.allowUserRootOnly = true;
+    } else if (arg === "--agent" && next) {
+      options.agent = next;
+      i++;
+    } else if ((arg === "--SavedContext" || arg === "-SavedContext" || arg === "--saved-context") && next) {
+      options.savedContext = next;
+      i++;
     }
   }
 
@@ -154,6 +196,7 @@ function listSessionArtifacts(root) {
       artifacts.push({
         name: member.name,
         label: `${sessionsZip}#${member.name}`,
+        modified: member.modified,
         readFull: () => readMember(sessionsZip, member.name).toString("utf8"),
       });
     }
@@ -234,7 +277,7 @@ function writeProjectSetupRequiredAndExit(details) {
   console.log("Ask the Director whether to create project M-PACT scaffolding here before emitting any refresh receipt.");
   console.log("Question: No project M-PACT root was found for this workspace. Create project M-PACT scaffolding here? This will add .AgentMemory/. Artifact folders and ZIP containers are created lazily when first used. Project startup shims are not part of project bootstrap. Answer yes or no.");
   console.log("If yes: follow references/bootstrap-project.md, then run refresh again.");
-  console.log("If no: run refresh again with --AllowUserRootOnly and emit the resulting receipt.");
+  console.log("If no: say \"M-PACT: no memory root here; refresh skipped\" and stop. User-root-only refresh requires a separate explicit Director request with --AllowUserRootOnly.");
   console.log("END PROJECT SETUP REQUIRED");
   process.exit(0);
 }
@@ -244,53 +287,6 @@ function utf8ByteCount(text) {
     return 0;
   }
   return Buffer.byteLength(String(text), "utf8");
-}
-
-function sha256(text) {
-  return crypto.createHash("sha256").update(String(text), "utf8").digest("hex");
-}
-
-function getStartupContractCoverage(skillDir, startupContractText) {
-  const skillPath = path.join(skillDir, "SKILL.md");
-  const hash = sha256(startupContractText);
-  if (!existsFile(skillPath)) {
-    return {
-      covered: false,
-      hash,
-      skillPath,
-      reason: "SKILL.md not found",
-    };
-  }
-
-  let skillText = "";
-  try {
-    skillText = readText(skillPath);
-  } catch (error) {
-    return {
-      covered: false,
-      hash,
-      skillPath,
-      reason: `SKILL.md could not be read (${error.message})`,
-    };
-  }
-
-  const marker = `startup-contract-sha256: ${hash}`;
-  return {
-    covered: skillText.includes(marker),
-    hash,
-    skillPath,
-    reason: skillText.includes(marker) ? "" : `SKILL.md is missing ${marker}`,
-  };
-}
-
-function addStartupContractReference(lines, startupContractPath, coverage) {
-  addLine(lines, "### startup-contract.md");
-  addLine(lines);
-  addLine(lines, `Path: ${formatDisplayPath(startupContractPath)}`);
-  addLine(lines, `SHA-256: ${coverage.hash}`);
-  addLine(lines, `Covered by invoked skill: ${formatDisplayPath(coverage.skillPath)}`);
-  addLine(lines, "Status: not inlined because SKILL.md carries the matching startup-contract-sha256 marker already loaded during skill invocation.");
-  addLine(lines);
 }
 
 function formatKB(bytes) {
@@ -323,6 +319,130 @@ function listDirectories(dirPath, prefix) {
 function taskNumberValue(taskName) {
   const match = /-t(\d{4})-/.exec(taskName);
   return match ? Number.parseInt(match[1], 10) : -1;
+}
+
+function taskLogMembers(taskPath) {
+  const logZip = path.join(taskPath, "log.zip");
+  if (!existsFile(logZip)) {
+    return [];
+  }
+  return listMembers(logZip)
+    .map((member) => withRecordMetadata(member, { recordsExpected: true }))
+    .sort((a, b) => {
+      const ar = a.record === null ? Number.MAX_SAFE_INTEGER : a.record;
+      const br = b.record === null ? Number.MAX_SAFE_INTEGER : b.record;
+      return ar - br || a.name.localeCompare(b.name);
+    });
+}
+
+function formatAgeSince(isoTimestamp) {
+  const time = Date.parse(isoTimestamp);
+  if (!Number.isFinite(time)) {
+    return "(unknown)";
+  }
+  return formatAgeMs(Date.now() - time);
+}
+
+function formatAgeMs(ageMs) {
+  if (!Number.isFinite(ageMs)) {
+    return "(unknown)";
+  }
+  const seconds = Math.max(0, Math.floor(ageMs / 1000));
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes}m`;
+  }
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) {
+    return `${hours}h`;
+  }
+  return `${Math.floor(hours / 24)}d`;
+}
+
+function addAgentTaskLogRefresh(lines, taskPath, agent) {
+  if (!agent) {
+    throw new Error("agent task-log refresh requires resolved agent identity");
+  }
+  const logZip = path.join(taskPath, "log.zip");
+  const members = taskLogMembers(taskPath);
+  const newest = latestMember(members, { defaultSort: "record-asc" });
+  const position = agentTaskLogPosition(members, agent);
+  const cursorRecord = newestAuthoredTaskLogMember(members, agent);
+  addLine(lines, "## Agent Task Log Refresh");
+  addLine(lines);
+  addLine(lines, `Agent: ${agent}`);
+  addLine(lines, `Task: ${path.basename(taskPath)}`);
+  addLine(lines, `Read-cursor: ${position.readCursor}`);
+  addLine(lines, `Unread records after read-cursor: ${position.unread.length}; by author: ${position.unreadByAuthor}`);
+  addLine(lines, `Newest record age: ${newest ? formatAgeSince(newest.modified) : "(none)"}`);
+  for (const line of formatTaskLogCatalogLines(members, { taskId: taskNumberValue(path.basename(taskPath)) >= 0 ? `t${String(taskNumberValue(path.basename(taskPath))).padStart(4, "0")}` : path.basename(taskPath) })) {
+    addLine(lines, line);
+  }
+  if (!cursorRecord) {
+    addLine(lines, "Task-log cursor record: (none)");
+    addLine(lines, "This agent has no authored task log record on the current task. Take a handoff when task-log catch-up is needed.");
+    addLine(lines);
+    return;
+  }
+  addLine(lines, `Task-log cursor record: ${String(cursorRecord.record).padStart(4, "0")} (${cursorRecord.name})`);
+  addLine(lines, `Task-log cursor age: ${formatAgeSince(cursorRecord.modified)}`);
+  addLine(lines);
+  const text = readMember(logZip, cursorRecord.name).toString("utf8");
+  addArtifact(lines, "agent-task-log-cursor", `${logZip}#${cursorRecord.name}`, text);
+}
+
+function writeSavedContextDecisionRequiredAndExit(details) {
+  console.log("M-PACT SAVED CONTEXT DECISION REQUIRED");
+  console.log(`Root: ${formatDisplayPath(details.rootPath)}`);
+  console.log(`Agent: ${details.agent}`);
+  console.log(`SavedContextTimestamp: ${details.context.timestamp}`);
+  console.log(`SavedContextFile: ${details.context.name}`);
+  console.log(`SavedContextAge: ${formatAgeMs(savedContextAgeMs(details.context))}`);
+  console.log(`Saved context is older than the ${Math.round(SAVED_CONTEXT_STALE_MS / 60000)} minute automatic restore threshold.`);
+  console.log("Ask the Director whether to use this saved context before emitting any refresh receipt.");
+  console.log(`If yes: run refresh again with --saved-context RESTORE:${details.context.name}`);
+  console.log(`If no: run refresh again with --saved-context DISCARD:${details.context.name}`);
+  console.log("END SAVED CONTEXT DECISION REQUIRED");
+  process.exit(0);
+}
+
+function writeSavedContextUnhandledAndExit(details) {
+  console.log("AUDIT: FAIL");
+  console.log("M-PACT REFRESH FAILURE");
+  console.log(`StartPath: ${formatDisplayPath(details.resolvedStart)}`);
+  console.log("Failure count: 1");
+  console.log("- M-PACT SAVED CONTEXT UNHANDLED: saved context file(s) are present, but refresh cannot decide which running agent owns this startup.");
+  console.log(`Root: ${formatDisplayPath(details.rootPath)}`);
+  console.log(`Agent: (unresolved)`);
+  console.log(`Reason: ${details.reason}`);
+  console.log("SavedContextFiles:");
+  for (const context of details.contexts) {
+    console.log(`- ${context.name}`);
+  }
+  console.log("Pass --agent <token> from a recognized local runtime or fix the conflicting provider markers before emitting any refresh receipt.");
+  console.log("END REFRESH FAILURE");
+  process.exit(1);
+}
+
+function addAgentTaskLogRefreshUnavailable(lines, taskPath, reason) {
+  addLine(lines, "## Agent Task Log Refresh");
+  addLine(lines);
+  addLine(lines, `Task: ${path.basename(taskPath)}`);
+  addLine(lines, "Agent: (unresolved)");
+  addLine(lines, `Per-agent saved context restore unavailable: ${reason}`);
+  addLine(lines, "Pass --agent <token> to override when running from an unrecognized local runtime.");
+  addLine(lines);
+}
+
+function orphanedCompanionsForTask(taskPath) {
+  const orphaned = orphanedSpecificationMembers(taskPath);
+  if (orphaned.length === 0) {
+    return null;
+  }
+  return `${path.basename(taskPath)}: ${formatOrphanedSpecMembers(orphaned)}`;
 }
 
 function orderActiveTasks(taskNames, currentTask) {
@@ -366,6 +486,18 @@ function main() {
   const argv = process.argv.slice(2);
   assertKnownFlags(argv, REFRESH_ACCEPTED_FLAGS);
   const options = parseArgs(argv);
+  // Agent identity resolves before any root-dependent halt so every later
+  // no-bundle exit can name the deterministic bundle it must remove.
+  let agentResolution = null;
+  let agentResolutionError = null;
+  try {
+    agentResolution = resolveAgentIdentity({ explicitAgent: options.agent, scriptPath: process.argv[1] });
+  } catch (error) {
+    if (options.agent || options.savedContext) {
+      throw error;
+    }
+    agentResolutionError = error;
+  }
   const failures = [];
   const sessionReads = [];
   const bundle = [];
@@ -383,6 +515,9 @@ function main() {
   let startupTaskText = "";
   let currentTaskPointer = "(none)";
   const missingOrAmbiguous = [];
+  const orphanedSpecCompanions = [];
+  let savedContextRestore = null;
+  let setupLocationRefusal = null;
 
   if (existsFile(startupContractPath)) {
     try {
@@ -445,6 +580,27 @@ function main() {
     chain.push(root);
   }
 
+  // Delete early, write late: remove this agent's deterministic bundle as soon
+  // as the scratch root is known, so any halt below leaves no stale bundle. A
+  // successful refresh rewrites it at the end. Halts before this point have no
+  // scratch root and therefore nothing to delete.
+  const bundleAgentToken = agentResolution ? agentResolution.agent : null;
+  const bundleScratchRoot = activeRoot || (existsDir(userRoot) ? resolveExisting(userRoot) : null);
+  if (bundleScratchRoot) {
+    removeRefreshBundle(bundleScratchRoot, bundleAgentToken);
+  }
+
+  if (!activeRoot && !options.allowUserRootOnly) {
+    const setupVerdict = validateProjectMemorySetupLocationVerdict({
+      projectPath: resolvedStart,
+      userRoot,
+    });
+    if (!setupVerdict.ok) {
+      setupLocationRefusal = setupVerdict.message;
+      options.allowUserRootOnly = true;
+    }
+  }
+
   if (!activeRoot && !options.allowUserRootOnly) {
     if (failures.length > 0) {
       writeFailureAndExit(resolvedStart, failures);
@@ -484,7 +640,7 @@ function main() {
           artifactBytes = getArtifactByteCount(mode, file.label, text);
           sessionBudgetTruncated = true;
         }
-        sessionReads.push({ root: activeRoot, path: file.label, mode, text });
+        sessionReads.push({ root: activeRoot, path: file.label, mode, text, modified: file.modified });
         sessionBudgetUsed += artifactBytes;
       } catch (error) {
         failures.push(`Failed to read selected active-root session: ${file.label} (${error.message})`);
@@ -496,6 +652,17 @@ function main() {
     const tasksDir = path.join(activeRoot, "tasks");
     if (existsDir(tasksDir)) {
       activeTaskNames = listDirectories(tasksDir, "A__");
+      for (const taskName of activeTaskNames) {
+        const taskPath = path.join(tasksDir, taskName);
+        const taskMd = path.join(taskPath, "task.md");
+        if (!existsFile(taskMd)) {
+          missingOrAmbiguous.push(`active task folder is missing task.md: ${taskName}`);
+        }
+        const orphaned = orphanedCompanionsForTask(taskPath);
+        if (orphaned) {
+          orphanedSpecCompanions.push(orphaned);
+        }
+      }
       let selectedTask = null;
       const taskEntries = fs.readdirSync(tasksDir, { withFileTypes: true });
       const currentPointers = taskEntries
@@ -534,7 +701,7 @@ function main() {
             failures.push(`Failed to read startup task file: ${taskMd} (${error.message})`);
           }
         } else {
-          failures.push(`Selected startup task is missing task.md: ${taskMd}`);
+          missingOrAmbiguous.push(`selected startup task is missing task.md: ${taskMd}`);
         }
       }
     }
@@ -542,6 +709,66 @@ function main() {
 
   if (failures.length > 0) {
     writeFailureAndExit(resolvedStart, failures);
+  }
+
+  const savedContextRoot = activeRoot || resolveExisting(userRoot);
+  if (agentResolution && agentResolution.agent) {
+    const cleanup = cleanupDuplicateSavedContexts(savedContextRoot, agentResolution.agent);
+    if (cleanup.failed.length > 0) {
+      throw new Error(`could not clean up duplicate saved context file(s): ${cleanup.failed.join(", ")}`);
+    }
+    const currentSavedContext = cleanup.current;
+    if (options.savedContext) {
+      const answer = parseSavedContextAnswer(options.savedContext);
+      if (!answer) {
+        throw new Error("--saved-context must be RESTORE:<filename> or DISCARD:<filename>");
+      }
+      if (!currentSavedContext || answer.filename !== currentSavedContext.name) {
+        throw new Error(`--saved-context names a missing, wrong, or stale file: ${answer.filename}`);
+      }
+      const body = answer.action === "RESTORE" ? readSavedContext(currentSavedContext) : null;
+      const failure = deleteSavedContext(currentSavedContext);
+      if (failure) {
+        throw new Error(`could not delete consumed saved context file: ${failure}`);
+      }
+      savedContextRestore = {
+        action: answer.action === "RESTORE" ? "restored" : "discarded",
+        agent: agentResolution.agent,
+        context: currentSavedContext,
+        body,
+      };
+    } else if (currentSavedContext) {
+      if (savedContextAgeMs(currentSavedContext) >= SAVED_CONTEXT_STALE_MS) {
+        writeSavedContextDecisionRequiredAndExit({
+          rootPath: savedContextRoot,
+          agent: agentResolution.agent,
+          context: currentSavedContext,
+        });
+      }
+      const body = readSavedContext(currentSavedContext);
+      const failure = deleteSavedContext(currentSavedContext);
+      if (failure) {
+        throw new Error(`could not delete consumed saved context file: ${failure}`);
+      }
+      savedContextRestore = {
+        action: "restored",
+        agent: agentResolution.agent,
+        context: currentSavedContext,
+        body,
+      };
+    }
+  } else if (options.savedContext) {
+    throw new Error("saved context answer requires resolved agent identity");
+  } else {
+    const unhandledContexts = listSavedContexts(savedContextRoot);
+    if (unhandledContexts.length > 0) {
+      writeSavedContextUnhandledAndExit({
+        resolvedStart,
+        rootPath: savedContextRoot,
+        reason: agentResolutionError ? agentResolutionError.message : "agent identity could not be resolved",
+        contexts: unhandledContexts,
+      });
+    }
   }
 
   const chainDisplay = formatDisplayPathList(chain);
@@ -552,14 +779,16 @@ function main() {
   const missingOrAmbiguousDisplay = missingOrAmbiguous.length > 0 ? formatList(missingOrAmbiguous) : "[(none)]";
   const projectRootsDisplay = formatDisplayPathList(projectRoots);
   const projectIdentityDisplay = describeProjectIdentity(activeRoot, userRoot);
+  const orphanedSpecCompanionsDisplay = orphanedSpecCompanions.length > 0 ? orphanedSpecCompanions.join("; ") : null;
   const receiptLines = [
     "M-PACT MEMORY REFRESH",
     `activeProjectRoot=${activeDisplay}; ${projectIdentityDisplay.receipt}`,
+    ...(setupLocationRefusal ? [`projectSetup=skipped-disallowed-location; reason=${setupLocationRefusal}`] : []),
+    ...(savedContextRestore ? [`savedContext=${savedContextRestore.action}; agent=${savedContextRestore.agent}; timestamp=${savedContextRestore.context.timestamp}; filename=${savedContextRestore.context.name}`] : []),
     ...refreshExternalActions.map((action) => `providerSetup=${action}`),
+    ...(orphanedSpecCompanionsDisplay ? [`orphanedSpecMembers=${orphanedSpecCompanionsDisplay}`] : []),
     "audit=PASS; bundle=loaded; output-complete=END REFRESH BUNDLE",
   ];
-  const startupContractCoverage = getStartupContractCoverage(skillDir, startupContractText);
-
   addLine(bundle, "AUDIT: PASS");
   addLine(bundle, "M-PACT REFRESH BUNDLE");
   addLine(bundle, `Generated: ${generatedTimestamp()}`);
@@ -574,6 +803,18 @@ function main() {
     addLine(bundle);
     addLine(bundle, projectIdentityDisplay.adoptionBlock);
   }
+  if (savedContextRestore && savedContextRestore.body !== null) {
+    addLine(bundle);
+    addLine(bundle, "## Saved Context Restore");
+    addLine(bundle);
+    addLine(bundle, `Agent: ${savedContextRestore.agent}`);
+    addLine(bundle, `SavedContextTimestamp: ${savedContextRestore.context.timestamp}`);
+    addLine(bundle, `SavedContextFile: ${savedContextRestore.context.name}`);
+    addLine(bundle);
+    addLine(bundle, "```text");
+    addLine(bundle, String(savedContextRestore.body || "").trimEnd());
+    addLine(bundle, "```");
+  }
   addLine(bundle);
   addLine(bundle, "## Root And Startup Manifest");
   addLine(bundle);
@@ -587,24 +828,24 @@ function main() {
   }
   addLine(bundle, `- Project roots, broad-to-specific: ${projectRootsDisplay}`);
   addLine(bundle, `- Active project root: ${activeDisplay}`);
+  if (setupLocationRefusal) {
+    addLine(bundle, `- Project setup skipped: ${setupLocationRefusal}`);
+  }
   addLine(bundle, projectIdentityDisplay.manifest);
   addLine(bundle, `- Memory chain, broad-to-specific: ${chainDisplay}`);
   addLine(bundle, `- Missing or ambiguous: ${missingOrAmbiguousDisplay}`);
+  addLine(bundle, `- Orphaned specification companions: ${orphanedSpecCompanionsDisplay || "(none)"}`);
   addLine(bundle, "- Startup session selection: active root only by filename descending; newest session full or truncated, with rendered session artifact capped at 25KB.");
   addLine(bundle, "- Startup task selection: active root only, read task.md only when exactly one zero-byte tasks/current__<task-folder> sentinel points to an active task; never infer a replacement current task.");
-  addLine(bundle, "- Startup exclusions: rule bodies, task specification snapshots, task logs, journals, and case studies.");
+  addLine(bundle, "- Startup exclusions: rule bodies, design specification bodies, task logs, journals, and case studies.");
   addLine(bundle);
   addLine(bundle, "## Protocol References Loaded Or Verified");
   addLine(bundle);
-  if (startupContractCoverage.covered) {
-    addStartupContractReference(bundle, startupContractPath, startupContractCoverage);
-  } else {
-    addArtifact(bundle, "startup-contract.md", startupContractPath, startupContractText);
-  }
+  addArtifact(bundle, "startup-contract.md", startupContractPath, startupContractText);
   addLine(bundle, "## Core Rule Names Noted");
   addLine(bundle);
   addLine(bundle, `Rule index: ${ruleIndexDisplay}.`);
-  addLine(bundle, "Only core rule filenames are included at startup. Use targeted lookup to read any rule body that may be relevant to the current work.");
+  addLine(bundle, "This rule index is level one of the rules: each filename below is a rule in force as stated. When current work correlates to an entry, read the rule body before proceeding; the body is the controlling detail. Non-core rules are lookup-only.");
   addLine(bundle);
   if (coreRuleNames.length === 0) {
     addLine(bundle, "(none)");
@@ -619,6 +860,8 @@ function main() {
   addLine(bundle, "## Recent Sessions Loaded");
   addLine(bundle);
   addLine(bundle, `Budget: ${formatKB(RECENT_SESSION_BUDGET_BYTES)}KB rendered session artifacts; used ${formatKB(sessionBudgetUsed)}KB.`);
+  addLine(bundle, "Session entries are point-in-time project notes. They may or may not be useful, and they may be stale.");
+  addLine(bundle, "If a session entry disagrees with this bundle's task sections or the current-task sentinel, those task sections and sentinel are authoritative.");
   if (sessionBudgetTruncated) {
     addLine(bundle, "Newest session was truncated to fit the recent-session budget.");
   }
@@ -628,6 +871,8 @@ function main() {
     addLine(bundle);
   } else {
     for (const session of sessionReads) {
+      addLine(bundle, `Rendered session age: ${formatAgeSince(session.modified)}`);
+      addLine(bundle);
       addArtifact(bundle, `${session.mode}: ${path.basename(session.path)}`, session.path, session.text);
     }
   }
@@ -648,6 +893,11 @@ function main() {
     const taskFolder = startupTaskRead.replace(/\/task\.md$/, "");
     const taskPath = path.join(activeRoot, "tasks", taskFolder, "task.md");
     addArtifact(bundle, `Startup task: ${startupTaskRead}`, taskPath, startupTaskText);
+    if (agentResolution && agentResolution.agent) {
+      addAgentTaskLogRefresh(bundle, path.dirname(taskPath), agentResolution.agent);
+    } else {
+      addAgentTaskLogRefreshUnavailable(bundle, path.dirname(taskPath), agentResolutionError ? agentResolutionError.message : "agent identity could not be resolved");
+    }
   }
 
   addLine(bundle, "END REFRESH BUNDLE");
@@ -656,8 +906,9 @@ function main() {
   const bundleBytes = utf8ByteCount(bundleText);
   const bundleLineCount = bundleText.split(/\r?\n/).length - 1;
 
-  const tempName = `m-pact-refresh-${Date.now()}-${crypto.randomUUID().replace(/-/g, "")}.md`;
-  const bundlePath = path.join(os.tmpdir(), tempName);
+  const scratchRoot = activeRoot || resolveExisting(userRoot);
+  const pruneResult = pruneScratchDirectory(scratchRoot);
+  const bundlePath = refreshBundlePath(scratchRoot, bundleAgentToken);
   fs.writeFileSync(bundlePath, bundleText, { encoding: "utf8" });
 
   console.log("AUDIT: PASS");
@@ -666,6 +917,9 @@ function main() {
   console.log(`BundleBytes: ${bundleBytes}`);
   console.log(`LineCount: ${bundleLineCount}`);
   console.log(`RecentSessionBudgetKB: ${formatKB(RECENT_SESSION_BUDGET_BYTES)}`);
+  if (pruneResult.failed.length > 0) {
+    console.log(`ScratchPruneWarning: ${pruneResult.failed.join(", ")}`);
+  }
   console.log("BEGIN REFRESH RECEIPT");
   for (const line of receiptLines) {
     console.log(line);
@@ -673,6 +927,9 @@ function main() {
   console.log("END REFRESH RECEIPT");
   if (projectIdentityDisplay.adoptionBlock) {
     console.log(projectIdentityDisplay.adoptionBlock);
+  }
+  if (isMpactHookContext()) {
+    console.log(HOOK_RECEIPT_EMISSION_NOTE);
   }
   console.log("END REFRESH BUNDLE");
 }

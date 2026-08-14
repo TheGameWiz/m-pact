@@ -4,18 +4,35 @@
 const path = require("path");
 const {
   appendMember,
-  hasMembers,
+  listMembers,
+  readMember,
 } = require("./lib/zip-record-store");
-const { withDirectoryLock } = require("./lib/directory-lock");
+const { withRecordMetadata } = require("./lib/container-state");
 const { validateProjectWrite } = require("./lib/project-identity");
+const {
+  activeItemReceipt,
+  enforceActiveItemHandoff,
+  newNonNumericActiveTags,
+  newestTaskLogMember,
+  parseActiveItems,
+} = require("./lib/active-items");
+const {
+  activeNumericItems,
+  listDesignSpecMembers,
+  validateClearedResolvedVersions,
+  versionValidationContext,
+} = require("./lib/design-spec");
 const { buildTaskLogMarkdown } = require("./lib/task-log-markdown");
 const {
-  booleanArg,
+  agentTokenValidator,
+  DEFAULT_UNSUPPORTED_OPERATION_FLAGS,
   localTimestamp,
   memberName,
+  resolveAgentToken,
   resolveTaskPath,
   runCli,
 } = require("./lib/helper-common");
+const { withTaskOperationLock } = require("./lib/task-state");
 
 const ACCEPTED_FLAGS = [
   "root",
@@ -23,40 +40,82 @@ const ACCEPTED_FLAGS = [
   "cross-project",
   "user-root",
   "input",
+  "from-stdin",
   "task",
   "task-path",
   "agent",
   "title",
   "slug-hint",
-  "design-change",
-  "spec-member",
   "no-spec-update-needed-because",
   "director-intent",
   "source-input",
 ];
+const REQUIRED_FLAGS = [];
+const REQUIRED_ONE_OF = [];
+const FLAG_VALUE_VALIDATORS = {
+  agent: agentTokenValidator,
+};
 
-function hasCurrentSpecification(taskPath) {
-  const specZip = path.join(taskPath, "specification.zip");
-  return hasMembers(specZip);
+function designSpecFormat(taskPath) {
+  return listDesignSpecMembers(path.join(taskPath, "specification.zip")).format;
+}
+
+function validateVersionDeclarations({ body, taskPath, logMembers }) {
+  const specState = listDesignSpecMembers(path.join(taskPath, "specification.zip"));
+  if (specState.format !== "new") {
+    return;
+  }
+  const parsed = activeNumericItems(body);
+  const { currentVersions, existingVersions } = versionValidationContext({
+    specMembers: specState.members,
+    logZipPath: path.join(taskPath, "log.zip"),
+    logMembers,
+  });
+  validateClearedResolvedVersions({ currentActive: parsed, currentVersions, existingVersions });
+}
+
+function assertNoRevisionDeclarations(body) {
+  const parsed = parseActiveItems(body, { strict: false });
+  if (!parsed) {
+    return;
+  }
+  const revisionItems = parsed.items
+    .filter((item) => item.declaration && item.declaration.keyword === "REVISION")
+    .map((item) => item.tag);
+  if (revisionItems.length > 0) {
+    throw new Error(`REVISION declarations can only be applied by write-design-spec, because task-log-only writes do not write item members; use write-design-spec to revise item(s): ${revisionItems.join(", ")}`);
+  }
 }
 
 function main({ args, input }) {
   const taskPath = resolveTaskPath(input, args, { allowedStates: ["A"] });
   const rootPath = path.dirname(path.dirname(taskPath));
   const identity = validateProjectWrite({ rootPath, input, args });
-  const agent = args.agent || "agent";
+  const agent = resolveAgentToken(args);
   const title = args.title || args["slug-hint"] || "task-log-entry";
-  const designChange = booleanArg(args, "design-change");
-  const specMember = args["spec-member"];
   const noSpecUpdateReason = args["no-spec-update-needed-because"];
-  return withDirectoryLock(taskPath, () => {
-    if (designChange && hasCurrentSpecification(taskPath) && !specMember && !noSpecUpdateReason) {
-      throw new Error("design-changing log entry requires specMember or noSpecUpdateNeededBecause because this task has a current specification");
+  return withTaskOperationLock(taskPath, () => {
+    const zipPath = path.join(taskPath, "log.zip");
+    const zipOptions = { requireExistingParent: true };
+    const logMembers = listMembers(zipPath, zipOptions).map((member) => withRecordMetadata(member, { recordsExpected: true }));
+    const latest = newestTaskLogMember(logMembers);
+    const latestBody = latest ? readMember(zipPath, latest.name, zipOptions).toString("utf8") : "";
+    const activeSummary = enforceActiveItemHandoff({
+      body: input.body,
+      latestRecord: latest ? latest.record : null,
+      latestBody,
+    });
+    const recordBody = activeSummary && activeSummary.body ? activeSummary.body : input.body;
+    assertNoRevisionDeclarations(recordBody);
+    if (designSpecFormat(taskPath) === "new") {
+      const nonNumeric = newNonNumericActiveTags({ body: recordBody, latestBody });
+      if (nonNumeric.length > 0) {
+        throw new Error(`new-format design specification tasks require numeric active-item tags; new non-numeric tag(s): ${nonNumeric.join(", ")}`);
+      }
+      validateVersionDeclarations({ body: recordBody, taskPath, logMembers });
     }
-
     const now = new Date();
     const timestamp = localTimestamp(now);
-    const zipPath = path.join(taskPath, "log.zip");
     const appended = appendMember(zipPath, ({ record }) => {
       const member = memberName({
         number: record,
@@ -71,15 +130,14 @@ function main({ args, input }) {
         input: {
           agent,
           title,
-          body: input.body,
+          body: recordBody,
           directorIntent: args["director-intent"],
           sourceInput: args["source-input"],
-          specMember,
           noSpecUpdateNeededBecause: noSpecUpdateReason,
         },
       });
       return { member, content };
-    }, now);
+    }, now, zipOptions);
 
     return {
       ok: true,
@@ -92,8 +150,17 @@ function main({ args, input }) {
       record: appended.record,
       member: appended.member,
       timestamp: timestamp.body,
+      activeItems: activeItemReceipt(activeSummary),
     };
   });
 }
 
-runCli(main, { acceptedFlags: ACCEPTED_FLAGS, stringFlags: ["root", "project-id", "user-root", "input", "task", "task-path", "agent", "title", "slug-hint", "spec-member", "no-spec-update-needed-because", "director-intent", "source-input"] });
+runCli(main, {
+  acceptedFlags: ACCEPTED_FLAGS,
+  stringFlags: ["root", "project-id", "user-root", "input", "task", "task-path", "agent", "title", "slug-hint", "no-spec-update-needed-because", "director-intent", "source-input"],
+  requiredFlags: REQUIRED_FLAGS,
+  requiredOneOf: REQUIRED_ONE_OF,
+  flagValueValidators: FLAG_VALUE_VALIDATORS,
+  unsupportedFlags: DEFAULT_UNSUPPORTED_OPERATION_FLAGS,
+  stdinFlags: ["from-stdin"],
+});

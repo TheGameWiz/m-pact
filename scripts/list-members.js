@@ -6,9 +6,11 @@ const {
   resolveContainer,
   withContainerOperationLock,
 } = require("./lib/container-state");
-const { runCli } = require("./lib/helper-common");
+const { DEFAULT_UNSUPPORTED_OPERATION_FLAGS, runCli } = require("./lib/helper-common");
 
 const ACCEPTED_FLAGS = ["root", "task", "task-path", "container"];
+const REQUIRED_FLAGS = ["container"];
+const REQUIRED_ONE_OF = [];
 
 function main({ args }) {
   const context = resolveContainer({}, args, { allowedStates: ["A", "C"] });
@@ -22,4 +24,10 @@ function main({ args }) {
   }));
 }
 
-runCli(main, { acceptedFlags: ACCEPTED_FLAGS, stringFlags: ["root", "task", "task-path", "container"] });
+runCli(main, {
+  acceptedFlags: ACCEPTED_FLAGS,
+  stringFlags: ["root", "task", "task-path", "container"],
+  requiredFlags: REQUIRED_FLAGS,
+  requiredOneOf: REQUIRED_ONE_OF,
+  unsupportedFlags: DEFAULT_UNSUPPORTED_OPERATION_FLAGS,
+});

@@ -7,7 +7,7 @@ Repair is approval-gated when the notice asks a question. Ask the Director the q
 Run:
 
 ```bash
-node scripts/repair-project-identity.js --root <project-or-.AgentMemory-root> --user-root <user-root>
+node <this-skill>/scripts/repair-project-identity.js --root <project-or-.AgentMemory-root> --user-root <user-root>
 ```
 
 Do not pass a project ID into the repair helper. The helper owns sentinel cleanup and ID minting under lock.

@@ -2,8 +2,9 @@
 "use strict";
 
 const path = require("path");
-const { assertKnownFlags, assertMpactAllowedInCurrentSession, assertStringFlagValues, booleanArg, parseArgs } = require("./lib/helper-common");
+const { booleanArg } = require("./lib/helper-common");
 const { installMpactRuntime, removeMpactShims } = require("./lib/install-runtime");
+const { runSetupCli } = require("./lib/setup-cli");
 
 const ACCEPTED_FLAGS = [
   "home",
@@ -11,16 +12,14 @@ const ACCEPTED_FLAGS = [
   "providers",
   "user-root",
   "skip-starter-rules",
-  "remove-shims",
+  "disable",
+  "enable",
 ];
+const REQUIRED_FLAGS = [];
+const REQUIRED_ONE_OF = [];
 
-function fail(message) {
-  process.stderr.write(`ERROR: ${message}\n`);
-  process.exitCode = 1;
-}
-
-function printReceipt(results) {
-  process.stdout.write("OK: install-mpact\n");
+function printReceipt(operation, results) {
+  process.stdout.write(`OK: install-mpact:${operation}\n`);
   for (const line of results) {
     process.stdout.write(`- ${line}\n`);
   }
@@ -28,25 +27,28 @@ function printReceipt(results) {
   process.stdout.write("Activation: already-open provider sessions may need a new session or reload before they see shim changes.\n");
 }
 
-function main() {
-  assertMpactAllowedInCurrentSession();
-  const argv = process.argv.slice(2);
-  assertKnownFlags(argv, ACCEPTED_FLAGS);
-  const args = parseArgs(argv);
-  assertStringFlagValues(args, ["home", "provider", "providers", "user-root"]);
+function main(args) {
   const skillRoot = path.dirname(__dirname);
-  if (booleanArg(args, "remove-shims")) {
+  const disable = booleanArg(args, "disable");
+  const enable = booleanArg(args, "enable");
+  if (disable && enable) {
+    throw new Error("--disable and --enable cannot be used together");
+  }
+  if (disable) {
     const { results } = removeMpactShims({ args, skillRoot });
-    printReceipt(results);
+    printReceipt("disable", results);
+    return;
+  }
+  if (enable) {
+    const { results } = installMpactRuntime({ args, skillRoot });
+    printReceipt("enable", results);
     return;
   }
   const { results } = installMpactRuntime({ args, skillRoot });
-  printReceipt(results);
+  printReceipt("install", results);
 }
 
-try {
-  main();
-} catch (error) {
-  fail(error.message);
-  process.exit(error.exitCode || process.exitCode || 1);
-}
+runSetupCli(main, {
+  acceptedFlags: ACCEPTED_FLAGS,
+  stringFlags: ["home", "provider", "providers", "user-root"],
+});

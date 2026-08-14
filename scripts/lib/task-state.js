@@ -3,6 +3,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { withDirectoryLock } = require("./directory-lock");
 
 const TASK_FOLDER_PATTERN = /^[AC]__p[1234x]-t\d{4}-/;
 
@@ -204,21 +205,51 @@ function setCurrentTask(tasksPath, taskPath) {
   return sentinel;
 }
 
-function updateTaskStatus(taskMdPath, fromStatus, toStatus) {
-  const content = fs.readFileSync(taskMdPath, "utf8");
-  const pattern = new RegExp(`^Status: ${fromStatus}$`, "m");
-  if (!pattern.test(content)) {
-    throw new Error(`task.md does not contain Status: ${fromStatus}`);
-  }
-  fs.writeFileSync(taskMdPath, content.replace(pattern, `Status: ${toStatus}`), "utf8");
-}
-
 function taskNumberFromFolder(folder) {
   const match = /-t(\d{4})-/.exec(folder);
   return match ? `t${match[1]}` : folder;
 }
 
-function transitionTaskState({ taskPath, fromPrefix, toPrefix, fromStatus, toStatus }) {
+function sanitizeTaskSlug(input) {
+  return String(input || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^\x00-\x7f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
+}
+
+function taskFolderName({ state, priority, number, title }) {
+  const prefix = String(state || "A").slice(0, 1);
+  const taskNumber = typeof number === "number"
+    ? `t${String(number).padStart(4, "0")}`
+    : String(number || "").startsWith("t")
+      ? String(number)
+      : `t${String(number).padStart(4, "0")}`;
+  const slug = (sanitizeTaskSlug(title) || "task").slice(0, 72).replace(/-+$/g, "") || "task";
+  return `${prefix}__${priority}-${taskNumber}-${slug}`;
+}
+
+function taskOperationLockPath(taskPath) {
+  return path.join(path.dirname(path.resolve(taskPath)), ".m-pact-task-locks", taskNumberFromFolder(path.basename(taskPath)));
+}
+
+function assertTaskFolderStillExists(taskPath) {
+  const taskMd = path.join(path.resolve(taskPath), "task.md");
+  if (!isFile(taskMd)) {
+    throw new Error(`task folder moved or disappeared during operation; re-resolve the task and retry: ${path.resolve(taskPath)}`);
+  }
+}
+
+function withTaskOperationLock(taskPath, fn) {
+  return withDirectoryLock(taskOperationLockPath(taskPath), () => {
+    assertTaskFolderStillExists(taskPath);
+    return fn();
+  });
+}
+
+function transitionTaskState({ taskPath, fromPrefix, toPrefix }) {
   const folder = path.basename(taskPath);
   const tasksPath = path.dirname(taskPath);
   const newFolder = folder.replace(new RegExp(`^${fromPrefix}__`), `${toPrefix}__`);
@@ -226,7 +257,6 @@ function transitionTaskState({ taskPath, fromPrefix, toPrefix, fromStatus, toSta
   if (fs.existsSync(newPath)) {
     throw new Error(`task transition target already exists: ${newPath}`);
   }
-  updateTaskStatus(path.join(taskPath, "task.md"), fromStatus, toStatus);
   fs.renameSync(taskPath, newPath);
   return {
     oldPath: taskPath,
@@ -234,7 +264,7 @@ function transitionTaskState({ taskPath, fromPrefix, toPrefix, fromStatus, toSta
     oldFolder: folder,
     newFolder,
     task: taskNumberFromFolder(folder),
-    status: toStatus,
+    status: toPrefix === "A" ? "Active" : "Closed",
     tasksPath,
   };
 }
@@ -246,9 +276,11 @@ module.exports = {
   resolveRootPath,
   resolveTaskPath,
   setCurrentTask,
+  taskOperationLockPath,
+  taskFolderName,
   taskStateFromFolder,
   taskNumberFromFolder,
   transitionTaskState,
-  updateTaskStatus,
   validateTaskPath,
+  withTaskOperationLock,
 };
