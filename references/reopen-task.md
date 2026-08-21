@@ -6,6 +6,8 @@ Use `scripts/reopen-task.js`. The helper owns the task state update and current-
 
 For tasks closed by the new close-status path, the reopen receipt surfaces `reopenUnfinished` and `reopenClearedUnresolved`. Reopen does not automatically return those items to `## Active Items`; the first task log after reopen must seed the active list deliberately. This obligation is mirrored in `write-task-log.md`.
 
+When the running provider exposes a transcript/session ID, the helper automatically records it in the task's `Agents.json` after resolving the agent identity. It reads `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`/`CODEX_SESSION_ID`, or `ANTIGRAVITY_CONVERSATION_ID` as appropriate; agents do not pass a provider-session argument.
+
 ## Procedure
 
 1. Call `scripts/reopen-task.js` once with direct helper arguments.

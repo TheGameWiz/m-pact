@@ -47,3 +47,5 @@ Conversation-derived resume state, decisions, caveats, and next steps.
 ```
 
 The helper owns task numbering, folder naming, `task.md`, optional first `log.zip` member, timestamps, project identity validation, and current-task sentinel replacement. Do not calculate task numbers.
+
+When the running provider exposes a transcript/session ID, the helper automatically records it in the new task's `Agents.json` after resolving the agent identity. It reads `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`/`CODEX_SESSION_ID`, or `ANTIGRAVITY_CONVERSATION_ID` as appropriate; agents do not pass a provider-session argument.

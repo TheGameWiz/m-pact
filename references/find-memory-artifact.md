@@ -10,6 +10,8 @@ This reference covers:
 - Case studies in `case-studies.zip`
 - Journals in `journal.zip`
 
+For provider chat, conversation, thread, session, transcript, or raw provider-history questions tied to a task, use `references/list-agent-session-paths.md` first. Do not broad-scan `.codex`, `.claude/projects`, or `.gemini` provider folders until `scripts/list-agent-session-paths.js` has scoped the search to the task's recorded `Agents.json` entries.
+
 ZIP-backed memory is helper-owned per `startup-contract.md`; use the standard helpers:
 
 - `scripts/list-members.js --container <sessions|case-studies|journal|task-log|specification>`

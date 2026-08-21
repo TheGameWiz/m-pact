@@ -21,6 +21,8 @@ node <this-skill>/scripts/write-task-log.js --task t0005 --project-id 7 --agent 
 
 The `--agent` flag is an override for tests, synthetic authors, and source-checkout runs; ordinary installed helpers resolve the running agent automatically. Any agent may write a task log when acting on Director intent; chronology, active items, and handoff review carry coordination.
 
+When the running provider exposes a transcript/session ID, the helper automatically records it in the task's `Agents.json` after resolving the agent identity. It reads `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`/`CODEX_SESSION_ID`, or `ANTIGRAVITY_CONVERSATION_ID` as appropriate; agents do not pass a provider-session argument.
+
 Director-invoked context save is not a task-log write. Use `references/context-save-restore.md` and `scripts/save-context.js` instead.
 
 ## Entry Standard

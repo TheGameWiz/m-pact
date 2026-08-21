@@ -315,9 +315,9 @@ function assertNoHelpProbe(argv) {
 }
 
 const RECEIPT_SCALAR_KEYS = [
-  "record", "member", "timestamp", "task", "status", "projectId", "projectPath", "crossProject", "taskPath", "taskSource", "taskState", "rootPath", "zipPath", "oldPath", "newPath", "sentinel", "rulePath", "memberCount", "query", "readCursor", "unreadCount", "unreadByAuthor", "readFrom", "readThrough", "nextCursor", "truncated", "membersRead", "specMember", "designSpecFormat", "designSpecNotice", "implementationReview", "currentBlob", "itemCount", "unabsorbedCount", "clearedUnresolved", "recordsSinceBlob", "openDependencies", "blobMember", "itemsWritten", "itemsRead", "projectionStatus", "batchStrategy", "closeAbsorption", "closeAbsorptionReason", "closeAbsorptionSpecMembers", "absorbedItems", "closeUnfinished", "closeClearedUnresolved", "reopenUnfinished", "reopenClearedUnresolved", "logMember", "activeRecord", "activeTagged", "activeItems", "orphanedSpecMembers", "repairedSpecMember", "repairRecord", "announcement", "collisionGroups", "taskLogCatalog", "normalized", "warning",
+  "record", "member", "timestamp", "task", "status", "projectId", "projectPath", "crossProject", "taskPath", "taskSource", "taskState", "rootPath", "zipPath", "oldPath", "newPath", "sentinel", "rulePath", "memberCount", "query", "readCursor", "unreadCount", "unreadByAuthor", "readFrom", "readThrough", "nextCursor", "truncated", "membersRead", "specMember", "designSpecFormat", "designSpecNotice", "implementationReview", "currentBlob", "itemCount", "unabsorbedCount", "clearedUnresolved", "recordsSinceBlob", "openDependencies", "blobMember", "itemsWritten", "itemsRead", "projectionStatus", "batchStrategy", "closeAbsorption", "closeAbsorptionReason", "closeAbsorptionSpecMembers", "absorbedItems", "closeUnfinished", "closeClearedUnresolved", "reopenUnfinished", "reopenClearedUnresolved", "logMember", "activeRecord", "activeTagged", "activeItems", "orphanedSpecMembers", "repairedSpecMember", "repairRecord", "announcement", "collisionGroups", "taskLogCatalog", "sessionCount", "resolvedCount", "unresolvedCount", "normalized", "warning",
 ];
-const RECEIPT_STRUCTURED_KEYS = new Set(["ok", "operation", "exitCode", "members", "matches", "content", "activeItemList"]);
+const RECEIPT_STRUCTURED_KEYS = new Set(["ok", "operation", "exitCode", "members", "matches", "agentSessionPaths", "unresolvedAgentSessions", "content", "activeItemList"]);
 
 function assertRegisteredReceiptKeys(value) {
   const registered = new Set([...RECEIPT_SCALAR_KEYS, ...RECEIPT_STRUCTURED_KEYS]);
@@ -353,6 +353,18 @@ function writeReceipt(value) {
       const record = match.record === undefined || match.record === null ? "" : ` record=${match.record}`;
       const score = match.score === undefined ? "" : ` score=${match.score}`;
       lines.push(`- ${match.name || match.member} size=${match.size}${record}${score} modified=${match.modified}`);
+    }
+  }
+  if (Array.isArray(value.agentSessionPaths)) {
+    lines.push("agentSessionPaths:");
+    for (const entry of value.agentSessionPaths) {
+      lines.push(`- provider=${entry.provider} agent=${entry.agent} id=${entry.id} path=${entry.path} modified=${entry.modified} sizeBytes=${entry.sizeBytes}`);
+    }
+  }
+  if (Array.isArray(value.unresolvedAgentSessions)) {
+    lines.push("unresolvedAgentSessions:");
+    for (const entry of value.unresolvedAgentSessions) {
+      lines.push(`- provider=${entry.provider} agent=${entry.agent} id=${entry.id}`);
     }
   }
   if (value.content !== undefined) {

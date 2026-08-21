@@ -27,6 +27,8 @@ Structured `--input` sections follow `helper-write-conventions.md`; `## Log` is 
 
 `revise-task` validates the paired log body before mutating `task.md`. If mutation succeeds but the later ZIP append fails, it does not roll back: a retry converges because the preserved input re-applies the same idempotent task fields and `--task <number>` still resolves after a folder rename.
 
+When the running provider exposes a transcript/session ID, the helper automatically records it in the task's `Agents.json` after resolving the agent identity. It reads `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`/`CODEX_SESSION_ID`, or `ANTIGRAVITY_CONVERSATION_ID` as appropriate; agents do not pass a provider-session argument.
+
 Example:
 
 ```bash

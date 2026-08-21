@@ -33,6 +33,7 @@ const {
   runCli,
 } = require("./lib/helper-common");
 const { withTaskOperationLock } = require("./lib/task-state");
+const { recordCurrentAgentSession } = require("./lib/agents-store");
 
 const ACCEPTED_FLAGS = [
   "root",
@@ -139,6 +140,7 @@ function main({ args, input }) {
       return { member, content };
     }, now, zipOptions);
 
+    recordCurrentAgentSession(taskPath, agent);
     return {
       ok: true,
       operation: "write-task-log",

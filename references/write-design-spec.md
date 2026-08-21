@@ -61,6 +61,8 @@ Legacy snapshot-format containers remain readable, but have no write path. If a 
 
 Any agent may write a design specification update when acting on Director intent. Design item births and revisions require Director approval; helper output records author identity rather than enforcing task seats.
 
+When the running provider exposes a transcript/session ID, the helper automatically records it in the task's `Agents.json` after resolving the agent identity. It reads `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`/`CODEX_SESSION_ID`, or `ANTIGRAVITY_CONVERSATION_ID` as appropriate; agents do not pass a provider-session argument.
+
 Example:
 
 ```bash

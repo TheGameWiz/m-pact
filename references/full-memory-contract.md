@@ -29,12 +29,13 @@ Memory roots use this standard layout:
     current__<active-task-folder>
     A__p*-t####-*/
       task.md
+      Agents.json
       specification.md
       specification.zip
       log.zip
 ```
 
-The layout above is the possible shape after use, not bootstrap output. Artifact folders and ZIP containers are lazy; missing categories mean empty categories unless a helper reports corruption. `.tmp/` is helper-owned scratch for command-only body delivery and refresh bundles, not memory history. Task folders start with `task.md`; task ZIP containers and the `specification.md` mirror appear later on demand. The current task pointer is an optional zero-byte sentinel named `current__<active-task-folder>` directly under `tasks/`; absence of `tasks/` or of the sentinel means no current task. `.m-pact-task-locks/` is helper-owned internal lock state keyed by stable task number, outside mutable task folders.
+The layout above is the possible shape after use, not bootstrap output. Artifact folders and ZIP containers are lazy; missing categories mean empty categories unless a helper reports corruption. `.tmp/` is helper-owned scratch for command-only body delivery and refresh bundles, not memory history. Task folders start with `task.md`; task ZIP containers, `Agents.json`, and the `specification.md` mirror appear later on demand. The current task pointer is an optional zero-byte sentinel named `current__<active-task-folder>` directly under `tasks/`; absence of `tasks/` or of the sentinel means no current task. `.m-pact-task-locks/` is helper-owned internal lock state keyed by stable task number, outside mutable task folders.
 
 The user root is required and canonically named `.AgentMemoryRoot/`. Project roots are canonically named `.AgentMemory/`.
 
@@ -43,6 +44,8 @@ Project identity is helper-owned. The user root has exactly one zero-byte `proje
 There is no separate index file. Filenames are the index; sorted directory listings are the table of contents.
 
 ZIP containers are helper-owned black boxes; the rule, the helper list, and the rationale are owned by `references/startup-contract.md`.
+
+Task-local `Agents.json` is helper-owned provider transcript provenance, not a ZIP container and not narrative memory. It stores `{ "version": 1, "sessions": [...] }`, where each session entry has `provider`, `agent`, and opaque provider transcript lookup `id`. Entries are append-only in first-observed order and unique by `(provider, id)`; there are no first-seen, last-seen, or count fields. Missing `Agents.json` means zero recorded provider sessions. The six task mutation helpers (`create-task`, `write-task-log`, `write-design-spec`, `revise-task`, `close-task`, `reopen-task`) automatically record the current provider ID when their existing agent resolution identifies `claude`, `codex`, or `antigravity` and the matching provider environment variable is present: `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID` with `CODEX_SESSION_ID` fallback, or `ANTIGRAVITY_CONVERSATION_ID`. Agents do not pass a provider-session argument. `sessions.zip` remains project-wide narrative continuity; `Agents.json` is only a task-local trailhead for provider-maintained raw transcripts.
 
 ## 3. Roles
 
@@ -165,6 +168,7 @@ Operation summaries (read the owner before acting):
 - Review independence: owned by `references/take-task-handoff.md`; roles are retired descriptive metadata and helpers do not gate writes on seats.
 - Design specification writes: Director-instructed; owner `references/write-design-spec.md`; writes `specification.zip` members plus a paired log, mirrored in `specification.md`; likeliest mistake: treating the mirror as a second source of truth or rerunning after a partial write without reading the projection status rules.
 - Task log writes: owner `references/write-task-log.md`, which also owns active-item and Cleared/Resolved grammar; appends one `log.zip` record; likeliest mistakes: assigning record numbers manually or treating another agent's records as your own; never modify another agent's entry.
+- Provider transcript path lookup: owner `references/list-agent-session-paths.md`; reads a task's `Agents.json` and resolves recorded IDs to provider transcript JSONL paths and stat metadata without reading transcript bodies; likeliest mistake: broad-scanning provider transcript roots before using the task-local ledger.
 - Taking a handoff: a read/analyze/report operation that authorizes no mutation; owner `references/take-task-handoff.md`, including the `prepare-handoff.js` receipt fields and the evaluation standard (claims to test, not material to summarize; no summary-only responses); likeliest mistake: treating "take this handoff" as permission to implement.
 - Set current task: explicit pointer replacement; owner `references/set-current-task.md`; replaces the `current__*` sentinel; likeliest mistake: inferring a replacement current task; never infer one, and log or spec writes must not move the sentinel.
 - Close and reopen: Director-only; owners `references/close-task.md` and `references/reopen-task.md`; rename the folder prefix; likeliest mistake: closing or reopening on agent judgment, or assuming reopen restores the pre-close active-item list; it does not.

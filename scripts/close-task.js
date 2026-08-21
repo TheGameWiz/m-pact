@@ -31,12 +31,15 @@ const {
 const { buildTaskLogMarkdown } = require("./lib/task-log-markdown");
 const { formatCloseStatusSection } = require("./lib/close-status");
 const {
+  agentTokenValidator,
   localTimestamp,
   memberName,
+  resolveAgentToken,
   resolveTaskPath,
   runCli,
 } = require("./lib/helper-common");
 const { transitionTaskState, withTaskOperationLock } = require("./lib/task-state");
+const { recordCurrentAgentSession } = require("./lib/agents-store");
 
 const ACCEPTED_FLAGS = [
   "root",
@@ -45,9 +48,13 @@ const ACCEPTED_FLAGS = [
   "user-root",
   "task",
   "task-path",
+  "agent",
 ];
 const REQUIRED_FLAGS = [];
 const REQUIRED_ONE_OF = [];
+const FLAG_VALUE_VALIDATORS = {
+  agent: agentTokenValidator,
+};
 
 function removeCurrentSentinel(tasksPath, folder) {
   const fs = require("fs");
@@ -302,6 +309,7 @@ function main({ args, input }) {
   const taskPath = resolveTaskPath(input, args, { allowedStates: ["A"] });
   const rootPath = path.dirname(path.dirname(taskPath));
   const identity = validateProjectWrite({ rootPath, input, args });
+  const agent = resolveAgentToken(args);
   const folder = path.basename(taskPath);
   const tasksPath = path.dirname(taskPath);
   return withDirectoryLock(tasksPath, () => withTaskOperationLock(taskPath, () => {
@@ -312,6 +320,7 @@ function main({ args, input }) {
         toPrefix: "C",
       });
       removeCurrentSentinel(tasksPath, folder);
+      recordCurrentAgentSession(transition.newPath, agent);
       return {
       ok: true,
       operation: "close-task",
@@ -334,7 +343,8 @@ function main({ args, input }) {
 
 runCli(main, {
   acceptedFlags: ACCEPTED_FLAGS,
-  stringFlags: ["root", "project-id", "user-root", "task", "task-path"],
+  stringFlags: ["root", "project-id", "user-root", "task", "task-path", "agent"],
   requiredFlags: REQUIRED_FLAGS,
   requiredOneOf: REQUIRED_ONE_OF,
+  flagValueValidators: FLAG_VALUE_VALIDATORS,
 });

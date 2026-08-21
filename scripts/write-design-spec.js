@@ -47,6 +47,7 @@ const {
   runCli,
 } = require("./lib/helper-common");
 const { withTaskOperationLock } = require("./lib/task-state");
+const { recordCurrentAgentSession } = require("./lib/agents-store");
 
 const ACCEPTED_FLAGS = [
   "root",
@@ -460,6 +461,7 @@ function main({ args, input }) {
       ...logMembers,
       withRecordMetadata({ name: logAppend.member }, { recordsExpected: true }),
     ];
+    recordCurrentAgentSession(taskPath, agent);
     return {
       ok: projectionError ? false : true,
       exitCode: projectionError ? 1 : undefined,

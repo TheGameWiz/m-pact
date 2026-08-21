@@ -11,11 +11,14 @@ const {
 const { withRecordMetadata } = require("./lib/container-state");
 const { newestTaskLogMember } = require("./lib/active-items");
 const {
+  agentTokenValidator,
+  resolveAgentToken,
   resolveTaskPath,
   runCli,
 } = require("./lib/helper-common");
 const { parseCloseStatus } = require("./lib/close-status");
 const { setCurrentTask, transitionTaskState, withTaskOperationLock } = require("./lib/task-state");
+const { recordCurrentAgentSession } = require("./lib/agents-store");
 
 const ACCEPTED_FLAGS = [
   "root",
@@ -24,9 +27,13 @@ const ACCEPTED_FLAGS = [
   "user-root",
   "task",
   "task-path",
+  "agent",
 ];
 const REQUIRED_FLAGS = [];
 const REQUIRED_ONE_OF = [];
+const FLAG_VALUE_VALIDATORS = {
+  agent: agentTokenValidator,
+};
 
 function latestCloseStatus(taskPath) {
   const logZipPath = path.join(taskPath, "log.zip");
@@ -42,6 +49,7 @@ function main({ args, input }) {
   const taskPath = resolveTaskPath(input, args, { allowedStates: ["C"] });
   const rootPath = path.dirname(path.dirname(taskPath));
   const identity = validateProjectWrite({ rootPath, input, args });
+  const agent = resolveAgentToken(args);
   const tasksPath = path.dirname(taskPath);
   return withDirectoryLock(tasksPath, () => withTaskOperationLock(taskPath, () => {
     const closeStatus = latestCloseStatus(taskPath);
@@ -51,6 +59,7 @@ function main({ args, input }) {
       toPrefix: "A",
     });
     const sentinel = setCurrentTask(tasksPath, transition.newPath);
+    recordCurrentAgentSession(transition.newPath, agent);
     return {
       ok: true,
       operation: "reopen-task",
@@ -71,7 +80,8 @@ function main({ args, input }) {
 
 runCli(main, {
   acceptedFlags: ACCEPTED_FLAGS,
-  stringFlags: ["root", "project-id", "user-root", "task", "task-path"],
+  stringFlags: ["root", "project-id", "user-root", "task", "task-path", "agent"],
   requiredFlags: REQUIRED_FLAGS,
   requiredOneOf: REQUIRED_ONE_OF,
+  flagValueValidators: FLAG_VALUE_VALIDATORS,
 });

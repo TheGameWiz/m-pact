@@ -38,6 +38,7 @@ const {
   summarizeNormalization,
 } = require("./lib/task-markdown");
 const { setCurrentTask, taskFolderName, taskNumberFromFolder, withTaskOperationLock } = require("./lib/task-state");
+const { recordCurrentAgentSession } = require("./lib/agents-store");
 
 const VALID_PRIORITIES = new Set(["p1", "p2", "p3", "p4", "px"]);
 const ACCEPTED_FLAGS = [
@@ -211,6 +212,7 @@ function main({ args, input }) {
       return { member, content };
     }, now, { requireExistingParent: true });
 
+    recordCurrentAgentSession(newPath, agent);
     return {
       ok: true,
       operation: "revise-task",

@@ -26,6 +26,7 @@ const {
   runCli,
 } = require("./lib/helper-common");
 const { setCurrentTask: replaceCurrentTask, taskFolderName } = require("./lib/task-state");
+const { recordCurrentAgentSession } = require("./lib/agents-store");
 
 const VALID_PRIORITIES = new Set(["p1", "p2", "p3", "p4", "px"]);
 const ACCEPTED_FLAGS = [
@@ -144,6 +145,7 @@ function main({ args, input }) {
       appendGeneratedMember(path.join(taskPath, "log.zip"), member, logContent, now);
     }
 
+    recordCurrentAgentSession(taskPath, agent);
     const sentinel = booleanArg(args, "no-current") ? null : replaceCurrentTask(tasksPath, taskPath);
     return {
       ok: true,
