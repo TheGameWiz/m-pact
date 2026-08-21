@@ -4,12 +4,25 @@
 const fs = require("fs");
 const path = require("path");
 const { withDirectoryLock } = require("./lib/directory-lock");
-const { booleanArg, resolveRootPath, runCli } = require("./lib/helper-common");
+const {
+  agentTokenValidator,
+  booleanArg,
+  resolveAgentToken,
+  resolveRootPath,
+  runCli,
+} = require("./lib/helper-common");
 const { validateProjectWrite } = require("./lib/project-identity");
 const { listMembers } = require("./lib/zip-record-store");
 const { withRecordMetadata } = require("./lib/container-state");
 const { formatTaskLogCatalogReceipt } = require("./lib/task-log-catalog");
-const { clearCurrentSentinels, setCurrentTask, taskNumberFromFolder, validateTaskPath } = require("./lib/task-state");
+const {
+  clearCurrentSentinels,
+  setCurrentTask,
+  taskNumberFromFolder,
+  validateTaskPath,
+  withTaskOperationLock,
+} = require("./lib/task-state");
+const { recordCurrentAgentSession } = require("./lib/agents-store");
 
 const ACCEPTED_FLAGS = [
   "root",
@@ -19,9 +32,13 @@ const ACCEPTED_FLAGS = [
   "task",
   "task-path",
   "clear",
+  "agent",
 ];
 const REQUIRED_FLAGS = [];
 const REQUIRED_ONE_OF = [["task", "task-path", "clear"]];
+const FLAG_VALUE_VALIDATORS = {
+  agent: agentTokenValidator,
+};
 
 function resolveTaskFolder(rootPath, args, input) {
   const value = args.task || args["task-path"];
@@ -70,8 +87,10 @@ function main({ args, input }) {
     });
   }
   const { tasksPath, taskPath, folder } = resolveTaskFolder(rootPath, args, input);
-  return withDirectoryLock(tasksPath, () => {
+  const agent = resolveAgentToken(args);
+  return withDirectoryLock(tasksPath, () => withTaskOperationLock(taskPath, () => {
     const sentinel = setCurrentTask(tasksPath, taskPath);
+    recordCurrentAgentSession(taskPath, agent);
     const logMembers = listMembers(path.join(taskPath, "log.zip"), { requireExistingParent: true })
       .map((member) => withRecordMetadata(member, { recordsExpected: true }));
     return {
@@ -85,12 +104,13 @@ function main({ args, input }) {
       sentinel,
       taskLogCatalog: formatTaskLogCatalogReceipt(logMembers, { taskId: taskNumberFromFolder(folder) }),
     };
-  });
+  }));
 }
 
 runCli(main, {
   acceptedFlags: ACCEPTED_FLAGS,
-  stringFlags: ["root", "project-id", "user-root", "task", "task-path"],
+  stringFlags: ["root", "project-id", "user-root", "task", "task-path", "agent"],
   requiredFlags: REQUIRED_FLAGS,
   requiredOneOf: REQUIRED_ONE_OF,
+  flagValueValidators: FLAG_VALUE_VALIDATORS,
 });

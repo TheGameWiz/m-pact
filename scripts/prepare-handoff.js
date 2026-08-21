@@ -34,6 +34,7 @@ const {
   formatOrphanedSpecMembers,
   orphanedSpecificationMembers,
 } = require("./lib/orphaned-companions");
+const { recordCurrentAgentSession } = require("./lib/agents-store");
 
 const ACCEPTED_FLAGS = ["root", "task", "task-path", "agent"];
 const REQUIRED_FLAGS = [];
@@ -167,6 +168,10 @@ function main({ args }) {
   const agent = resolveAgentToken(args);
 
   return withContainerOperationLock(logContext, () => {
+    const state = taskState(taskPath);
+    if (state === "open") {
+      recordCurrentAgentSession(taskPath, agent);
+    }
     const specMembers = listContainerMembers(specContext);
     const logMembers = listContainerMembers(logContext);
     const specState = listDesignSpecMembers(specContext.zipPath);
@@ -189,7 +194,7 @@ function main({ args }) {
       task: path.basename(taskPath),
       taskPath,
       taskSource: taskSource(args),
-      taskState: taskState(taskPath),
+      taskState: state,
       readCursor: position.readCursor,
       unreadCount: position.unread.length,
       unreadByAuthor: position.unreadByAuthor,

@@ -10,6 +10,8 @@ Do not use this merely because a task log, summary, or specification was written
 2. Call `scripts/set-current-task.js` once with direct helper arguments.
 3. Reply briefly, e.g. `Current task is t0005.`
 
+When selecting a task, the helper automatically records the running provider transcript/session ID in that task's `Agents.json` after resolving the agent identity. It reads `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`/`CODEX_SESSION_ID`, or `ANTIGRAVITY_CONVERSATION_ID` as appropriate; agents do not pass a provider-session argument. The `--clear` path does not record because no task is selected. Pass `--agent <token>` only for synthetic callers, tests, source-checkout runs, or unrecognized local runtimes where automatic identity is unavailable.
+
 Example:
 
 ```bash

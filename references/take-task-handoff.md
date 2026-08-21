@@ -61,6 +61,8 @@ State the resolution in one sentence and proceed. When the answer is that there 
 
 `scripts/prepare-handoff.js` makes the task source and task state explicit. It names whether the task came from the current-task sentinel or an explicit flag, and it states open or closed in words rather than leaving that encoded only in the folder prefix.
 
+When the resolved task is open, `prepare-handoff.js` automatically records the running provider transcript/session ID in that task's `Agents.json` after resolving the agent identity. It reads `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`/`CODEX_SESSION_ID`, or `ANTIGRAVITY_CONVERSATION_ID` as appropriate; agents do not pass a provider-session argument. Closed-task lookups do not record because they are triage rather than work in progress.
+
 The helper reports only one state-derived implementation-review blocker: when a design specification has items and none are cleared, no implementation has been reported and implementation review is unavailable. It does not claim to resolve direction, because a request and a delivery can occupy the same task state.
 
 A task with no design specification is a different case. The receipt says there is no design specification in its own words, and the receiver says so and stops unless the task logs name a different explicit review target.
