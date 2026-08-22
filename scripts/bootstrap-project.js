@@ -12,6 +12,7 @@ const {
   initializeProjectIdentity,
   validateProjectMemorySetupLocation,
 } = require("./lib/project-identity");
+const { maintainProjectRegistry } = require("./lib/project-registry");
 const { ensureScratchDirectory } = require("./lib/scratch");
 const { runSetupCli } = require("./lib/setup-cli");
 
@@ -74,7 +75,9 @@ function main(args) {
   ensureScratchDirectory(projectMemory);
   results.push("created-or-present:.AgentMemory/.tmp");
   const identity = initializeProjectIdentity(projectMemory, userRoot);
+  maintainProjectRegistry(userRoot, identity);
   results.push(`${identity.adopted ? "created" : "preserved"}:project:${identity.projectId}:${identity.sentinel}`);
+  results.push("updated:projects.json");
   results.push("project-shims:not-supported");
   printReceipt("bootstrap-project", path.join(projectRoot, ".AgentMemory"), results);
 }
