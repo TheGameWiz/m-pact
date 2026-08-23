@@ -49,6 +49,7 @@ Read only the reference needed for the current operation:
 - Uninstall M-PACT runtime setup: `references/uninstall-mpact.md`
 - Find, list, or read memory artifacts: `references/find-memory-artifact.md`
 - Find provider chat, conversation, thread, session, transcript, or task-associated chat history paths: `references/list-agent-session-paths.md`
+- Recall something discussed in a prior conversation, at task, project, or global scope: `references/search-agent-sessions.md`
 - Memory root policy and scoped write decisions: `references/memory-root-policy.md`
 - Startup contract: `references/startup-contract.md`
 - Full operating protocol: `references/full-memory-contract.md`
