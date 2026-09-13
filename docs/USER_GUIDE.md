@@ -574,17 +574,16 @@ Use handoffs when one agent or session needs to understand current task state be
 
 Ask the receiving agent to use an anchored receiving form such as `Take Handoff, Review Design` when you want it to understand the task before acting. The agent should read the task, current spec, and the needed ordered log span, then report state, risks, assumptions, and recommended next steps. Ask it to implement, edit, or log separately if you want it to continue beyond analysis.
 
-You can also use a handoff phrase to create the handoff task from the current conversation:
+You can also use an explicit task-creation phrase to create the handoff task from the current conversation:
 
 ```text
-Handoff.
-Handoff to Claude.
-Hand this off.
+Make this a task.
+Create a task from this conversation.
 ```
 
-In that case, the current agent should create a normal task from the conversation, make it current, and write the first log entry as the compressed handoff state. Naming an agent is optional. If you name the same agent you are already using, the request still makes sense: it creates a durable context-switch point.
+In that case, the current agent should create a normal task from the conversation, make it current, and write the first log entry as the compressed handoff state.
 
-Standalone `handoff` means create a new task from the live conversation. It should not append to an older task just because a `tasks/current__*` sentinel still points there from earlier work. To write a handoff for an existing task instead, say that explicitly:
+Standalone handoff phrases such as `handoff`, `hand this off`, or `handoff to Claude` naming no existing task ask before creating a new task from the live conversation: "Do you want me to create a new task from this conversation?" If you say yes, the agent creates it; if no, it continues the conversation and writes nothing. It should not append to an older task just because a `tasks/current__*` sentinel still points there from earlier work. To write a handoff for an existing task instead, say that explicitly:
 
 ```text
 Write a handoff for the current task.

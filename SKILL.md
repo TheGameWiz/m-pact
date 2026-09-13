@@ -55,6 +55,7 @@ Read only the reference needed for the current operation:
 - Full operating protocol: `references/full-memory-contract.md`
 - Write a session entry: `references/write-session-entry.md`
 - Write a case study: `references/write-case-study.md`
+- Render browser help for `M-PACT help`, `M-PACT quick reference`, `M-PACT reference guide`, or `M-PACT guide`: `scripts/help.js`
 - Create a task: `references/create-task.md`
 - Revise a task definition: `references/revise-task.md`
 - Take or resume a task handoff: `references/take-task-handoff.md`

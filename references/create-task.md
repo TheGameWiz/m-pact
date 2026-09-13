@@ -1,12 +1,14 @@
 # Create Task
 
-Use only after explicit Director instruction to create a task, or for standalone "handoff" / "make this a task" requests that preserve the live discussion as a new durable task.
+Use only after explicit Director instruction to create a task, or for confirmed standalone handoff / explicit "make this a task" requests that preserve the live discussion as a new durable task.
 
 ## Target
 
 Default target is the active project root. `tasks/` is lazy and is created by the helper when needed.
 
-Treat standalone "handoff" as new task creation even when another task is current. The full handoff-phrase disambiguation lives in `take-task-handoff.md`.
+Standalone handoff phrases such as "handoff," "hand this off," or "handoff to <agent>" naming no existing task are confirmation-gated even when another task is current. Ask one short question before creating: "Do you want me to create a new task from this conversation?" If the Director says yes, create the task. If the Director says no, continue the conversation and write nothing. The full handoff-phrase disambiguation lives in `take-task-handoff.md`.
+
+Explicit task-creation phrases such as "make this a task" or "create a task from this conversation" do not need this extra confirmation; the task-creation intent is already clear.
 
 ## Procedure
 

@@ -2,7 +2,7 @@
 
 Use for existing-task handoff handling.
 
-The `Take Handoff, ...` receiving forms below are existing-task read operations. Standalone "handoff," "hand this off," "handoff to <agent>," "make this a task," or similar creates a new task from the live conversation under `create-task.md`, even when another task is current. Append to an existing task only when the Director names that task or says "handoff this/current task."
+The `Take Handoff, ...` receiving forms below are existing-task read operations. Standalone handoff phrases such as "handoff," "hand this off," or "handoff to <agent>" naming no existing task ask one short confirmation before creating a new task from the live conversation under `create-task.md`, even when another task is current. If the Director says yes, create the task; if no, continue the conversation and write nothing. Explicit task-creation phrases such as "make this a task" or "create a task from this conversation" create directly. Append to an existing task only when the Director names that task or says "handoff this/current task."
 
 Taking a handoff is a read/analyze/evaluate/report operation.
 
@@ -14,18 +14,26 @@ Default endpoint: provide an opinionated evaluation, not just a summary, unless 
 
 This section owns the handoff invocation vocabulary. The sets below are a guaranteed minimum, not an exhaustive command reference. An unlisted verb resolves by the direction it names rather than by string matching the table.
 
+`<Kind>` means `Design` or `Implementation`. `Design` means the design, plan, requirements, specification, or intended approach. `Implementation` means everything the design asked to be built: executable code, shipped reference prose that instructs agent behavior, tests, and helper output contracts. It does not mean only `scripts/`.
+
 | Direction | Anchored forms | Resolution |
 | --- | --- | --- |
-| Giving handoff | `Handoff, Request Design Review`; `Handoff, Request Implementation Review`; `Handoff, Review Results`; `Handoff, Request Review` | The leading verb is optional. `Write`, `Save`, `Create`, and `Store` also resolve as giving, as does omitting the verb. In this column only, `Request` marks an ask and its absence marks a delivery. |
-| Receiving handoff | `Take Handoff, Review Design`; `Take Handoff, Review Implementation`; `Take Handoff, Evaluate Review`; `Take Handoff, Implement`; `Take Handoff, Review` | The verb is required. `Take` is canonical; `Receive` and `Get` also resolve as receiving. |
+| Giving handoff | `Handoff, Request <Kind> Review`; `Handoff, <Kind> Review`; `Handoff for <Kind> Review`; `Handoff, <Kind> Review Results`; `Handoff, Review Results`; `Handoff, Request Review`; `Handoff, Implement`; `Handoff, Implement Fixes`; `Handoff, Discuss` | The leading verb is optional. `Write`, `Save`, `Create`, and `Store` also resolve as giving, as does omitting the verb. Giving writes a record for the next agent. |
+| Receiving handoff | `Take Handoff, Review <Kind>`; `Take Handoff, <Kind> Review`; `Take Handoff for <Kind> Review`; `Take Handoff, <Kind> Review Results`; `Take Handoff, Review Results`; `Take Handoff, Evaluate Review`; `Take Handoff, Implement`; `Take Handoff, Implement Fixes`; `Take Handoff, Discuss`; `Take Handoff, Review` | The verb is required. `Take` is canonical; `Receive` and `Get` also resolve as receiving. Receiving reads the record and performs, evaluates, implements, or discusses the named work. |
 
 The asymmetry is semantic: a handoff is the act of giving, so the bare word already names the giving side. Every receiving phrase is an instruction to act and is therefore an ask in the ordinary sense; `Request` carries no direction signal there.
 
-`Handoff, Request Review` and `Take Handoff, Review` are resolved forms, not fixed-kind forms. They name no review kind and are settled by the review-purpose ladder below. Resolving bare `Review` is safe because it is underspecified rather than ambiguous: it can only mean less than the Director intended, not the opposite. By contrast, the retired `Review for Implementation` could flip direction or purpose. Use `Handoff, Request Implementation Review` when asking another agent to review implemented work, and use `Take Handoff, Implement` when instructing the receiving agent to implement.
+In compact review forms, the leading handoff verb carries direction and `Results` carries request versus delivery. No `Results` means a request to perform the named review: `Write Handoff, Design Review` and `Handoff, Design Review` resolve as `Handoff, Request Design Review`. `Results` means delivery or evaluation of review results: `Write Handoff, Design Review Results` delivers design-review results, and `Take Handoff, Design Review Results` evaluates them. `Write Handoff for Design Review` is the natural-language equivalent of `Write Handoff, Design Review`; it is safe because it has no `Results`.
 
-A phrase mixing a receiving verb with a giving-side object, such as `Get Handoff, Review Results`, is outside the guaranteed set. Ask for clarification rather than inventing a precedence rule for a combination the Director does not use.
+`Handoff, Request Review`, `Take Handoff, Review`, and `Take Handoff, Review Results` are resolved forms, not fixed-kind forms. They name no review kind and are settled by the review-purpose ladder below. Resolving bare `Review` is safe because it is underspecified rather than ambiguous: it can only mean less than the Director intended, not the opposite. By contrast, the retired `Review for Implementation` could flip direction or purpose. Use `Handoff, Request Implementation Review` or compact `Handoff, Implementation Review` when asking another agent to review implemented work. Use `Handoff, Implement` or `Take Handoff, Implement` when instructing an agent to implement.
 
-Implementation means everything the design asked to be built: executable code, shipped reference prose that instructs agent behavior, tests, and helper output contracts. It does not mean only `scripts/`.
+A phrase mixing a receiving verb with a giving-side request object, such as `Get Handoff, Request Design Review`, is outside the guaranteed set. Ask for clarification rather than inventing a precedence rule for a combination the Director does not use.
+
+`Handoff, Implement` writes a handoff asking the next agent to implement the active approved design items. `Handoff, Implement Fixes` means the same implementation request when the active items are review-driven or fix-shaped; it is accepted phrasing, not a separate operation. On the receiving side, `Take Handoff, Implement Fixes` is likewise accepted phrasing for `Take Handoff, Implement` in a fix-shaped context and has no precondition on a prior `Fold in Results`.
+
+`Handoff, Discuss` writes a handoff asking the next agent to take the handoff and discuss with the Director. `Take Handoff, Discuss` reads the handoff and enters discussion mode: analysis, questions, tradeoff discussion, and recommendations only. `Discuss` does not authorize code edits, design/specification/log writes, task-state changes, or other durable mutation. An optional topic may follow either form as ordinary prose; it is not a structured argument.
+
+`Take Handoff, Fold in Results` folds review findings into design/specification/log state as design-item state: accept, revise, reject, or record each finding under the existing item-approval rules in `write-task-log.md` and `write-design-spec.md`. It never implies or performs code mutation, regardless of whether the review was of design or implementation. The phrase authorizes design/specification/log updates needed to incorporate review findings into already-approved task scope; a finding that introduces new scope still needs Director approval under the ordinary design-item rule. Any resulting code work is a separate Director-authorized implementation handoff.
 
 ## Task Resolution
 
@@ -48,7 +56,7 @@ A writer resolving `Handoff, Request Review` uses this ladder:
 
 After compaction or saved-context restore, the writer must not reconstruct the just-completed kind from likelihood when that reasoning was dropped. It falls through to impossibility or asks.
 
-A receiver resolving `Take Handoff, Review` uses this ladder:
+A receiver resolving `Take Handoff, Review` or kind-less `Take Handoff, Review Results` uses this ladder:
 
 1. An explicitly named kind wins.
 2. Otherwise use the declaration in the handoff being taken.
@@ -104,7 +112,7 @@ When the Director has authorized implementation, collapse the work into as few s
 
 ## Conversation-Created Handoffs
 
-Some tasks are created directly from a live conversation via the standalone-handoff phrases above. Treat these as ordinary tasks. The named handoff agent may be the same agent that created the task; this still means the Director wanted a durable context-switch point. The first log entry is expected to contain the compressed conversation state needed to resume: decisions, open questions, current reasoning, alternatives considered, and recommended next move.
+Some tasks are created directly from a live conversation via the task-creation phrases above, including a standalone handoff phrase after Director confirmation. Treat these as ordinary tasks. The named handoff agent may be the same agent that created the task; this still means the Director wanted a durable context-switch point. The first log entry is expected to contain the compressed conversation state needed to resume: decisions, open questions, current reasoning, alternatives considered, and recommended next move.
 
 When taking this kind of handoff, read `task.md` and the initial handoff log before deciding whether more log history is needed. Do not require a separate session entry; sessions are optional broader continuity records, not the canonical task state.
 

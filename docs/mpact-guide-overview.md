@@ -16,6 +16,11 @@ session, whether that's a new tab, a cleared context, or switching to a differen
 And when a quick summary doesn't have the detail you need, you can search back through the actual
 conversation to find it.
 
+**Save context whenever you want, and it restores automatically** - Compaction eats the
+conversation, not just the record. Everything you talked through, the options you ruled out and
+why, is gone the moment the context resets. Ask once and it's saved to disk, and the next session
+picks up where you left off automatically.
+
 **Work organized as tasks, each with its own blueprint** - A project breaks down into tasks, and
 each task carries its own design spec alongside the implementation, so agents build against
 something you've already agreed on rather than improvising as they go.
