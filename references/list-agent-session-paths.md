@@ -40,4 +40,4 @@ Antigravity path resolution is best-effort against known roots under `~/.gemini/
 
 ## Non-Goals
 
-This helper is not semantic search, not a transcript parser, not a provider archive crawler, and not a replacement for `sessions.zip`. It exists to hand the agent a task-scoped list of raw provider transcript paths so any subsequent search is narrow and intentional.
+This helper is not semantic search, not a transcript parser, and not a provider archive crawler. It exists to hand the agent a task-scoped list of raw provider transcript paths so any subsequent search is narrow and intentional.

@@ -61,11 +61,10 @@ Notes. "Write a handoff" is not a separate function; it is a task log record who
 | Function | Reference | Script | Audience |
 |---|---|---|---|
 | Write or update a rule | `write-rule.md` | `write-rule.js` | user |
-| Write a session entry | `write-session-entry.md` | `write-session-entry.js` | user |
 | Write a journal entry | `write-journal-entry.md` | `write-journal-entry.js` | user |
 | Write a case study | `write-case-study.md` | `write-case-study.js` | user |
 
-Notes. These four overlap in the user's mind and the guide has to draw the lines: a rule changes future behavior, a case study records a lesson, a journal entry is a note worth keeping, a session entry is a point-in-time project snapshot. Session entries especially need their boundary drawn, because they were used as a context-save mechanism before saved-context files existed.
+Notes. These three overlap in the user's mind and the guide has to draw the lines: a rule changes future behavior, a case study records a lesson, and a journal entry is a note worth keeping.
 
 ## F. Finding things
 

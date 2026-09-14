@@ -2,13 +2,6 @@
 "use strict";
 
 const CONTAINERS = {
-  sessions: {
-    name: "sessions",
-    scope: "root",
-    zipFilename: "sessions.zip",
-    defaultSort: "name-desc",
-    recordsExpected: false,
-  },
   "case-studies": {
     name: "case-studies",
     scope: "root",
@@ -40,8 +33,6 @@ const CONTAINERS = {
 };
 
 const ALIASES = new Map([
-  ["session", "sessions"],
-  ["sessions", "sessions"],
   ["case-study", "case-studies"],
   ["case-studies", "case-studies"],
   ["case", "case-studies"],

@@ -53,7 +53,6 @@ Read only the reference needed for the current operation:
 - Memory root policy and scoped write decisions: `references/memory-root-policy.md`
 - Startup contract: `references/startup-contract.md`
 - Full operating protocol: `references/full-memory-contract.md`
-- Write a session entry: `references/write-session-entry.md`
 - Write a case study: `references/write-case-study.md`
 - Render browser help for `M-PACT help`, `M-PACT quick reference`, `M-PACT reference guide`, or `M-PACT guide`: `scripts/help.js`
 - Create a task: `references/create-task.md`
@@ -76,7 +75,7 @@ Read only the reference needed for the current operation:
 
 - Never fabricate. If you do not know, say so. Confident wrong answers get acted on without verification.
 - Evidence before certainty. Read relevant source artifacts before final recommendations or implementation claims.
-- Startup context is orientation, not evidence. Use it to recognize likely relevant tasks, sessions, rules, and references.
+- Startup context is orientation, not evidence. Use it to recognize likely relevant tasks, rules, and references.
 - The rule index is level one of the rules: listed filenames are rules in force as stated. Read the correlated rule body before proceeding; `references/startup-contract.md` owns the full rule.
 - When specifics matter, fetch the referenced artifact instead of reconstructing details from memory.
 - Before loading or emitting large context that you control, state what is about to enter context, why it is needed, and whether a smaller index, summary, span, or targeted lookup will serve.

@@ -48,7 +48,6 @@ One line each, grouped the way you'll meet them. Read this when you already know
 ### Memory beyond tasks
 
 - **Write a rule** - a durable instruction that shapes future behavior. *"Add a rule: always do X."* Goes in the project unless you say *"global rule"* or *"user-level rule."*
-- **Write a session entry** - a project-wide snapshot or note, not tied to one task. *"Write a session entry for this decision."* Not a way to save context; use save context for that.
 - **Write a journal entry** - a reflective note worth keeping that isn't a rule or a task record. *"Write a journal entry about X."* The one record you can later ask to have edited: *"Modify that journal entry."*
 - **Write a case study** - a success, failure, or lesson worth carrying forward. *"Write a case study on X."*
 

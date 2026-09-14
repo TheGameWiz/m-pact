@@ -123,7 +123,6 @@ Section 8 lists three operations and says "turn it off" is ambiguous. A ConflabC
 - **Taking a handoff on a closed task stops.** `take-task-handoff.md`: a handoff resolved onto a closed task has no work to pick up; the agent says so in one sentence. Worth one line under "Taking a handoff."
 - **The agent names the task and purpose it resolved.** Same reference: the first line of a handoff response names the task and the purpose applied, so a wrong task is visible before the deliverable. Worth one line, because it tells the user what to check.
 - **Nested projects.** Section 7 calls nesting "the one trap" and says a nested project "silently inherits the parent's memory." `memory-root-policy.md` and `startup-contract.md` describe the chain (user root, ancestor roots, nearest root) as the design, with inherited roots read-only by default. Inheritance is a feature when the child is part of the parent; it is a trap only when the child is an unrelated project that happens to live in the parent's tree. The wording should say which.
-- **Session entries and refresh.** `write-session-entry.md`: refresh reads only the newest session entry, capped at 25KB, and task state wins on disagreement. The user should know that a session entry is startup orientation, not authority. One line under "Session entries."
 - **Help aliases are now a checked surface.** `SKILL.md`, `docs/M-PACT_USER_GUIDE_QUICK_REFERENCE.md`, and `scripts/help.js` agree on the user-facing invocation set: `M-PACT help`, `M-PACT quick reference`, `M-PACT guide`, and `M-PACT reference guide`. The renderer also accepts `quick`, `quick-reference`, and `reference-guide` as parser conveniences, but the guide only needs to teach the four natural phrases.
 
 ## Reference by reference
@@ -149,7 +148,6 @@ Section 8 lists three operations and says "turn it off" is ambiguous. A ConflabC
 | `write-design-spec.md` | Design items; revisions; `specification.md` mirror | Part 4 "Designing and iterating" | Mirror missing (finding 9). |
 | `repair-task-spec-log.md` | Orphaned spec member repair; announced, not asked | None | Correctly excluded from Part 4 (nothing to ask for). The announcement is user-visible; one line in section 14 is enough. |
 | `write-rule.md` | Rules; project versus global; merge over duplicate | Part 4 "Rules" | Thin. Scope and filename-as-rule missing (finding 7). |
-| `write-session-entry.md` | Session entry; not a save-context substitute | Part 4 "Session entries" | Covered. Refresh-reads-newest-only missing (finding 12). |
 | `write-journal-entry.md` | Journal entry; the editable exception | Part 4 "Journal entries"; section 2 | Editable exception missing (finding 5). |
 | `write-case-study.md` | Case study | Part 4 "Case studies" | Covered. |
 | `find-memory-artifact.md` | Look up an artifact; scope words; task list ordering | Part 4 "Finding things" | Scope words missing (finding 7). |

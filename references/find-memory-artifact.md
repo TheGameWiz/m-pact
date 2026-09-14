@@ -5,7 +5,6 @@ Use for memory artifact retrieval.
 This reference covers:
 
 - Rules in `rules/`
-- Sessions in `sessions.zip`
 - Tasks in `tasks/`
 - Case studies in `case-studies.zip`
 - Journals in `journal.zip`
@@ -14,7 +13,7 @@ For provider chat, conversation, thread, session, transcript, or raw provider-hi
 
 ZIP-backed memory is helper-owned per `startup-contract.md`; use the standard helpers:
 
-- `scripts/list-members.js --container <sessions|case-studies|journal|task-log|specification>`
+- `scripts/list-members.js --container <case-studies|journal|task-log|specification>`
 - `scripts/read-member.js --container <name> --member <filename>` or `--record <n>` or `--latest`; for new-format design specifications, use `--item <number>` to read the current version of an item.
 - `scripts/search-bodies.js --container <name> --query <tokens>`
 - `scripts/read-member-span.js --container <task-log|specification> --after <record>` for numbered catch-up reads
@@ -40,7 +39,7 @@ Do not scan sibling projects unless the Director names them. Normal memory looku
 5. If filename search is inconclusive, use `search-bodies.js` in the selected roots only.
 6. Preserve root boundaries in the answer. Do not merge or renumber across roots.
 
-Sort timestamped member names (sessions, journals) by timestamp descending unless the Director asks for chronological order.
+Sort timestamped journal member names by timestamp descending unless the Director asks for chronological order.
 
 ## Artifact Rules
 

@@ -531,12 +531,10 @@ function addNoSavedContextFallbackBundle(lines, taskPath, agent, reason) {
 
 const MIN_NODE_MAJOR = 18;
 const EOL = os.EOL;
-const RECENT_SESSION_BUDGET_BYTES = 25 * 1024;
 const FALLBACK_TOTAL_BUDGET_BYTES = 15 * 1024;
 const FALLBACK_TASK_LOG_BUDGET_BYTES = 10 * 1024;
 const FALLBACK_TRANSCRIPT_BUDGET_BYTES = 5 * 1024;
 const TASKLESS_FALLBACK_TRANSCRIPT_BUDGET_BYTES = 10 * 1024;
-const TRUNCATION_NOTICE = "\n\n[Truncated to fit the 25KB recent-session refresh budget.]";
 const FALLBACK_TRUNCATION_NOTICE = "\n\n[Truncated to fit the fallback section byte budget.]";
 const HOOK_STARTUP_DIRECTIVE = "M-PACT STARTUP DIRECTIVE: This injected refresh output is mandatory pre-answer context. Before answering the Director's first request, read the file named by BundlePath, verify its final line is END REFRESH BUNDLE, treat that bundle as loaded, then emit only the receipt body between BEGIN REFRESH RECEIPT and END REFRESH RECEIPT. Do not print the BEGIN/END marker lines. Do not add a startup heading, summary, or other prose before the receipt.";
 const HOOK_RECEIPT_EMISSION_NOTE = "M-PACT HOOK NOTE: The Director has not seen the receipt. Reading and verifying BundlePath is mandatory before answering the first request. Emit only the receipt body as the first visible response, excluding BEGIN/END marker lines and any startup summary, then continue the Director's requested work. In Antigravity, injected text is transient and the fast path must complete this turn.";
@@ -680,23 +678,6 @@ function describeProjectIdentity(activeRoot, userRoot) {
   };
 }
 
-function listSessionArtifacts(root) {
-  const artifacts = [];
-  const sessionsZip = path.join(root, "sessions.zip");
-  if (existsFile(sessionsZip)) {
-    for (const member of listMembers(sessionsZip)) {
-      artifacts.push({
-        name: member.name,
-        label: `${sessionsZip}#${member.name}`,
-        modified: member.modified,
-        readFull: () => readMember(sessionsZip, member.name).toString("utf8"),
-      });
-    }
-  }
-
-  return artifacts.sort((a, b) => b.name.localeCompare(a.name));
-}
-
 function addArtifact(lines, title, artifactPath, body) {
   addLine(lines, `### ${title}`);
   addLine(lines);
@@ -708,21 +689,7 @@ function addArtifact(lines, title, artifactPath, body) {
   addLine(lines);
 }
 
-function getArtifactByteCount(title, artifactPath, body) {
-  const lines = [
-    `### ${title}`,
-    "",
-    `Path: ${formatDisplayPath(artifactPath)}`,
-    "",
-    "```text",
-    String(body || "").trimEnd(),
-    "```",
-    "",
-  ];
-  return utf8ByteCount(lines.join(EOL) + EOL);
-}
-
-function truncateTextToByteBudget(text, maxBytes, notice = TRUNCATION_NOTICE) {
+function truncateTextToByteBudget(text, maxBytes, notice = FALLBACK_TRUNCATION_NOTICE) {
   if (maxBytes <= 0) {
     return "";
   }
@@ -1027,7 +994,6 @@ function main() {
     agentResolutionError = error;
   }
   const failures = [];
-  const sessionReads = [];
   const bundle = [];
   const coreRuleNames = [];
   const ruleIndexParts = [];
@@ -1149,31 +1115,6 @@ function main() {
 
     for (const rule of rules.filter((item) => item.name.startsWith("core-"))) {
       coreRuleNames.push(rule.name);
-    }
-  }
-
-  let sessionBudgetUsed = 0;
-  let sessionBudgetTruncated = false;
-
-  if (activeRoot) {
-    const file = listSessionArtifacts(activeRoot)[0];
-    if (file) {
-      try {
-        let text = file.readFull();
-        let mode = "full";
-        let artifactBytes = getArtifactByteCount(mode, file.label, text);
-        if (artifactBytes > RECENT_SESSION_BUDGET_BYTES) {
-          mode = "full-truncated";
-          const overheadBytes = getArtifactByteCount(mode, file.label, "");
-          text = truncateTextToByteBudget(text, RECENT_SESSION_BUDGET_BYTES - overheadBytes);
-          artifactBytes = getArtifactByteCount(mode, file.label, text);
-          sessionBudgetTruncated = true;
-        }
-        sessionReads.push({ root: activeRoot, path: file.label, mode, text, modified: file.modified });
-        sessionBudgetUsed += artifactBytes;
-      } catch (error) {
-        failures.push(`Failed to read selected active-root session: ${file.label} (${error.message})`);
-      }
     }
   }
 
@@ -1384,7 +1325,6 @@ function main() {
   addLine(bundle, `- Memory chain, broad-to-specific: ${chainDisplay}`);
   addLine(bundle, `- Missing or ambiguous: ${missingOrAmbiguousDisplay}`);
   addLine(bundle, `- Orphaned specification companions: ${orphanedSpecCompanionsDisplay || "(none)"}`);
-  addLine(bundle, "- Startup session selection: active root only by filename descending; newest session full or truncated, with rendered session artifact capped at 25KB.");
   addLine(bundle, "- Startup task selection: active root only, read task.md only when exactly one zero-byte tasks/current__<task-folder> sentinel points to an active task; never infer a replacement current task.");
   addLine(bundle, "- Startup exclusions: rule bodies, design specification bodies, task logs, journals, and case studies.");
   addLine(bundle);
@@ -1404,26 +1344,6 @@ function main() {
       addLine(bundle, `- ${ruleName}`);
     }
     addLine(bundle);
-  }
-
-  addLine(bundle, "## Recent Sessions Loaded");
-  addLine(bundle);
-  addLine(bundle, `Budget: ${formatKB(RECENT_SESSION_BUDGET_BYTES)}KB rendered session artifacts; used ${formatKB(sessionBudgetUsed)}KB.`);
-  addLine(bundle, "Session entries are point-in-time project notes. They may or may not be useful, and they may be stale.");
-  addLine(bundle, "If a session entry disagrees with this bundle's task sections or the current-task sentinel, those task sections and sentinel are authoritative.");
-  if (sessionBudgetTruncated) {
-    addLine(bundle, "Newest session was truncated to fit the recent-session budget.");
-  }
-  addLine(bundle);
-  if (sessionReads.length === 0) {
-    addLine(bundle, "(none)");
-    addLine(bundle);
-  } else {
-    for (const session of sessionReads) {
-      addLine(bundle, `Rendered session age: ${formatAgeSince(session.modified)}`);
-      addLine(bundle);
-      addArtifact(bundle, `${session.mode}: ${path.basename(session.path)}`, session.path, session.text);
-    }
   }
 
   addLine(bundle, "## Active Tasks Noted");
@@ -1473,7 +1393,6 @@ function main() {
   console.log(`BundlePath: ${bundlePath}`);
   console.log(`BundleBytes: ${bundleBytes}`);
   console.log(`LineCount: ${bundleLineCount}`);
-  console.log(`RecentSessionBudgetKB: ${formatKB(RECENT_SESSION_BUDGET_BYTES)}`);
   if (pruneResult.failed.length > 0) {
     console.log(`ScratchPruneWarning: ${pruneResult.failed.join(", ")}`);
   }

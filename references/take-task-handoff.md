@@ -6,7 +6,7 @@ The `Take Handoff, ...` receiving forms below are existing-task read operations.
 
 Taking a handoff is a read/analyze/evaluate/report operation.
 
-Mutation gate: taking a handoff does not by itself authorize modifying source code, design specifications, docs, task state, task logs, rules, sessions, or other durable artifacts. Continue into mutation only when the Director already gave separate explicit implementation or write authorization in the current turn: says to implement, continue implementation, make the change, update the spec, write the log, edit the document, or gives equivalent explicit direction.
+Mutation gate: taking a handoff does not by itself authorize modifying source code, design specifications, docs, task state, task logs, rules, or other durable artifacts. Continue into mutation only when the Director already gave separate explicit implementation or write authorization in the current turn: says to implement, continue implementation, make the change, update the spec, write the log, edit the document, or gives equivalent explicit direction.
 
 Default endpoint: provide an opinionated evaluation, not just a summary, unless the Director explicitly asks only for a summary. Explain the current task state briefly, then evaluate the current handoff span for feasibility, risks, questionable assumptions, implementation issues, and fit with Director intent. Recommend the best next path when evidence supports one, including why it is preferable and what tradeoffs or checks remain. Do not push the Director to choose immediately; the Director may want discussion or more facts before deciding.
 
@@ -114,7 +114,7 @@ When the Director has authorized implementation, collapse the work into as few s
 
 Some tasks are created directly from a live conversation via the task-creation phrases above, including a standalone handoff phrase after Director confirmation. Treat these as ordinary tasks. The named handoff agent may be the same agent that created the task; this still means the Director wanted a durable context-switch point. The first log entry is expected to contain the compressed conversation state needed to resume: decisions, open questions, current reasoning, alternatives considered, and recommended next move.
 
-When taking this kind of handoff, read `task.md` and the initial handoff log before deciding whether more log history is needed. Do not require a separate session entry; sessions are optional broader continuity records, not the canonical task state.
+When taking this kind of handoff, read `task.md` and the initial handoff log before deciding whether more log history is needed.
 
 ## Guardrails
 

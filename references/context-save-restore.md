@@ -39,7 +39,7 @@ node <this-skill>/scripts/save-context.js --project-id 7 --agent codex
 
 Use the project ID from the latest refresh or successful write receipt when the resolved root is a project `.AgentMemory`; user-root saves do not use a project ID. Supply only the save body; the helper writes the file in the resolved root `.tmp` directory. Ordinary installed helpers resolve the agent automatically; pass `--agent` only in the override cases enumerated in `startup-contract.md`.
 
-Save-context requires no current task. Do not create a task, write a session entry, or select a task merely to save context.
+Save-context requires no current task. Do not create a task or select a task merely to save context.
 
 ## Restore Procedure
 

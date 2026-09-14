@@ -37,8 +37,8 @@ the full context, what's decided, what's pending, comes with it.
 written once, followed by every agent.
 
 **Also capture everything that isn't a task** - Not every thought fits neatly into a task, so
-journals, case studies, and session entries give you a place to capture insights, decisions, and
-lessons that would otherwise just get lost.
+journals and case studies give you a place to capture insights, decisions, and lessons that would
+otherwise just get lost.
 
 None of this requires a rigid structure. Run M-PACT with a single agent if that's your preference,
 or bring in a second agent, which is a common pattern, one as your design partner, the other for

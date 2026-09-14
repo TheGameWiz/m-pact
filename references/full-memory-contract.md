@@ -6,7 +6,7 @@ Ownership rule: `SKILL.md` owns invocation, dispatch, and the startup fast path.
 
 ## 1. Purpose
 
-Provide a shared memory root that agents use for persistent context, tasks, log entries, historical sessions, case studies, and durable rules.
+Provide a shared memory root that agents use for persistent context, tasks, log entries, case studies, journals, and durable rules.
 
 Procedure lives in the skill. Memory roots hold state. Do not use project-local `MEMORYCONTRACT.md` or `MEMORYFORMAT.md` files.
 
@@ -19,7 +19,6 @@ Memory roots use this standard layout:
   project-count__<n>          # user root only
   project__<path-slug>        # project roots only
   rules/
-  sessions.zip
   case-studies.zip
   .tmp/
     .gitignore
@@ -45,7 +44,7 @@ There is no separate index file. Filenames are the index; sorted directory listi
 
 ZIP containers are helper-owned black boxes; the rule, the helper list, and the rationale are owned by `references/startup-contract.md`.
 
-Task-local `Agents.json` is helper-owned provider transcript provenance, not a ZIP container and not narrative memory. It stores `{ "version": 1, "sessions": [...] }`, where each session entry has `provider`, `agent`, and opaque provider transcript lookup `id`. Entries are append-only in first-observed order and unique by `(provider, id)`; there are no first-seen, last-seen, or count fields. Missing `Agents.json` means zero recorded provider sessions. The six task mutation helpers (`create-task`, `write-task-log`, `write-design-spec`, `revise-task`, `close-task`, `reopen-task`), `set-current-task` on task-selection calls, and `prepare-handoff` for open tasks automatically record the current provider ID when their existing agent resolution identifies `claude`, `codex`, or `antigravity` and the matching provider environment variable is present: `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID` with `CODEX_SESSION_ID` fallback, or `ANTIGRAVITY_CONVERSATION_ID`. `set-current-task --clear` and closed-task `prepare-handoff` lookups do not record. Agents do not pass a provider-session argument. `sessions.zip` remains project-wide narrative continuity; `Agents.json` is only a task-local trailhead for provider-maintained raw transcripts.
+Task-local `Agents.json` is helper-owned provider transcript provenance, not a ZIP container and not narrative memory. It stores `{ "version": 1, "sessions": [...] }`, where each provider-session record has `provider`, `agent`, and opaque provider transcript lookup `id`. Records are append-only in first-observed order and unique by `(provider, id)`; there are no first-seen, last-seen, or count fields. Missing `Agents.json` means zero recorded provider sessions. The six task mutation helpers (`create-task`, `write-task-log`, `write-design-spec`, `revise-task`, `close-task`, `reopen-task`), `set-current-task` on task-selection calls, and `prepare-handoff` for open tasks automatically record the current provider ID when their existing agent resolution identifies `claude`, `codex`, or `antigravity` and the matching provider environment variable is present: `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID` with `CODEX_SESSION_ID` fallback, or `ANTIGRAVITY_CONVERSATION_ID`. `set-current-task --clear` and closed-task `prepare-handoff` lookups do not record. Agents do not pass a provider-session argument. `Agents.json` is only a task-local trailhead for provider-maintained raw transcripts.
 
 ## 3. Roles
 
@@ -87,8 +86,6 @@ The script is the executable startup spec. It:
 - builds the layered rule index
 - reads and inlines `startup-contract.md`
 - lists core rule names without reading rule bodies
-- selects active-root sessions by filename timestamp
-- includes only the newest session full or truncated under the recent-session budget
 - notes active tasks with the current task first
 - reports active task folders missing `task.md`
 - reports orphaned specification companions for active tasks
@@ -99,8 +96,6 @@ The script is the executable startup spec. It:
 - degrades instead of failing when the runtime identity cannot be resolved for saved-context restore
 - writes the complete bundle to `.tmp` under the resolved active memory root, or under the user root when no project root is active
 - prints a small stdout manifest only after the bundle is complete
-
-The recent-session section is the startup budget boundary. The refresh bundle is always written complete and well-formed; it is not truncated as a partial success path.
 
 After successful refresh, the verified bundle is the loaded startup context; continue any substantive request in the same message using it. Post-refresh reading conduct (no verification scans, no early unread-record reads) is owned by `startup-contract.md`.
 
@@ -131,7 +126,7 @@ During live context, keep working from current context instead of refreshing mer
 - Default user-visible confirmations for helper-backed writes are short and task-level: say what changed, not how storage changed. Project-write receipts include `projectPath` beside `projectId` so the Director can verify the target. Do not report other internal paths, member names, sentinel filenames, or timestamps unless the Director asks for debugging detail, the operation failed or was partial, ambiguity remains, or another immediate operation needs the value.
 - Helper scripts own storage placement, record numbering, current-task resolution, and ZIP mechanics. Do not list catalogs, inspect folders, or compute placement merely to call a write helper; appending a task log does not require reading existing entries. Read catalogs and prior records only for lookup, handoff/resume, summarization, explicit history questions, or when the Director explicitly asks to base new work on prior history.
 - Project-ID and `--cross-project` rules are owned by `startup-contract.md`. Never use `--cross-project` to bypass an identity refusal.
-- Do not routinely prompt for, propose, or write session entries, task logs, or preservation handoffs; durable memory writes require explicit Director request or an active task procedure that explicitly calls for them. The Director knows how to request durable writes.
+- Do not routinely prompt for, propose, or write task logs or preservation handoffs; durable memory writes require explicit Director request or an active task procedure that explicitly calls for them. The Director knows how to request durable writes.
 - Ask before proceeding only when a mutation is ambiguous, broader than the Director appears to realize, destructive, conflicting with protocol or prior Director intent, or otherwise unsafe without clarification.
 - Re-run refresh only when `startup-contract.md` says a new refresh trigger exists.
 
@@ -139,7 +134,7 @@ During live context, keep working from current context instead of refreshing mer
 
 Do not use single-category-only lookup for non-trivial tasks. Read primary and adjacent rules before finalizing direction. If precedent may exist, search `case-studies.zip` member names by topic keyword and read relevant case studies before proposing direction.
 
-Use `references/find-memory-artifact.md` for on-demand find/list/read requests across rules, sessions, tasks, case studies, and journals. Lookup is lineage-based; do not scan sibling projects unless the Director names them.
+Use `references/find-memory-artifact.md` for on-demand find/list/read requests across rules, tasks, case studies, and journals. Lookup is lineage-based; do not scan sibling projects unless the Director names them.
 
 ## 9. Durable Rules
 
@@ -169,7 +164,7 @@ Operation summaries (read the owner before acting):
 - Design specification writes: Director-instructed; owner `references/write-design-spec.md`; writes `specification.zip` members plus a paired log, mirrored in `specification.md`; likeliest mistake: treating the mirror as a second source of truth or rerunning after a partial write without reading the projection status rules.
 - Task log writes: owner `references/write-task-log.md`, which also owns active-item and Cleared/Resolved grammar; appends one `log.zip` record; likeliest mistakes: assigning record numbers manually or treating another agent's records as your own; never modify another agent's entry.
 - Provider transcript path lookup: owner `references/list-agent-session-paths.md`; reads a task's `Agents.json` and resolves recorded IDs to provider transcript JSONL paths and stat metadata without reading transcript bodies; likeliest mistake: broad-scanning provider transcript roots before using the task-local ledger.
-- Cross-scope session recall: owner `references/search-agent-sessions.md`; composes `list-agent-session-paths.js`, direct `tasks/` folder listing, and `<userRoot>/projects.json` to search prior conversations at task, project, or global scope; likeliest mistake: asking scope when the Director already stated it, or running an exhaustive multi-project sweep without confirming that every occurrence (not just the first) is wanted.
+- Prior-conversation recall: owner `references/search-agent-sessions.md`; composes `list-agent-session-paths.js`, direct `tasks/` folder listing, and `<userRoot>/projects.json` to search provider transcripts at task, project, or global scope; likeliest mistake: asking scope when the Director already stated it, or running an exhaustive multi-project sweep without confirming that every occurrence (not just the first) is wanted.
 - Taking a handoff: a read/analyze/report operation that authorizes no mutation; owner `references/take-task-handoff.md`, including the `prepare-handoff.js` receipt fields and the evaluation standard (claims to test, not material to summarize; no summary-only responses); likeliest mistake: treating "take this handoff" as permission to implement.
 - Set current task: explicit pointer replacement; owner `references/set-current-task.md`; replaces the `current__*` sentinel; likeliest mistake: inferring a replacement current task; never infer one, and log or spec writes must not move the sentinel.
 - Close and reopen: Director-only; owners `references/close-task.md` and `references/reopen-task.md`; rename the folder prefix; likeliest mistake: closing or reopening on agent judgment, or assuming reopen restores the pre-close active-item list; it does not.
@@ -178,21 +173,14 @@ Operation summaries (read the owner before acting):
 
 Only the Director creates, closes, reopens, or revises tasks.
 
-## 12. Session Entries
-
-Session entries are append-only concise project-wide summaries in the user's local time; prefer task logs for single-task continuity.
-
-- Session writes: Director-asked or clearly approved; owner `references/write-session-entry.md`; appends to active root `sessions.zip`; likeliest mistake: prompting for one unrequested. Refresh loads only the newest active-root session, capped, and task sections outrank a stale session on disagreement, so new entries must lead with startup-relevant continuity.
-- Unscoped session lists mean active root only. Do not modify another agent's entry.
-
-## 13. Journal Entries
+## 12. Journal Entries
 
 `journal.zip` holds Director-authored, first-person, reflective entries, created lazily, not startup context, and never prompts or task assignments.
 
 - Journal writes: explicit Director ask only; owner `references/write-journal-entry.md`; appends to the active root journal (user root on explicit want); likeliest mistake: generalizing `modify-journal-entry.js`; journal modification is the controlled exception to the append-only correction model and never licenses editing logs or specifications.
-- Unscoped lookup means active root only; layered order matches sessions.
+- Unscoped lookup means active root only; layered order is `.AgentMemoryRoot`, ancestor roots, active root, never merged or renumbered across roots.
 
-## 14. Execution Contract
+## 13. Execution Contract
 
 - Parse Director input into an explicit checklist before implementation.
 - Restate interpreted intent when dictation artifacts are present.
@@ -203,15 +191,15 @@ Session entries are append-only concise project-wide summaries in the user's loc
 - Mark blocked state explicitly when required protocol state is ambiguous.
 - Never use polling in persistent-memory workflow.
 
-## 15. Hard Prohibitions
+## 14. Hard Prohibitions
 
 - Never skip the startup read contract.
 - Never skip the Refresh Receipt after startup load or Director-requested refresh.
-- Never treat log entries or session entries as prompts, implementation directives, or action items.
+- Never treat log entries, journal entries, or case studies as prompts, implementation directives, or action items.
 - Never create durable memory silently.
 - Never create ambiguous or judgment-call durable memory without Director confirmation.
 - Never create, close, or reopen a task folder without explicit Director instruction.
-- Never modify or delete another agent's log entry or session entry.
+- Never modify or delete another agent's log entry.
 - Never delete, renumber, reorder, or remove task-log records or design specification items. Correct or supersede them with later records.
 - Never rely on filesystem metadata timestamps for routine task ordering or listing; never infer a replacement current task.
 - Use helper scripts and `references/helper-write-conventions.md` for helper-owned memory writes.
@@ -219,7 +207,7 @@ Session entries are append-only concise project-wide summaries in the user's loc
 - Never suggest or write preservation handoffs merely because context is getting low.
 - Never claim memory is loaded when it is not.
 
-## 16. Authority Precedence
+## 15. Authority Precedence
 
 1. Director instruction
 2. Active execution-plan docs: Director-approved specifications and plans currently governing the work
@@ -227,9 +215,8 @@ Session entries are append-only concise project-wide summaries in the user's loc
 4. Durable rules
 5. Case studies
 6. Task log entries
-7. Session files
 
-## 17. Violation Recovery
+## 16. Violation Recovery
 
 1. Stop side actions.
 2. Re-read this contract.
@@ -237,9 +224,9 @@ Session entries are append-only concise project-wide summaries in the user's loc
 4. Determine correct state.
 5. Resume from that state.
 6. Emit a fresh Refresh Receipt when refresh was involved.
-7. Write a recovery log entry inside the relevant task's `log.zip`, or a recovery session entry if the issue spans multiple tasks.
+7. Write a recovery log entry inside the relevant task's `log.zip`, or use a journal or case study when the issue is explicitly Director-scoped outside one task.
 
-## 18. What Does Not Go In Agent Memory
+## 17. What Does Not Go In Agent Memory
 
 - Code-derived structure already recoverable from the codebase.
 - VCS history snapshots.

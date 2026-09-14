@@ -2,7 +2,7 @@
 
 M-PACT helps local coding agents share memory. It was designed and validated for Codex and Claude Code, with Antigravity support replacing the retired Gemini CLI extension. Its goal is simple: let agents remember useful project information, share it with each other, and pick up work without depending on one chat window to hold everything.
 
-M-PACT stores memory at two levels: global memory that can follow you across projects, and project memory that belongs to one workspace. That memory can include shared rules, session notes, project tasks, task logs, task specifications, case studies, and project journals.
+M-PACT stores memory at two levels: global memory that can follow you across projects, and project memory that belongs to one workspace. That memory can include shared rules, project tasks, task logs, task specifications, case studies, and project journals.
 
 This makes it possible to use more than one agent on the same project at the same time. One agent can work on a design, another can review it, another can implement it, and another can verify the code. They can hand work back and forth through task logs and specifications instead of trying to reconstruct state from chat history.
 
@@ -11,7 +11,7 @@ The workflow is flexible, but one useful pattern is to pair agents from differen
 The system has one important separation:
 
 - The `m-pact` skill owns procedures: refresh, lookup, bootstrap, task operations, rule writing, and artifact templates.
-- Memory roots hold state: rules, sessions, tasks, case studies, and journals.
+- Memory roots hold state: rules, tasks, case studies, and journals.
 
 This guide describes the user-facing operations, what each one is for, and why you would ask an agent to use it.
 
@@ -20,7 +20,7 @@ This guide describes the user-facing operations, what each one is for, and why y
 At the simplest level, M-PACT lets you:
 
 - Create shared rules that teach agents your coding style, preferences, project habits, and recurring lessons.
-- Write session entries for broad project continuity, and use saved-context files when you explicitly want to preserve same-agent context before compaction or restart.
+- Use saved-context files when you explicitly want to preserve same-agent context before compaction or restart.
 - Create project tasks with logs and specifications so agents can design, implement, review, test, and verify work in a structured loop.
 - Create case studies for important successes, failures, investigations, and lessons that you want future agents to remember.
 - Write journal entries for project notes you want to keep but do not want to turn into rules, tasks, or case studies.
@@ -143,11 +143,11 @@ At the start of a new agent context, say:
 Use $m-pact and refresh memory.
 ```
 
-The agent should run the skill's refresh procedure. If a project memory root exists, it loads the memory chain and emits a compact refresh receipt. The visible receipt starts with `M-PACT MEMORY REFRESH`; internal begin/end marker lines in the bundle are not shown. The full roots, rules, sessions, and task pointer details stay inside the loaded bundle instead of being printed during normal startup.
+The agent should run the skill's refresh procedure. If a project memory root exists, it loads the memory chain and emits a compact refresh receipt. The visible receipt starts with `M-PACT MEMORY REFRESH`; internal begin/end marker lines in the bundle are not shown. The full roots, rules, and task pointer details stay inside the loaded bundle instead of being printed during normal startup.
 
 For project roots with identity, the refresh receipt also includes the active project root and project ID. If an older project root has no identity sentinel yet, refresh reports `projectIdentity=adoption-required` and prints a `M-PACT PROJECT ADOPTION REQUIRED` question. If you answer yes, the agent runs the one-root adoption helper, refreshes again, and then passes that ID back to durable project-root write helpers as `--project-id <n>`.
 
-After the receipt, refresh itself is complete. If the same message included work beyond refresh, the agent should continue with that work using the loaded context. The agent should not scan `.AgentMemory`, sessions, rules, tasks, or the generated bundle just to verify the refresh. The bundle is already the verified startup context. Ask for targeted lookup when you want a specific memory artifact.
+After the receipt, refresh itself is complete. If the same message included work beyond refresh, the agent should continue with that work using the loaded context. The agent should not scan `.AgentMemory`, rules, tasks, or the generated bundle just to verify the refresh. The bundle is already the verified startup context. Ask for targeted lookup when you want a specific memory artifact.
 
 This startup refresh is the practical bridge for multi-provider work. A Codex tab, a Claude Code tab, and an Antigravity session can all begin from the same memory chain instead of acting like separate isolated chats. Copilot CLI is a plausible future target, but the current project should describe it as unvalidated best-effort support.
 
@@ -161,7 +161,7 @@ Refresh is only for:
 
 Do not refresh just because a task is large. Use targeted lookup, task handoffs, and checkpoints while the current context is still intact.
 
-The refresh bundle is complete when emitted. The recent-session section has a byte budget and may truncate the rendered newest session artifact inside the complete bundle; ask for targeted lookup when omitted session detail matters.
+The refresh bundle is complete when emitted. It loads a compact startup snapshot and leaves detailed history for targeted lookup when you need it.
 
 Common lookup requests:
 
@@ -190,7 +190,6 @@ Common durable-context requests:
 
 ```text
 Save context for this task before compaction.
-Write a session entry summarizing this project-wide decision.
 Create a case study for this debugging incident.
 Add a user-level rule that agents must verify X before doing Y.
 Write a journal entry in my voice about this design decision.
@@ -212,7 +211,7 @@ Bootstrap my .AgentMemoryRoot with the starter rules.
 
 User-root bootstrap installs bundled starter core rules unless you ask to skip them. These starter rules are editable defaults. Review them and edit, delete, or replace anything that does not fit your workflow.
 
-As a general pattern: start each new context with refresh, use targeted reads during normal work, and write the smallest durable artifact that fits. Use a rule for behavior, a task log for task state, a session for broad continuity, and a case study for a narrative lesson.
+As a general pattern: start each new context with refresh, use targeted reads during normal work, and write the smallest durable artifact that fits. Use a rule for behavior, a task log for task state, a journal for project notes, and a case study for a narrative lesson.
 
 ## Core Concepts
 
@@ -248,7 +247,6 @@ Both user and project roots may eventually have this shape:
   project-count__<n>       # user root only
   project__<path-slug>     # project roots only
   rules/
-  sessions.zip
   tasks/
   case-studies.zip
   journal.zip
@@ -265,7 +263,7 @@ tasks/
     log.zip
 ```
 
-The shape is lazy. A new project bootstrap creates `.AgentMemory/` and its `project__<path-slug>` identity sentinel only. `rules/`, `tasks/`, `sessions.zip`, `case-studies.zip`, and `journal.zip` appear only when first used. A new task folder starts with `task.md`; its specification and log ZIPs appear only when those records are written.
+The shape is lazy. A new project bootstrap creates `.AgentMemory/` and its `project__<path-slug>` identity sentinel only. `rules/`, `tasks/`, `case-studies.zip`, and `journal.zip` appear only when first used. A new task folder starts with `task.md`; its specification and log ZIPs appear only when those records are written.
 
 Project identity sentinels are helper-owned. New project bootstrap mints identity automatically. Existing pre-identity roots use lazy confirmed adoption: they are considered only when encountered by refresh or a durable write, and identity is minted only after you answer yes to the adoption question. If a moved or copied project reports a path mismatch, use the repair helper instead of hand-editing sentinel files.
 
@@ -279,7 +277,7 @@ This matters because memory should be cheap to scan. A good filename tells the a
 
 ### What It Does
 
-Refresh loads startup context from the memory chain. It resolves roots, inlines the compact startup contract, lists core rule filenames without loading rule bodies, notes non-core rule filenames, reads the newest active-root session under the recent-session budget, notes active tasks, reads the pointed current task when one is valid, and reports what was loaded.
+Refresh loads startup context from the memory chain. It resolves roots, inlines the compact startup contract, lists core rule filenames without loading rule bodies, notes non-core rule filenames, notes active tasks, reads the pointed current task when one is valid, and reports what was loaded.
 
 ### Why Use It
 
@@ -327,14 +325,13 @@ The startup bundle may include root orientation such as the start path, user roo
 
 ### How To Use It
 
-Name the project, path, or scope when you want something written outside the active project. Otherwise, ask naturally and let the helper resolve the active root. This is useful when you are in one workspace but want to add a task, rule, session, or lookup to another known project. A write to a different project root can proceed when the loaded project ID matches that target. `--cross-project` is only for explicitly approved writes to a project whose ID was not loaded. It lifts the requirement to supply a project ID, not the check itself: if you do supply one and it contradicts the target, the write still halts, and the target identity is validated either way.
+Name the project, path, or scope when you want something written outside the active project. Otherwise, ask naturally and let the helper resolve the active root. This is useful when you are in one workspace but want to add a task, rule, journal, case study, or lookup to another known project. A write to a different project root can proceed when the loaded project ID matches that target. `--cross-project` is only for explicitly approved writes to a project whose ID was not loaded. It lifts the requirement to supply a project ID, not the check itself: if you do supply one and it contradicts the target, the write still halts, and the target identity is validated either way.
 
 ### Common Requests
 
 ```text
 Which memory root is active here?
 Show the memory chain.
-Where would a new session entry be written?
 Use the user root for this rule.
 Add a task to the Conflab project.
 ```
@@ -395,7 +392,7 @@ Use lookup when you want to find prior context without loading everything into t
 
 ### How To Use It
 
-Ask the agent to find, list, or read the kind of memory you need and include a few topic words. Lookup is best when you remember that something was discussed but do not know which session, task, rule, case study, or journal entry contains it. The helper should narrow by filenames first, then read only the likely matches.
+Ask the agent to find, list, or read the kind of memory you need and include a few topic words. Lookup is best when you remember that something was discussed but do not know which task, rule, case study, or journal entry contains it. The helper should narrow by filenames first, then read only the likely matches.
 
 ### Scopes
 
@@ -412,7 +409,6 @@ Normal lookup is lineage-based. Agents should not scan sibling projects unless y
 ### Common Requests
 
 ```text
-List active project sessions.
 Find layered rules about review.
 Read task A__p1-t0012-refresh-script.
 Show case studies about context compaction.
@@ -463,37 +459,6 @@ Add a project rule that agents must read the spec before reviewing code.
 Write this as a user-level rule.
 Check whether we already have a rule for this.
 Update the existing handoff rule instead of creating a duplicate.
-```
-
-## Sessions
-
-### What They Are
-
-Session entries are append-only summaries in `sessions.zip`. They preserve cross-task or project-wide continuity.
-
-### Why Use Them
-
-Use sessions when something happened outside a single task, or when future agents need a compact project-level checkpoint.
-
-### How To Use Them
-
-Ask for a session entry when you are recording project-wide continuity, cross-task context, or a decision that does not belong to one task. For same-agent compaction or restart, ask to save context instead; that writes a saved-context file restored for the same agent during refresh.
-
-### Startup Behavior
-
-Startup refresh reads the newest active-root session in full, capped at 25KB. Put resume-critical context at the start of `## Summary`.
-
-### What They Are Not
-
-Session entries are not prompts, task assignments, or implementation directives. They are informational context.
-
-### Common Requests
-
-```text
-Save context for this task before compaction.
-Write a session entry summarizing today's project-wide M-PACT decisions.
-List recent active project sessions.
-Read the newest session in full.
 ```
 
 ## Tasks
@@ -776,7 +741,7 @@ Place M-PACT in each provider's normal skill folder, then run provider runtime s
 1. Bootstrap M-PACT for the project.
 2. Confirm `.AgentMemory/` was created.
 3. Add only project-specific rules when real project behavior needs to persist.
-4. Use sessions for broad continuity and tasks for structured work.
+4. Use tasks for structured work and case studies or journals for broader narrative records.
 
 ### New User Setup
 
@@ -798,7 +763,7 @@ Place M-PACT in each provider's normal skill folder, then run provider runtime s
 2. Use targeted lookup while context is intact.
 3. Use save-context only when you explicitly want a same-agent compaction/restart checkpoint.
 4. Store narrative lessons as case studies, not long rules.
-5. Store durable behavior as short rules, not long sessions.
+5. Store durable behavior as short rules, not long narrative records.
 
 ## Safety And Authority Model
 
@@ -821,8 +786,6 @@ Agents may proceed through low-risk details once you clearly authorize the opera
 ## Choosing The Right Artifact
 
 Use a rule when future agent behavior should change.
-
-Use a session when project-wide continuity should be remembered.
 
 Use a task when structured work needs state, logs, or handoffs.
 

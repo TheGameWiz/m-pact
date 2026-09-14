@@ -2,7 +2,7 @@
 
 M-PACT helps local coding agents share memory. It was designed and validated for Codex and Claude Code, with Antigravity support replacing the retired Gemini CLI extension. Its goal is simple: let agents remember useful project information, share it with each other, and pick up work without depending on one chat window to hold everything.
 
-M-PACT stores memory at two levels: global memory that can follow you across projects, and project memory that belongs to one workspace. That memory can include shared rules, session notes, project tasks, task logs, task specifications, task summaries, case studies, and project journals.
+M-PACT stores memory at two levels: global memory that can follow you across projects, and project memory that belongs to one workspace. That memory can include shared rules, project tasks, task logs, task specifications, case studies, and project journals.
 
 This makes it possible to use more than one agent on the same project at the same time. One agent can work on a design, another can review it, another can implement it, and another can verify the code. They can hand work back and forth through task logs and specifications instead of reconstructing state from chat history.
 
@@ -70,7 +70,7 @@ To use M-PACT again, unset `MPACT_SUPPRESS`, set it to an empty value, or start 
 Use this skill when you want agents to:
 
 - Share useful memory between providers and sessions at both global and project levels.
-- Start a new context with the right rules, recent sessions, active tasks, and project orientation.
+- Start a new context with the right rules, active tasks, and project orientation.
 - Create shared rules that teach agents your coding style, project habits, and recurring lessons.
 - Use task logs, specifications, and summaries to design, implement, review, test, and verify work in a visible loop.
 - Hand work from one agent to another without relying on chat history or oversized startup prompts.
@@ -97,7 +97,6 @@ Each root uses the same standard folders:
 project-count__<n>       # user root only
 project__<path-slug>     # project roots only
 rules/
-sessions.zip
 tasks/
 case-studies.zip
 journal.zip
@@ -123,7 +122,7 @@ At the start of a new context, ask the agent:
 Use $m-pact and refresh memory.
 ```
 
-The agent should run the bundled refresh procedure without separately probing `.AgentMemoryRoot/` first. If the user root is truly missing, refresh performs provider runtime setup mechanics and continues. If no project `.AgentMemory/` exists, refresh should stop before any receipt and ask whether to add project scaffolding. If you answer no, it should rerun user-root-only refresh and emit that receipt. Refresh trigger policy is owned by `references/startup-contract.md`; other surfaces point there instead of restating the full rule. The refresh bundle is complete when it is emitted; the recent-session section has its own byte budget and may truncate the rendered newest session artifact inside the complete bundle.
+The agent should run the bundled refresh procedure without separately probing `.AgentMemoryRoot/` first. If the user root is truly missing, refresh performs provider runtime setup mechanics and continues. If no project `.AgentMemory/` exists, refresh should stop before any receipt and ask whether to add project scaffolding. If you answer no, it should rerun user-root-only refresh and emit that receipt. Refresh trigger policy is owned by `references/startup-contract.md`; other surfaces point there instead of restating the full rule.
 
 After the receipt, refresh itself is complete. If the same message included work beyond refresh, the agent should continue with that work using the loaded context. Agents should not scan memory folders merely to verify refresh; targeted lookup is for specific follow-up needs.
 
@@ -135,7 +134,6 @@ During normal work, ask for targeted operations instead:
 Find layered rules about handoffs.
 Take Handoff, Review.
 Write a task log checkpoint.
-Write a session entry for this project-wide decision.
 Create a case study for this incident.
 ```
 
@@ -166,7 +164,7 @@ m-pact/
 
 - Filenames are the index. Directory listings are the table of contents.
 - Refresh trigger policy is owned by `references/startup-contract.md`.
-- Sessions, task logs, and summaries are context, not prompts or task assignments.
+- Task logs, journals, and case studies are context, not prompts or task assignments.
 - Task logs are append-only.
 - Task specifications live in `specification.zip`. Legacy tasks use numbered snapshots; new-format tasks use a current narrative blob plus immutable item members and may have a helper-maintained editable `specification.md` narrative mirror.
 - Durable project-root writes require the project ID from the latest refresh or successful helper receipt. Helper receipts include `projectPath` beside `projectId` so humans can verify the target project.

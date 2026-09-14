@@ -31,7 +31,7 @@ Examples must be platform-neutral, or shown for both shells. The current guide h
 | One list, from design to done | "Designing and iterating" in Part 4. |
 | Handoff seamlessly between agents | "Taking a handoff" and "Writing a handoff" in Part 4. The guide has more to say than the pitch: "context comes with it" is machinery, but whether the agent took the handoff you meant is judgment. |
 | One set of rules, every agent follows | "Rules" in Part 4. |
-| Also capture everything that isn't a task | "Session entries," "Journal entries," and "Case studies" in Part 4. |
+| Also capture everything that isn't a task | "Journal entries" and "Case studies" in Part 4. |
 
 The overview itself gets one change *(walk)*: the save-context bullet moves from sixth to third, directly behind persistent memory, so the two memory promises sit together. They stay two bullets. One is the written record surviving, the other is the unwritten conversation surviving, and teaching that distinction is a large part of what the guide is for.
 
@@ -61,7 +61,7 @@ This section is the overview document (`mpact-guide-overview.md`), copied into t
 >
 > **One set of rules, every agent follows** - Your preferences, standards, and lessons learned, written once, followed by every agent.
 >
-> **Also capture everything that isn't a task** - Not every thought fits neatly into a task, so journals, case studies, and session entries give you a place to capture insights, decisions, and lessons that would otherwise just get lost.
+> **Also capture everything that isn't a task** - Not every thought fits neatly into a task, so journals and case studies give you a place to capture insights, decisions, and lessons that would otherwise just get lost.
 >
 > None of this requires a rigid structure. Run M-PACT with a single agent if that's your preference, or bring in a second agent, which is a common pattern, one as your design partner, the other for implementation, each circling back to check the other's work. Beyond that, the door's open too, however many agents fit the way you work.
 
@@ -224,7 +224,6 @@ One short section each, in the order a user meets them. Every section answers th
 - **Writing a task log**
 - **Closing and reopening a task** - close records whatever was still open at the time, and the agent's reply says so if there was any. Reopen surfaces that list but does not put it back into play; the first log entry after reopen has to say what is active again. Reopening is normal, not an admission anything failed.
 - **Rules** *(home of "One set of rules, every agent follows")* - durable instructions that shape future behavior. A rule goes in the project unless you say global or user-level. The agent checks for an existing rule on the topic and merges rather than duplicates. The filename is the rule's one-line form and is read at every startup; the body is read when the rule applies.
-- **Session entries** *(home, with the next two, of "Also capture everything that isn't a task")* - project snapshots and notes. Explicitly *not* a way to save context; that is what save-context is for. Startup reads only the newest one, and task state wins if they disagree, so lead with what a fresh session needs to know.
 - **Journal entries** - notes you want kept but that are not rules, tasks, or case studies. The one record you can ask to have edited after the fact.
 - **Case studies** - successes, failures, and lessons worth carrying forward.
 - **Finding things** - looking up a specific artifact or searching bodies. Unscoped means this project. Say global (or user, or root) for your user-level memory, parent for the project above, all or layered for everything in the chain. Sibling projects are never searched unless you name them.

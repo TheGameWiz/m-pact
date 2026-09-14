@@ -1,6 +1,6 @@
 # Helper Write Conventions
 
-Use for helper-owned prose writes: task logs, handoff logs, sessions, journals, case studies, rules, task creation handoff bodies, and specification/log paired updates.
+Use for helper-owned prose writes: task logs, handoff logs, journals, case studies, rules, task creation handoff bodies, and specification/log paired updates.
 
 Helpers own timestamps, numbering, member names, validation, final formatting, and ZIP writes. The agent supplies the semantic arguments and raw/plain body content.
 

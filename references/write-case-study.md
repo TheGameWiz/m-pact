@@ -1,6 +1,6 @@
 # Write Case Study
 
-Use when an incident, investigation, decision, or worked example needs a narrative record richer than a rule or session entry.
+Use when an incident, investigation, decision, or worked example needs a narrative record richer than a rule or journal entry.
 
 ## Authorization
 
