@@ -8,7 +8,7 @@ This is a Director-invoked exception to the preservation-write prohibitions. Age
 
 Context save writes one file for the resolved agent in the `.tmp` directory under the helper-resolved active memory root: the closest `.AgentMemory/.tmp` for project work, or `.AgentMemoryRoot/.tmp` when no project root is resolved. It is not OS temp, not a ZIP member, not a task-log record, and not tied to a task.
 
-The filename is `saved-context-<agent>-<timestamp>.md`, where the timestamp is local time in `YYYYMMDD-HHMMSS`. The save helper deletes any existing saved context for that agent before writing the replacement. The body should put resume-critical state first: what was just verified, what was ruled out, files or commands in flight, risks, and the next intended action.
+The filename is `saved-context-<agent>-<timestamp>.md`, where the timestamp is local time in `YYYYMMDD-HHMMSS`. The save helper deletes any existing saved context for that agent before writing the replacement. The body should put resume-critical state first: what was just verified, what was ruled out, files or commands in flight, risks, and the next intended action. When current task state matters, name the task and newest relevant task-log position, but do not duplicate every durable record. Successful refresh already provides recovery anchors for the current task's `log.zip`, `Agents.json`, task-log catch-up helper, transcript-path helper, and the current native transcript when the provider exposes a session ID.
 
 Saved context belongs to the same agent after context loss, not to a different agent taking a clean handoff. Task handoff remains a task-log operation.
 
@@ -28,7 +28,8 @@ These invocation aliases name the same operation; `save-context` is the canonica
 1. Confirm the Director explicitly requested the save.
 2. Write the saved context file with `scripts/save-context.js`.
 3. Put resume-critical state first.
-4. Do not include `## Active Items`; saved context is not an active-item handoff.
+4. Include task/log/transcript anchors only as concise pointers when they matter; use refresh's generated recovery anchors when available.
+5. Do not include `## Active Items`; saved context is not an active-item handoff.
 
 Example:
 

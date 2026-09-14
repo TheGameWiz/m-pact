@@ -195,7 +195,7 @@ function main() {
   const state = readState();
   const conversationState = conversationId ? state.conversations[conversationId] : null;
   if (conversationState && conversationState.bundlePath) {
-    inject(`M-PACT ANTIGRAVITY REFRESH: same conversation. If the refresh bundle content is no longer in context, read ${conversationState.bundlePath}, verify its final line is END REFRESH BUNDLE, emit the receipt body, then continue.`);
+    inject(`M-PACT ANTIGRAVITY REFRESH: same conversation. If the refresh bundle content is no longer in context, reading ${conversationState.bundlePath} is mandatory before answering the Director. Verify its final line is END REFRESH BUNDLE, treat it as loaded context, emit only the receipt body without BEGIN/END marker lines or a startup summary, then continue.`);
     return;
   }
 

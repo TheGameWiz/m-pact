@@ -5,7 +5,12 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { listMembers, readMember } = require("./lib/zip-record-store");
+const { providerSessionIdForAgent, recordCurrentAgentSession } = require("./lib/agents-store");
 const { REFRESH_ACCEPTED_FLAGS, assertKnownFlags, assertMpactAllowedInCurrentSession, isMpactHookContext, resolveAgentIdentity } = require("./lib/helper-common");
+const {
+  newestResolvedAgentSessionPaths,
+  resolveEntry,
+} = require("./list-agent-session-paths");
 const {
   latestMember,
   withRecordMetadata,
@@ -42,12 +47,499 @@ const {
   readSavedContext,
   savedContextAgeMs,
 } = require("./lib/saved-context");
+const { withTaskOperationLock } = require("./lib/task-state");
+
+function taskIdForTaskPath(taskPath) {
+  const value = taskNumberValue(path.basename(taskPath));
+  return value >= 0 ? `t${String(value).padStart(4, "0")}` : path.basename(taskPath);
+}
+
+function collapseBlankLines(lines) {
+  const output = [];
+  let blank = false;
+  for (const line of lines) {
+    if (line.trim() === "") {
+      if (!blank) {
+        output.push("");
+      }
+      blank = true;
+      continue;
+    }
+    output.push(line);
+    blank = false;
+  }
+  return output;
+}
+
+function compactRepeatedTaskLogItemLines(lines, seenItemMentions, member) {
+  if (!seenItemMentions) {
+    return lines;
+  }
+  const recordLabel = String(member.record).padStart(4, "0");
+  return lines.map((line) => {
+    const match = /^(- \[([A-Za-z0-9._-]+)\] )(.*)$/.exec(line);
+    if (!match) {
+      return line;
+    }
+    const normalized = line.trim();
+    const previous = seenItemMentions.get(match[2]);
+    if (previous && previous.normalized === normalized) {
+      return `${match[1]}(unchanged repeat omitted; newest full mention retained in record ${previous.recordLabel})`;
+    }
+    seenItemMentions.set(match[2], { normalized, recordLabel });
+    return line;
+  });
+}
+
+function compactTaskLogText(text, options = {}) {
+  const source = String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trimEnd();
+  const lines = source.length > 0 ? source.split("\n") : [];
+  const output = [];
+  let inFrontMatter = lines[0] === "---";
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (inFrontMatter) {
+      if (index === 0) {
+        continue;
+      }
+      if (line === "---") {
+        inFrontMatter = false;
+      }
+      continue;
+    }
+    if (/^(record|timestamp|agents|agent|source|task|taskPath|projectId):\s/i.test(line)) {
+      continue;
+    }
+    if (/^(OK|PARTIAL|AUDIT):\s/.test(line)) {
+      continue;
+    }
+    output.push(line);
+  }
+  return compactRepeatedTaskLogItemLines(collapseBlankLines(output), options.seenItemMentions, options.member)
+    .join("\n")
+    .trimEnd();
+}
+
+function renderFallbackTaskLogRecord(member, logZip, text) {
+  return [
+    `### task-log-digest: ${member.name}`,
+    "",
+    `Path: ${formatDisplayPath(`${logZip}#${member.name}`)}`,
+    `Record: ${String(member.record).padStart(4, "0")}; author: ${member.author || "(none)"}; modified: ${member.modified}`,
+    "",
+    "```text",
+    String(text || "").trimEnd(),
+    "```",
+    "",
+  ].join(EOL);
+}
+
+function addFallbackTaskLogDigest(lines, taskPath, agent, budgetBytes = FALLBACK_TASK_LOG_BUDGET_BYTES) {
+  const logZip = path.join(taskPath, "log.zip");
+  const members = taskLogMembers(taskPath);
+  const position = agentTaskLogPosition(members, agent);
+  const cursorRecord = newestAuthoredTaskLogMember(members, agent);
+  const cursor = cursorRecord ? cursorRecord.record : position.readCursor;
+  const taskId = taskIdForTaskPath(taskPath);
+  const candidates = members
+    .filter((member) => member.record !== null && member.record <= cursor)
+    .sort((a, b) => b.record - a.record || b.name.localeCompare(a.name));
+  const selected = [];
+  const seenItemMentions = new Map();
+  let used = 0;
+  for (const member of candidates) {
+    const text = compactTaskLogText(readMember(logZip, member.name).toString("utf8"), { seenItemMentions, member });
+    const rendered = renderFallbackTaskLogRecord(member, logZip, text);
+    const bytes = utf8ByteCount(rendered);
+    if (selected.length > 0 && used + bytes > budgetBytes) {
+      break;
+    }
+    selected.push({ member, rendered, bytes });
+    used += bytes;
+  }
+  const selectedRecords = selected.map((item) => item.member.record).filter(Number.isFinite);
+  const oldestIncluded = selectedRecords.length > 0 ? Math.min(...selectedRecords) : null;
+  const omittedOlder = oldestIncluded === null
+    ? candidates.length
+    : candidates.filter((member) => member.record < oldestIncluded).length;
+  const omittedRange = omittedOlder > 0 && oldestIncluded !== null
+    ? `0001-${String(oldestIncluded - 1).padStart(4, "0")}`
+    : omittedOlder > 0 ? `0001-${String(cursor).padStart(4, "0")}` : "(none)";
+
+  addLine(lines, "## Fallback Task Log Digest");
+  addLine(lines);
+  addLine(lines, `Budget: target ${formatKB(FALLBACK_TASK_LOG_BUDGET_BYTES)}KB; available ${formatKB(budgetBytes)}KB after soft spillover planning; used ${formatKB(used)}KB.`);
+  addLine(lines, `Agent: ${agent}`);
+  addLine(lines, `Task: ${path.basename(taskPath)}`);
+  addLine(lines, `Read-cursor: ${position.readCursor}`);
+  addLine(lines, `Task-log cursor record: ${cursorRecord ? `${String(cursorRecord.record).padStart(4, "0")} (${cursorRecord.name})` : "(none)"}`);
+  addLine(lines, `Post-cursor records not inlined: ${position.unread.length}; by author: ${position.unreadByAuthor}`);
+  addLine(lines, `Included records: ${selectedRecords.length > 0 ? `${String(Math.min(...selectedRecords)).padStart(4, "0")}-${String(Math.max(...selectedRecords)).padStart(4, "0")}` : "(none)"}`);
+  addLine(lines, `Omitted older records: ${omittedOlder}; range: ${omittedRange}`);
+  addLine(lines, `Manual inspection: node scripts/read-member-span.js --task ${taskId} --container task-log --after 0 --through ${String(cursor).padStart(4, "0")}`);
+  addLine(lines, "Filtering: front matter and helper/lifecycle boilerplate removed; unchanged repeated tagged item lines are compressed while changed mentions are kept in full.");
+  addLine(lines);
+  if (selected.length === 0) {
+    addLine(lines, "(none; this agent has no task-log cursor record yet)");
+    addLine(lines);
+    return { used, selectedCount: 0, omittedOlder, postCursorCount: position.unread.length };
+  }
+  for (const item of [...selected].reverse()) {
+    lines.push(item.rendered.replace(/\s*$/, ""));
+    addLine(lines);
+  }
+  return { used, selectedCount: selected.length, omittedOlder, postCursorCount: position.unread.length };
+}
+
+function isToolLikeTranscriptRecord(record) {
+  const payload = record?.payload || {};
+  const item = payload.item || {};
+  const message = payload.message || record?.message || {};
+  const role = String(record?.role || payload.role || message.role || item.role || "").toLowerCase();
+  const type = String(record?.type || payload.type || message.type || item.type || "").toLowerCase();
+  const source = String(record?.source || "").toUpperCase();
+  const antigravityToolTypes = new Set([
+    "CODE_ACTION",
+    "GREP_SEARCH",
+    "LIST_DIRECTORY",
+    "READ_URL_CONTENT",
+    "RUN_COMMAND",
+    "SEARCH_WEB",
+    "VIEW_FILE",
+  ]);
+  return role === "tool" || role === "function" || /tool|function_call/.test(type)
+    || (source === "MODEL" && antigravityToolTypes.has(String(record?.type || "").toUpperCase()));
+}
+
+function transcriptRecordBody(record) {
+  const payload = record?.payload || null;
+  if (record?.type === "response_item" && payload) {
+    return payload;
+  }
+  if (payload?.message) {
+    return payload.message;
+  }
+  if (record?.message) {
+    return record.message;
+  }
+  return record;
+}
+
+function transcriptRole(record) {
+  const antigravityRole = antigravityTranscriptRole(record);
+  if (antigravityRole) {
+    return antigravityRole;
+  }
+  const body = transcriptRecordBody(record);
+  const role = String(body?.role || "").toLowerCase();
+  if (role === "user" || role === "director") {
+    return "user";
+  }
+  if (role === "assistant") {
+    return "assistant";
+  }
+  return null;
+}
+
+function antigravityTranscriptRole(record) {
+  const source = String(record?.source || "").toUpperCase();
+  const type = String(record?.type || "").toUpperCase();
+  if (source === "USER_EXPLICIT" && type === "USER_INPUT") {
+    return "user";
+  }
+  if (source === "MODEL" && type === "PLANNER_RESPONSE") {
+    return "assistant";
+  }
+  return null;
+}
+
+function antigravityTranscriptText(record, role) {
+  const source = String(record?.source || "").toUpperCase();
+  const type = String(record?.type || "").toUpperCase();
+  if (!(source === "USER_EXPLICIT" && type === "USER_INPUT") && !(source === "MODEL" && type === "PLANNER_RESPONSE")) {
+    return null;
+  }
+  const content = typeof record?.content === "string" ? record.content : "";
+  if (role !== "user") {
+    return content;
+  }
+  const match = /<USER_REQUEST>\s*([\s\S]*?)\s*<\/USER_REQUEST>/i.exec(content);
+  return match ? match[1] : content;
+}
+
+function transcriptTextValue(record, body, role) {
+  const antigravityText = antigravityTranscriptText(record, role);
+  if (antigravityText !== null) {
+    return antigravityText;
+  }
+  return body.content ?? body.text ?? body;
+}
+
+function collectTranscriptText(value, output = []) {
+  if (value === null || value === undefined) {
+    return output;
+  }
+  if (typeof value === "string") {
+    if (value.trim()) {
+      output.push(value.trim());
+    }
+    return output;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectTranscriptText(item, output);
+    }
+    return output;
+  }
+  if (typeof value !== "object") {
+    return output;
+  }
+  const type = String(value.type || "").toLowerCase();
+  if (/tool|function_call|thinking_delta|signature_delta/.test(type)) {
+    return output;
+  }
+  if (typeof value.text === "string") {
+    collectTranscriptText(value.text, output);
+  }
+  if (typeof value.content === "string" || Array.isArray(value.content)) {
+    collectTranscriptText(value.content, output);
+  }
+  if (value.message) {
+    collectTranscriptText(value.message.content || value.message.text, output);
+  }
+  return output;
+}
+
+function currentProviderSession(agent) {
+  const current = providerSessionIdForAgent(agent);
+  if (!current) {
+    return null;
+  }
+  return {
+    provider: current.provider,
+    agent,
+    id: current.id,
+  };
+}
+
+function currentProviderSessions(agent) {
+  const session = currentProviderSession(agent);
+  return session ? [session] : [];
+}
+
+function readTranscriptTurns(session) {
+  const turns = [];
+  let droppedToolOrLifecycle = 0;
+  const lines = readText(session.path).split(/\r?\n/);
+  for (const line of lines) {
+    if (!line.trim()) {
+      continue;
+    }
+    let record;
+    try {
+      record = JSON.parse(line);
+    } catch {
+      droppedToolOrLifecycle += 1;
+      continue;
+    }
+    if (isToolLikeTranscriptRecord(record)) {
+      droppedToolOrLifecycle += 1;
+      continue;
+    }
+    const role = transcriptRole(record);
+    if (!role) {
+      droppedToolOrLifecycle += 1;
+      continue;
+    }
+    const body = transcriptRecordBody(record);
+    const text = collectTranscriptText(transcriptTextValue(record, body, role)).join("\n").trim();
+    if (!text) {
+      droppedToolOrLifecycle += 1;
+      continue;
+    }
+    turns.push({ role, text });
+  }
+  return { turns, droppedToolOrLifecycle };
+}
+
+function renderTranscriptTurn(session, turn) {
+  return [
+    `### native-session-tail: ${session.provider}/${session.agent}`,
+    "",
+    `Path: ${formatDisplayPath(session.path)}`,
+    `Modified: ${session.modified}`,
+    "",
+    "```text",
+    `${turn.role}: ${turn.text}`,
+    "```",
+    "",
+  ].join(EOL);
+}
+
+function estimateFallbackNativeTranscriptNeed(sessions) {
+  const resolved = [];
+  sessions.forEach((session, registryIndex) => {
+    const entry = resolveEntry(session);
+    if (entry) {
+      resolved.push({ ...entry, registryIndex });
+    }
+  });
+  let bytes = 0;
+  let turns = 0;
+  for (const session of newestResolvedAgentSessionPaths(resolved)) {
+    const read = readTranscriptTurns(session);
+    for (const turn of read.turns) {
+      bytes += utf8ByteCount(renderTranscriptTurn(session, turn));
+      turns += 1;
+    }
+  }
+  return { bytes, turns };
+}
+
+function addFallbackNativeTranscriptTail(lines, sessions, agent, budgetBytes = FALLBACK_TRANSCRIPT_BUDGET_BYTES, options = {}) {
+  const resolved = [];
+  const unresolved = [];
+  sessions.forEach((session, registryIndex) => {
+    const entry = resolveEntry(session);
+    if (entry) {
+      resolved.push({ ...entry, registryIndex });
+    } else {
+      unresolved.push(session);
+    }
+  });
+  const selectedSessions = newestResolvedAgentSessionPaths(resolved);
+  const selectedTurns = [];
+  const summaries = [];
+  let used = 0;
+  let omittedOlder = 0;
+  let droppedToolOrLifecycle = 0;
+  for (const session of selectedSessions) {
+    const read = readTranscriptTurns(session);
+    droppedToolOrLifecycle += read.droppedToolOrLifecycle;
+    let includedForSession = 0;
+    for (let index = read.turns.length - 1; index >= 0; index--) {
+      const rendered = renderTranscriptTurn(session, read.turns[index]);
+      const bytes = utf8ByteCount(rendered);
+      if (selectedTurns.length > 0 && used + bytes > budgetBytes) {
+        omittedOlder += index + 1;
+        break;
+      }
+      if (selectedTurns.length === 0 && bytes > budgetBytes) {
+        const overhead = utf8ByteCount(renderTranscriptTurn(session, { role: read.turns[index].role, text: "" }));
+        const text = truncateTextToByteBudget(read.turns[index].text, Math.max(0, budgetBytes - overhead), FALLBACK_TRUNCATION_NOTICE);
+        const clipped = renderTranscriptTurn(session, { role: read.turns[index].role, text });
+        selectedTurns.push({ session, rendered: clipped });
+        used += utf8ByteCount(clipped);
+      } else {
+        selectedTurns.push({ session, rendered });
+        used += bytes;
+      }
+      includedForSession += 1;
+    }
+    summaries.push(`${session.provider}/${session.agent}: included ${includedForSession} of ${read.turns.length} filtered turn(s)`);
+    if (used >= budgetBytes) {
+      break;
+    }
+  }
+
+  addLine(lines, "## Native Session Tail");
+  addLine(lines);
+  addLine(lines, `Budget: target ${formatKB(options.targetBudgetBytes || FALLBACK_TRANSCRIPT_BUDGET_BYTES)}KB; available ${formatKB(budgetBytes)}KB after soft spillover planning; used ${formatKB(used)}KB.`);
+  addLine(lines, "Role: conversational nuance only; task log and artifacts remain authoritative on conflict.");
+  addLine(lines, `Agent: ${agent}`);
+  if (options.registryLabel) {
+    addLine(lines, `Session registry: ${options.registryLabel}`);
+  }
+  addLine(lines, `Resolved current-agent session paths: ${selectedSessions.length}; unresolved current-agent session anchors: ${unresolved.length}.`);
+  addLine(lines, `Included/omitted turns: ${summaries.length > 0 ? summaries.join("; ") : "(none)"}; omitted older filtered turns: ${omittedOlder}.`);
+  addLine(lines, `Dropped tool/lifecycle blocks: ${droppedToolOrLifecycle}.`);
+  addLine(lines, `Manual inspection: ${options.manualInspection || "node scripts/list-agent-session-paths.js --task <task>"} then inspect the selected provider JSONL directly.`);
+  addLine(lines);
+  if (selectedTurns.length === 0) {
+    addLine(lines, "(none)");
+    addLine(lines);
+    return { used, selectedCount: 0, omittedOlder, droppedToolOrLifecycle };
+  }
+  for (const turn of [...selectedTurns].reverse()) {
+    lines.push(turn.rendered.replace(/\s*$/, ""));
+    addLine(lines);
+  }
+  return { used, selectedCount: selectedTurns.length, omittedOlder, droppedToolOrLifecycle };
+}
+
+function fallbackContextReason(savedContextRestore) {
+  if (savedContextRestore && savedContextRestore.action === "restored") {
+    return null;
+  }
+  if (savedContextRestore && savedContextRestore.action === "discarded") {
+    return "saved context discarded";
+  }
+  return "no saved context available";
+}
+
+function addNoSavedContextFallbackBundle(lines, taskPath, agent, reason) {
+  addLine(lines, "## No Saved Context Fallback Bundle");
+  addLine(lines);
+  addLine(lines, `Reason: ${reason}.`);
+  addLine(lines, `Soft total budget: ${formatKB(FALLBACK_TOTAL_BUDGET_BYTES)}KB. With a current task, refresh favors task-log state (${formatKB(FALLBACK_TASK_LOG_BUDGET_BYTES)}KB) over transcript nuance (${formatKB(FALLBACK_TRANSCRIPT_BUDGET_BYTES)}KB); without a current task, it uses up to ${formatKB(TASKLESS_FALLBACK_TRANSCRIPT_BUDGET_BYTES)}KB for the current native transcript.`);
+  addLine(lines, "This section is generated by the refresh helper; do not self-fetch replacement context unless the truncation report says more is needed.");
+  addLine(lines);
+  if (!agent) {
+    addLine(lines, "(agent unresolved; per-agent fallback context unavailable)");
+    addLine(lines);
+    return;
+  }
+  if (!taskPath) {
+    const sessions = currentProviderSessions(agent);
+    addLine(lines, "Task-log fallback: unavailable because no current task is selected.");
+    addLine(lines, "Native transcript source: current provider session ID from this refresh environment.");
+    addLine(lines);
+    if (sessions.length === 0) {
+      addLine(lines, "(current provider session ID unavailable; taskless transcript fallback unavailable)");
+      addLine(lines);
+      return;
+    }
+    addFallbackNativeTranscriptTail(lines, sessions, agent, TASKLESS_FALLBACK_TRANSCRIPT_BUDGET_BYTES, {
+      targetBudgetBytes: TASKLESS_FALLBACK_TRANSCRIPT_BUDGET_BYTES,
+      registryLabel: "current provider session (not persisted)",
+      manualInspection: "inspect the provider JSONL path shown above",
+    });
+    addLine(lines);
+    return;
+  }
+  const sessions = currentProviderSessions(agent);
+  const transcriptNeed = estimateFallbackNativeTranscriptNeed(sessions);
+  const transcriptTargetUse = Math.min(transcriptNeed.bytes, FALLBACK_TRANSCRIPT_BUDGET_BYTES);
+  const taskLogBudget = Math.min(
+    FALLBACK_TOTAL_BUDGET_BYTES,
+    FALLBACK_TASK_LOG_BUDGET_BYTES + Math.max(0, FALLBACK_TRANSCRIPT_BUDGET_BYTES - transcriptTargetUse),
+  );
+  const taskLogResult = addFallbackTaskLogDigest(lines, taskPath, agent, taskLogBudget);
+  const transcriptBudget = Math.max(0, FALLBACK_TOTAL_BUDGET_BYTES - taskLogResult.used);
+  if (sessions.length === 0) {
+    addLine(lines, "## Native Session Tail");
+    addLine(lines);
+    addLine(lines, "(current provider session ID unavailable; transcript fallback unavailable)");
+    addLine(lines);
+  } else {
+    addFallbackNativeTranscriptTail(lines, sessions, agent, transcriptBudget, {
+      registryLabel: "current provider session (not persisted)",
+      manualInspection: "inspect the provider JSONL path shown above",
+    });
+  }
+}
 
 const MIN_NODE_MAJOR = 18;
 const EOL = os.EOL;
 const RECENT_SESSION_BUDGET_BYTES = 25 * 1024;
+const FALLBACK_TOTAL_BUDGET_BYTES = 15 * 1024;
+const FALLBACK_TASK_LOG_BUDGET_BYTES = 10 * 1024;
+const FALLBACK_TRANSCRIPT_BUDGET_BYTES = 5 * 1024;
+const TASKLESS_FALLBACK_TRANSCRIPT_BUDGET_BYTES = 10 * 1024;
 const TRUNCATION_NOTICE = "\n\n[Truncated to fit the 25KB recent-session refresh budget.]";
-const HOOK_RECEIPT_EMISSION_NOTE = "M-PACT HOOK NOTE: This refresh output was injected into agent context only. The Director has not seen the receipt. Verify the bundle, emit the receipt body verbatim at the start of the first response, follow any required refresh decision block, then continue the Director's requested work. In Antigravity, injected text is transient and the fast path must complete this turn.";
+const FALLBACK_TRUNCATION_NOTICE = "\n\n[Truncated to fit the fallback section byte budget.]";
+const HOOK_STARTUP_DIRECTIVE = "M-PACT STARTUP DIRECTIVE: This injected refresh output is mandatory pre-answer context. Before answering the Director's first request, read the file named by BundlePath, verify its final line is END REFRESH BUNDLE, treat that bundle as loaded, then emit only the receipt body between BEGIN REFRESH RECEIPT and END REFRESH RECEIPT. Do not print the BEGIN/END marker lines. Do not add a startup heading, summary, or other prose before the receipt.";
+const HOOK_RECEIPT_EMISSION_NOTE = "M-PACT HOOK NOTE: The Director has not seen the receipt. Reading and verifying BundlePath is mandatory before answering the first request. Emit only the receipt body as the first visible response, excluding BEGIN/END marker lines and any startup summary, then continue the Director's requested work. In Antigravity, injected text is transient and the fast path must complete this turn.";
 
 function parseArgs(argv) {
   const options = {
@@ -437,6 +929,42 @@ function addAgentTaskLogRefreshUnavailable(lines, taskPath, reason) {
   addLine(lines);
 }
 
+function addRecoveryAnchors(lines, taskPath, agent) {
+  addLine(lines, "## Recovery Anchors");
+  addLine(lines);
+  addLine(lines, "Use these pointers for targeted recovery when restored or generated context is not enough. Do not read whole raw transcripts by default; inspect them only when missing conversation nuance matters.");
+  addLine(lines);
+  if (!taskPath) {
+    const session = agent ? currentProviderSession(agent) : null;
+    addLine(lines, "- Current task: (none; no valid open current task selected)");
+    addLine(lines, "- Durable task history: unavailable without a current task.");
+    if (session) {
+      const resolved = resolveEntry(session);
+      addLine(lines, `- Current native transcript: provider=${session.provider}; agent=${session.agent}; id=${session.id}${resolved ? `; path=${formatDisplayPath(resolved.path)}` : "; path=(not found yet)"}`);
+    } else {
+      addLine(lines, "- Current native transcript: unavailable; provider session ID is not exposed in this refresh environment.");
+    }
+    addLine(lines);
+    return;
+  }
+  const taskId = taskIdForTaskPath(taskPath);
+  const taskLogCursor = agent ? agentTaskLogPosition(taskLogMembers(taskPath), agent).readCursor : null;
+  const taskLogCursorLabel = Number.isFinite(taskLogCursor) ? String(taskLogCursor).padStart(4, "0") : "<read-cursor>";
+  const session = agent ? currentProviderSession(agent) : null;
+  addLine(lines, `- Current task: ${taskId}; folder: ${path.basename(taskPath)}; path: ${formatDisplayPath(taskPath)}`);
+  addLine(lines, `- Durable task history: ${formatDisplayPath(path.join(taskPath, "log.zip"))}`);
+  addLine(lines, `- Task-log catch-up: \`node scripts/read-member-span.js --task ${taskId} --container task-log --after ${taskLogCursorLabel}\``);
+  if (session) {
+    const resolved = resolveEntry(session);
+    addLine(lines, `- Current native transcript: provider=${session.provider}; agent=${session.agent}; id=${session.id}${resolved ? `; path=${formatDisplayPath(resolved.path)}` : "; path=(not found yet)"}`);
+  } else {
+    addLine(lines, "- Current native transcript: unavailable; provider session ID is not exposed in this refresh environment.");
+  }
+  addLine(lines, `- Raw transcript trailhead: ${formatDisplayPath(path.join(taskPath, "Agents.json"))}`);
+  addLine(lines, `- Transcript paths: \`node scripts/list-agent-session-paths.js --task ${taskId}\``);
+  addLine(lines);
+}
+
 function orphanedCompanionsForTask(taskPath) {
   const orphaned = orphanedSpecificationMembers(taskPath);
   if (orphaned.length === 0) {
@@ -514,6 +1042,7 @@ function main() {
   let startupTaskRead = "(none)";
   let startupTaskText = "";
   let currentTaskPointer = "(none)";
+  let currentTaskPathForSessionCapture = null;
   const missingOrAmbiguous = [];
   const orphanedSpecCompanions = [];
   let savedContextRestore = null;
@@ -664,6 +1193,7 @@ function main() {
         }
       }
       let selectedTask = null;
+      let currentPointerValid = false;
       const taskEntries = fs.readdirSync(tasksDir, { withFileTypes: true });
       const currentPointers = taskEntries
         .filter((entry) => entry.isFile() && entry.name.startsWith("current__"))
@@ -676,13 +1206,16 @@ function main() {
         const pointerStat = fs.statSync(pointerPath);
         currentTaskPointer = pointerName.slice("current__".length);
         const candidateTaskPath = path.join(tasksDir, currentTaskPointer);
+        currentPointerValid = true;
         if (pointerStat.size !== 0) {
           missingOrAmbiguous.push(`current task pointer ${pointerName} must be a zero-byte sentinel`);
+          currentPointerValid = false;
         }
         if (/^A__/.test(currentTaskPointer) && existsDir(candidateTaskPath)) {
           selectedTask = currentTaskPointer;
         } else {
           missingOrAmbiguous.push(`stale current task pointer ${pointerName}; remove it or explicitly choose an active task`);
+          currentPointerValid = false;
         }
       } else if (currentPointers.length > 1) {
         currentTaskPointer = "(none; multiple current task sentinels)";
@@ -697,6 +1230,9 @@ function main() {
           try {
             startupTaskText = readText(taskMd);
             startupTaskRead = `${selectedTask}/task.md`;
+            if (currentPointerValid) {
+              currentTaskPathForSessionCapture = path.dirname(taskMd);
+            }
           } catch (error) {
             failures.push(`Failed to read startup task file: ${taskMd} (${error.message})`);
           }
@@ -780,6 +1316,11 @@ function main() {
   const projectRootsDisplay = formatDisplayPathList(projectRoots);
   const projectIdentityDisplay = describeProjectIdentity(activeRoot, userRoot);
   const orphanedSpecCompanionsDisplay = orphanedSpecCompanions.length > 0 ? orphanedSpecCompanions.join("; ") : null;
+  if (currentTaskPathForSessionCapture && agentResolution && agentResolution.agent && /projectIdentity=ok\b/.test(projectIdentityDisplay.receipt)) {
+    withTaskOperationLock(currentTaskPathForSessionCapture, () => {
+      recordCurrentAgentSession(currentTaskPathForSessionCapture, agentResolution.agent);
+    });
+  }
   const receiptLines = [
     "M-PACT MEMORY REFRESH",
     `activeProjectRoot=${activeDisplay}; ${projectIdentityDisplay.receipt}`,
@@ -815,6 +1356,14 @@ function main() {
     addLine(bundle, String(savedContextRestore.body || "").trimEnd());
     addLine(bundle, "```");
   }
+  addLine(bundle);
+  addLine(bundle, "## Startup Load Requirement");
+  addLine(bundle);
+  addLine(bundle, "Reading this bundle is mandatory before answering after startup refresh or Director-requested refresh. Verify the final line is `END REFRESH BUNDLE`, treat the verified bundle as loaded context, then emit only the receipt body from the receipt block. Do not print the `BEGIN REFRESH RECEIPT` or `END REFRESH RECEIPT` marker lines, and do not add a startup heading or summary before the receipt.");
+  const fallbackReason = fallbackContextReason(savedContextRestore);
+  let startupTaskPathForFallback = null;
+  addLine(bundle);
+  addRecoveryAnchors(bundle, currentTaskPathForSessionCapture, agentResolution ? agentResolution.agent : null);
   addLine(bundle);
   addLine(bundle, "## Root And Startup Manifest");
   addLine(bundle);
@@ -892,12 +1441,17 @@ function main() {
   if (startupTaskRead !== "(none)") {
     const taskFolder = startupTaskRead.replace(/\/task\.md$/, "");
     const taskPath = path.join(activeRoot, "tasks", taskFolder, "task.md");
+    startupTaskPathForFallback = path.dirname(taskPath);
     addArtifact(bundle, `Startup task: ${startupTaskRead}`, taskPath, startupTaskText);
     if (agentResolution && agentResolution.agent) {
       addAgentTaskLogRefresh(bundle, path.dirname(taskPath), agentResolution.agent);
     } else {
       addAgentTaskLogRefreshUnavailable(bundle, path.dirname(taskPath), agentResolutionError ? agentResolutionError.message : "agent identity could not be resolved");
     }
+  }
+
+  if (fallbackReason) {
+    addNoSavedContextFallbackBundle(bundle, startupTaskPathForFallback, agentResolution ? agentResolution.agent : null, fallbackReason);
   }
 
   addLine(bundle, "END REFRESH BUNDLE");
@@ -911,6 +1465,9 @@ function main() {
   const bundlePath = refreshBundlePath(scratchRoot, bundleAgentToken);
   fs.writeFileSync(bundlePath, bundleText, { encoding: "utf8" });
 
+  if (isMpactHookContext()) {
+    console.log(HOOK_STARTUP_DIRECTIVE);
+  }
   console.log("AUDIT: PASS");
   console.log("M-PACT REFRESH BUNDLE MANIFEST");
   console.log(`BundlePath: ${bundlePath}`);

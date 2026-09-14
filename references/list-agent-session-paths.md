@@ -22,7 +22,7 @@ For "where did we discuss ABC?", run the helper, then search the returned `path`
 
 ## Capture
 
-Task mutation helpers record provider transcript IDs automatically in `Agents.json`. `set-current-task` also records on task-selection calls, and `prepare-handoff` records when the resolved task is open. `set-current-task --clear` and closed-task `prepare-handoff` lookups do not record. A live agent does not pass its own session ID. The helpers reuse existing agent resolution and read the provider variable for that agent:
+Task mutation helpers record provider transcript IDs automatically in `Agents.json`. Successful refresh also records when it resolves exactly one valid open current task, valid project identity, resolved agent identity, and a provider session ID. `set-current-task` records on task-selection calls, and `prepare-handoff` records when the resolved task is open. `set-current-task --clear`, closed-task `prepare-handoff` lookups, halted refresh runs, ambiguous or stale current-task refreshes, and refreshes without valid project identity do not record. A live agent does not pass its own session ID. The helpers reuse existing agent resolution and read the provider variable for that agent:
 
 - Claude: `CLAUDE_CODE_SESSION_ID`
 - Codex: `CODEX_THREAD_ID`, falling back to `CODEX_SESSION_ID`

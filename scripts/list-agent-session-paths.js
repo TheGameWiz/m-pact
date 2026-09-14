@@ -35,6 +35,40 @@ function statEntry(entry, filePath, extra = {}) {
   };
 }
 
+function modifiedTime(entry) {
+  const parsed = Date.parse(entry && entry.modified);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function sortNewestFirst(entries) {
+  return [...(entries || [])].sort((a, b) => {
+    return modifiedTime(b) - modifiedTime(a)
+      || (Number.isFinite(b.registryIndex) ? b.registryIndex : -1) - (Number.isFinite(a.registryIndex) ? a.registryIndex : -1)
+      || String(a.path || "").localeCompare(String(b.path || ""));
+  });
+}
+
+function sortResolvedAgentSessionPaths(entries) {
+  return [...(entries || [])].sort((a, b) => {
+    return String(a.provider || "").localeCompare(String(b.provider || ""))
+      || String(a.agent || "").localeCompare(String(b.agent || ""))
+      || modifiedTime(b) - modifiedTime(a)
+      || (Number.isFinite(b.registryIndex) ? b.registryIndex : -1) - (Number.isFinite(a.registryIndex) ? a.registryIndex : -1)
+      || String(a.path || "").localeCompare(String(b.path || ""));
+  });
+}
+
+function newestResolvedAgentSessionPaths(entries) {
+  const groups = new Map();
+  for (const entry of sortResolvedAgentSessionPaths(entries)) {
+    const key = `${entry.provider}\u0000${entry.agent}`;
+    if (!groups.has(key)) {
+      groups.set(key, entry);
+    }
+  }
+  return [...groups.values()].sort((a, b) => modifiedTime(b) - modifiedTime(a) || String(a.provider || "").localeCompare(String(b.provider || "")));
+}
+
 function safeReaddir(dirPath) {
   try {
     return fs.readdirSync(dirPath, { withFileTypes: true });
@@ -111,10 +145,11 @@ function findCodexPath(entry, env = process.env) {
   if (matches.length === 0) {
     return null;
   }
-  matches.sort();
-  return statEntry(entry, matches[0], {
+  const newest = sortNewestFirst(matches.map((match) => statEntry(entry, match)))[0];
+  return {
+    ...newest,
     title: indexed?.thread_name,
-  });
+  };
 }
 
 function antigravityRoots(env = process.env) {
@@ -152,14 +187,14 @@ function main({ args, input }) {
   const sessions = readAgentSessions(taskPath);
   const resolved = [];
   const unresolved = [];
-  for (const session of sessions) {
+  sessions.forEach((session, registryIndex) => {
     const entry = resolveEntry(session);
     if (entry) {
-      resolved.push(entry);
+      resolved.push({ ...entry, registryIndex });
     } else {
       unresolved.push(session);
     }
-  }
+  });
   return {
     ok: true,
     operation: "list-agent-session-paths",
@@ -167,23 +202,27 @@ function main({ args, input }) {
     sessionCount: sessions.length,
     resolvedCount: resolved.length,
     unresolvedCount: unresolved.length,
-    agentSessionPaths: resolved,
+    agentSessionPaths: sortResolvedAgentSessionPaths(resolved),
     unresolvedAgentSessions: unresolved,
   };
 }
 
-runCli(main, {
-  acceptedFlags: ACCEPTED_FLAGS,
-  stringFlags: ACCEPTED_FLAGS,
-  requiredFlags: REQUIRED_FLAGS,
-  requiredOneOf: REQUIRED_ONE_OF,
-  unsupportedFlags: DEFAULT_UNSUPPORTED_OPERATION_FLAGS,
-});
+if (require.main === module) {
+  runCli(main, {
+    acceptedFlags: ACCEPTED_FLAGS,
+    stringFlags: ACCEPTED_FLAGS,
+    requiredFlags: REQUIRED_FLAGS,
+    requiredOneOf: REQUIRED_ONE_OF,
+    unsupportedFlags: DEFAULT_UNSUPPORTED_OPERATION_FLAGS,
+  });
+}
 
 module.exports = {
   antigravityRoots,
   findAntigravityPath,
   findClaudePath,
   findCodexPath,
+  newestResolvedAgentSessionPaths,
   resolveEntry,
+  sortResolvedAgentSessionPaths,
 };

@@ -35,6 +35,10 @@ If identity cannot be resolved and no saved-context files are present, refresh s
 
 When a current task exists, refresh also reports the resolved agent's task-log read-cursor and unread task-log records after that cursor; if the agent has authored a record on the current task, refresh includes that cursor record as orientation. If the receipt names `orphanedSpecMembers`, use `references/repair-task-spec-log.md` for the affected task and surface the repair announcement.
 
+Every successful refresh includes compact recovery anchors. When a valid open current task is selected, the anchors include the task path, task `log.zip`, the task-log catch-up helper command, task `Agents.json`, and the transcript-path helper command. When the running provider exposes a current session ID, the anchors also include the current native transcript path if it can be resolved. These anchors are lookup pointers, not instructions to read everything. Use them for targeted recovery when restored saved context or generated fallback context is not enough.
+
+When no saved context exists, refresh builds a generated fallback section. With a current task, the fallback favors task-log state and adds a small current-native-transcript tail for conversational nuance. Without a current task, task-log recovery is unavailable, so the fallback uses up to 10KB from the current provider session transcript when `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`/`CODEX_SESSION_ID`, or `ANTIGRAVITY_CONVERSATION_ID` is available. It does not use task `Agents.json` to choose the native transcript tail; that tail is always the current provider session.
+
 ## Stdout Markers
 
 If stdout contains `M-PACT SUPPRESSED` and its literal final line is `END M-PACT SUPPRESSED`, this is not a failure and not a setup-required state. Do not emit a receipt and do not retry through this reference; the `SKILL.md` Suppressed Sessions section owns the handling.
@@ -43,13 +47,13 @@ If stdout contains `M-PACT PROJECT SETUP REQUIRED` and its literal final line is
 
 If stdout contains `M-PACT SAVED CONTEXT DECISION REQUIRED` and its literal final line is `END SAVED CONTEXT DECISION REQUIRED`, no refresh bundle was produced. Do not emit a receipt. Ask and rerun per `SKILL.md` fast path step 5, with the exact `--saved-context RESTORE:<filename>` or `--saved-context DISCARD:<filename>` declaration from stdout.
 
-If stdout contains `AUDIT: PASS`, `M-PACT REFRESH BUNDLE MANIFEST`, a `BundlePath: <absolute path>` line, a compact receipt block, and its literal final line is `END REFRESH BUNDLE`, read the bundle file at `BundlePath`, verify the file's literal final line is also `END REFRESH BUNDLE`, then emit the compact receipt body. The stdout manifest alone is not a completed refresh and does not load memory by itself; `BundlePath` is the next required step, not a question for the Director. Never stop after printing the bundle path, and never ask whether to open the bundle or what to do next before the receipt body has been emitted.
+If stdout contains `AUDIT: PASS`, `M-PACT REFRESH BUNDLE MANIFEST`, a `BundlePath: <absolute path>` line, a compact receipt block, and its literal final line is `END REFRESH BUNDLE`, reading the bundle file at `BundlePath` is mandatory. Verify the file's literal final line is also `END REFRESH BUNDLE`, then emit the compact receipt body. The stdout manifest alone is not a completed refresh and does not load memory by itself; `BundlePath` is the next required step, not a question for the Director. Never stop after printing the bundle path, and never ask whether to open the bundle or what to do next before the receipt body has been emitted.
 
 If that successful stdout also contains `M-PACT PROJECT ADOPTION REQUIRED`, refresh still completed and memory is loaded. Emit the compact receipt first, then follow the adoption flow in `SKILL.md` fast path step 2.
 
 ## Receipt
 
-Stdout and the bundle file both include the compact receipt block between `BEGIN REFRESH RECEIPT` and `END REFRESH RECEIPT`. Emit only that receipt body, excluding the marker lines themselves. The first visible line must be `M-PACT MEMORY REFRESH`. Normal successful refresh should be a tiny acknowledgement, not a startup report: do not print roots, rule lists, session counts, task pointers, or the full startup manifest merely to prove refresh; those details are already loaded inside the verified bundle. The receipt does not end the turn: when the same user message includes a substantive request beyond refresh/startup, continue with that request using the loaded context.
+Stdout and the bundle file both include the compact receipt block between `BEGIN REFRESH RECEIPT` and `END REFRESH RECEIPT`. Emit only that receipt body, excluding the marker lines themselves. The first visible line must be `M-PACT MEMORY REFRESH`. Normal successful refresh should be a tiny acknowledgement, not a startup report: do not print roots, rule lists, session counts, task pointers, a "startup memory refreshed" heading, or the full startup manifest merely to prove refresh; those details are already loaded inside the verified bundle. The receipt does not end the turn: when the same user message includes a substantive request beyond refresh/startup, continue with that request using the loaded context.
 
 ## When Refresh Fails
 

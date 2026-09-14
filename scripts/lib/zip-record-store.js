@@ -5,6 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const zlib = require("zlib");
+const { assertMpactAllowedInCurrentSession } = require("./helper-common");
 
 const LOCAL_FILE_HEADER = 0x04034b50;
 const CENTRAL_DIRECTORY_HEADER = 0x02014b50;
@@ -294,6 +295,7 @@ function inflateEntryPayload(compressed, entry) {
 }
 
 function readMemberContentUnlocked(zipPath, entry) {
+  assertMpactAllowedInCurrentSession();
   const fd = fs.openSync(zipPath, "r");
   try {
     const stat = fs.fstatSync(fd);
@@ -322,6 +324,7 @@ function tryValidateContent(fd, entry) {
 }
 
 function walkLocalHeadersUnlocked(zipPath, { validateContent = false } = {}) {
+  assertMpactAllowedInCurrentSession();
   if (!fs.existsSync(zipPath)) {
     return { entries: [], localEnd: 0 };
   }
@@ -651,6 +654,7 @@ function recoverCatalogUnlocked(zipPath, options = {}) {
 }
 
 function readCatalogUnlocked(zipPath, options = {}) {
+  assertMpactAllowedInCurrentSession();
   if (!fs.existsSync(zipPath)) {
     return [];
   }
@@ -662,6 +666,7 @@ function readCatalogUnlocked(zipPath, options = {}) {
 }
 
 function readCatalog(zipPath, options = {}) {
+  assertMpactAllowedInCurrentSession();
   const targetLockPath = acquireLock(zipPath, options);
   try {
     return readCatalogUnlocked(zipPath, options);
@@ -671,6 +676,7 @@ function readCatalog(zipPath, options = {}) {
 }
 
 function listMembers(zipPath, options = {}) {
+  assertMpactAllowedInCurrentSession();
   return readCatalog(zipPath, options).map((entry) => ({
     name: entry.name,
     size: entry.uncompressedSize,
@@ -679,6 +685,7 @@ function listMembers(zipPath, options = {}) {
 }
 
 function readMember(zipPath, memberName, options = {}) {
+  assertMpactAllowedInCurrentSession();
   const targetLockPath = acquireLock(zipPath, options);
   try {
     const entry = readCatalogUnlocked(zipPath, options).find((candidate) => candidate.name === memberName);
@@ -757,6 +764,7 @@ function appendGeneratedMemberLocked(zipPath, memberName, content, modified) {
 }
 
 function appendGeneratedMember(zipPath, memberName, content, modified = new Date(), options = {}) {
+  assertMpactAllowedInCurrentSession();
   validateMemberName(memberName);
   ensureZipParent(zipPath, options);
   const targetLockPath = acquireLock(zipPath, options);
@@ -842,6 +850,7 @@ function appendMemberFromLocalScan(zipPath, buildMember, modified) {
 }
 
 function appendMember(zipPath, buildMember, modified = new Date(), options = {}) {
+  assertMpactAllowedInCurrentSession();
   if (typeof buildMember !== "function") {
     throw new Error("numbered ZIP append requires a member builder function");
   }
@@ -890,6 +899,7 @@ function copyRangeSync(sourceFd, targetFd, start, length, targetStart) {
 }
 
 function replaceMember(zipPath, memberName, content, modified = new Date(), options = {}) {
+  assertMpactAllowedInCurrentSession();
   validateMemberName(memberName);
   ensureZipParent(zipPath, options);
   const targetLockPath = acquireLock(zipPath, options);
@@ -955,6 +965,7 @@ function replaceMember(zipPath, memberName, content, modified = new Date(), opti
 }
 
 function appendGeneratedMembers(zipPath, members, modified = new Date(), options = {}) {
+  assertMpactAllowedInCurrentSession();
   if (!Array.isArray(members) || members.length === 0) {
     throw new Error("appendGeneratedMembers requires at least one member");
   }
