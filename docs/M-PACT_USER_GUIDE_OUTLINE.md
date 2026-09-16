@@ -2,7 +2,7 @@
 
 Working document. This is the plan for a rewritten user guide, not the guide itself. It does not ship; once the guide exists this file moves out of `docs/` *(decided 2026-09-06, walk)*.
 
-**Revised 2026-09-06**, twice. First against a reference audit (all 27 files in `references/`, plus `SKILL.md` and `README.md`; findings in `M-PACT_REFERENCE_AUDIT.md`). Then in a walk discussion the same day, which reframed Part 1, resolved five open questions, and surfaced four skill changes the guide could not describe until they existed. **Updated 2026-09-07** for the landed help entry: the Quick Reference is now the help source, and `M-PACT help`, `M-PACT quick reference`, `M-PACT guide`, and `M-PACT reference guide` all render it. Earlier passes are kept below so the history is in one file.
+**Revised 2026-09-06**, twice. First against a reference audit (all 27 files in `references/`, plus `SKILL.md` and `README.md`; findings in `M-PACT_REFERENCE_AUDIT.md`). Then in a walk discussion the same day, which reframed Part 1, resolved five open questions, and surfaced four skill changes the guide could not describe until they existed. **Updated 2026-09-14** to retire the browser help entry after cross-provider browser launch proved unreliable. Earlier passes are kept below so the history is in one file.
 
 ## Voice and scope
 
@@ -16,9 +16,9 @@ Examples must be platform-neutral, or shown for both shells. The current guide h
 
 **Words** *(walk)*. In the guide's own voice M-PACT is a "coding tool," matching the overview. Not a "skill," not a "harness." Those words are true and belong in the references; to a reader they describe plumbing, not what the thing is for. Likewise "a written record of the actions you took," not "source of truth."
 
-**Form** *(walk; updated 2026-09-07)*. Markdown only, in `docs/` alongside the quick reference. A linkable table of contents at the top, using GitHub's heading anchors, so the guide source is navigable without maintaining hand-written HTML. The help renderer may create browser HTML from those Markdown sources, but that is output, not a second guide.
+**Form** *(walk; updated 2026-09-14)*. Markdown only, in `docs/`. A linkable table of contents at the top, using GitHub's heading anchors, so the guide source is navigable without maintaining hand-written HTML. There is no generated browser-help surface for agents to open.
 
-**Section shape** *(decided 2026-09-06)*. Every section in Parts 2 through 4 has the same shape: prose first, giving the rhythm and the why; then each reference term the section covers, with its example directly beneath it. One list, not two. Terms and examples are the same thought, and splitting them into a terms block and an examples block creates two lists that say the same thing and drift apart. No per-section lookup block; that job belongs to the Quick Reference. *(walk)* The shape stays scoped to Parts 2 through 4. Parts 1 and 5 have no reference terms to intersperse, so the question of extending it is closed; there is nothing to extend it to.
+**Section shape** *(decided 2026-09-06)*. Every section in Parts 2 through 4 has the same shape: prose first, giving the rhythm and the why; then each reference term the section covers, with its example directly beneath it. One list, not two. Terms and examples are the same thought, and splitting them into a terms block and an examples block creates two lists that say the same thing and drift apart. No per-section lookup block. *(walk)* The shape stays scoped to Parts 2 through 4. Parts 1 and 5 have no reference terms to intersperse, so the question of extending it is closed; there is nothing to extend it to.
 
 **The overview is a contract** *(walk)*. The guide is not organized by the overview's eight bullets; the bullet order is a sales order, leading with the payoff, and a guide must run in learning order. But every bullet has a home section, and that section opens by echoing the bullet's own words, so a reader who arrived from the overview finds the promise being kept. The mapping:
 
@@ -41,7 +41,7 @@ The overview itself gets one change *(walk)*: the save-context bullet moves from
 
 ### 1. What this is and who it's for *(reframed, walk)*
 
-This section is the overview document (`mpact-guide-overview.md`), copied into the guide verbatim. Not summarized, not paraphrased, not trimmed. The same text opens the repository README, so it has to stand alone in both places; it is one file, copied into both at assembly, never retyped, for the same drift reason the quick reference is a single marked block. The full text follows, with the save-context bullet already in third position.
+This section is the overview document (`mpact-guide-overview.md`), copied into the guide verbatim. Not summarized, not paraphrased, not trimmed. The same text opens the repository README, so it has to stand alone in both places; it is one file, copied into both at assembly, never retyped. The full text follows, with the save-context bullet already in third position.
 
 > M-PACT is a multi-provider coding tool. Built for a world where you're not limited to one AI agent, it lets you orchestrate several, even across different providers, so they remember your work, hand it off to each other, and catch each other's mistakes instead of you starting over every time.
 >
@@ -86,7 +86,7 @@ Six to eight short paragraphs. This is the section that makes everything else ma
 - Writes are append-only. A wrong record is corrected by a later record, never erased. The one exception is the journal, which you can ask the agent to edit in place; logs and specifications are never edited.
 - There are two kinds of memory of a conversation: the record an agent wrote, and the transcript of what was actually said. M-PACT keeps the first and knows where to find the second.
 
-The Quick Reference sits directly after this section, so the reader sees the whole capability list before reaching setup. That is why Part 2 can be setup and Part 3 can be asking, in that order, without the tool looking heavy. *(Ordering question closed on that basis, walk.)*
+The capability overview sits directly after this section, so the reader sees the whole shape before reaching setup. That is why Part 2 can be setup and Part 3 can be asking, in that order, without the tool looking heavy. *(Ordering question closed on that basis, walk.)*
 
 ### 3. What to expect from agents *(expanded, walk)*
 
@@ -195,8 +195,8 @@ Replaces the earlier "examples framed as illustrations" framing, which was prose
 
 - **The structure.** A request is a verb (which direction, how much authority), an object (what kind of work), and an outcome. Present it as ordinary English, verb plus noun, because that is what it is.
 - **The samples.** The round trip a user does all day, three lines, verbatim: *"Handoff, Request Design Review"* going out; *"Take Handoff, Design Review"* to act on it; *"Handoff, Review Results"* coming back. Then the same three with Implementation in place of Design. That is the whole pattern; the reader has it after six lines.
-- **The pointer.** For the complete set, a link to the handoff grid at the bottom of the Quick Reference. Do not repeat the grid here; the section is the structure and the samples, the grid is the reference.
-- **What is guaranteed and what resolves.** Two operations have an anchored minimum in the skill: handoff (the forms above) and save context ("save context," "restore context," and a few siblings). Help has one too: "help," "quick reference," "guide," and "reference guide" render the Quick Reference and link to the full guide. Those are shown as reliable as written. Everything else resolves by meaning, and the guide varies its phrasings deliberately so nobody reads them as a required vocabulary. The guide promises no anchored forms for any other operation, because nothing implements them. Whether the skill should grow more anchored sets is a skill decision, not a guide one; it is recorded under "Pending skill changes," not as an open question here.
+- **The pointer.** For the complete set, link to the handoff grid where it lives in the guide. Do not repeat the grid here; the section is the structure and the samples, the grid is the reference.
+- **What is guaranteed and what resolves.** Two operations have an anchored minimum in the skill: handoff (the forms above) and save context ("save context," "restore context," and a few siblings). Those are shown as reliable as written. Everything else resolves by meaning, and the guide varies its phrasings deliberately so nobody reads them as a required vocabulary. The guide promises no anchored forms for any other operation, because nothing implements them. Whether the skill should grow more anchored sets is a skill decision, not a guide one; it is recorded under "Pending skill changes," not as an open question here.
 
 ---
 
@@ -267,12 +267,12 @@ Beats, unchanged: create the task from a conversation; design discussion, items 
 Writing the guide keeps finding places where the references are correct but the behavior has a gap or the text is unreadable. These are skill work, not guide work, and the guide cannot describe the unresolved ones until they exist. Each unresolved one wants a design item on the M-PACT project.
 
 1. **Prompt on a pointer mismatch, take side only.** Today a bare "take handoff" resolves silently through the current-task pointer, and with two windows on two tasks the pointer may have been moved by the other window. Nothing compares the task the agent has been working in against the pointer. Change: on an unnamed take, when the agent has a working task in context that differs from the pointer, ask one line ("you've been on t0045, the pointer says t0046, which did you want?") before resolving. A named take never asks. Writes never ask; the agent's context already fixes the task and there is nothing to disambiguate. The requesting instruction may or may not name a task, so the guard keys off the absence.
-2. **The handoff vocabulary as a grid.** `take-task-handoff.md` bakes the anchored forms into full phrases in one table cell, so the grammar underneath is invisible; you cannot see that the verb carries direction and the object carries kind. Rewrite as a pick-one-from-each grid, three columns (phrase, object, what happens), in two blocks (giving, taking) because the second columns are not interchangeable between them. Same grid goes at the bottom of the Quick Reference. One table, both places.
+2. **The handoff vocabulary as a grid.** `take-task-handoff.md` bakes the anchored forms into full phrases in one table cell, so the grammar underneath is invisible; you cannot see that the verb carries direction and the object carries kind. Rewrite as a pick-one-from-each grid, three columns (phrase, object, what happens), in two blocks (giving, taking) because the second columns are not interchangeable between them.
 3. **Whether other operations get anchored phrasings.** Moved here from the open questions. The guide promises none; adding any is a skill decision. `[0002-decide-whether-phrasings-are-anchored]`.
 
-Landed 2026-09-07, for the record:
+Retired 2026-09-14, for the record:
 
-- **The `help` entry.** The Quick Reference is now the source. `M-PACT help`, `M-PACT quick reference`, `M-PACT guide`, and `M-PACT reference guide` render the marked Quick Reference block, create a browser page for the full guide from `docs/USER_GUIDE.md`, and open the quick-reference page with a link to the full guide. The script also accepts `quick`, `quick-reference`, and `reference-guide`; those are parser conveniences, not extra vocabulary for the guide to teach.
+- **The browser `help` entry.** The `M-PACT help` / quick-reference renderer was removed after cross-provider browser launch behavior proved unreliable and too distracting for the value it provided.
 
 ---
 
@@ -282,10 +282,10 @@ Landed 2026-09-07, for the record:
 
 Closed 2026-09-06 (walk), for the record:
 
-- **Where the capability list lives.** The Quick Reference is the list. A `help` entry renders it. No second source. (Landed 2026-09-07.)
-- **Whether operations other than handoff, save-context, and help get anchored phrasings.** Not a guide question. (Pending skill change 3.)
+- **Where the capability list lives.** In the guide source, not in a generated browser-help surface.
+- **Whether operations other than handoff and save-context get anchored phrasings.** Not a guide question. (Pending skill change 3.)
 - **Whether this outline ships.** No.
-- **Ordering of Parts 2 and 3.** Setup first stands; the Quick Reference after section 2 already gives the reader the capability view before setup.
+- **Ordering of Parts 2 and 3.** Setup first stands; the capability overview after section 2 already gives the reader the capability view before setup.
 - **Whether the section shape extends to Parts 1 and 5.** Nothing there to intersperse; stays scoped.
 
 ---
@@ -310,17 +310,17 @@ Dictated, after the reference audit the same day. Nothing here came from reading
 
 **Closed** - five open questions (capability list, anchoring, outline shipping, Parts 2/3 order, section-shape extension). One remains.
 
-**Surfaced** - four skill changes, in their own section, so the guide does not describe behavior that does not exist yet. The help entry landed on 2026-09-07; the other three remain pending.
+**Surfaced** - four skill changes, in their own section, so the guide does not describe behavior that does not exist yet. The browser help entry later landed and was retired; the other three remain pending.
 
 ---
 
-## What changed on the help update (2026-09-07)
+## What changed on the help retirement (2026-09-14)
 
-**Updated** - the help entry is no longer pending skill work. The outline now treats the Quick Reference as the help source that actually renders in the browser, with the four guide-facing aliases: `M-PACT help`, `M-PACT quick reference`, `M-PACT guide`, and `M-PACT reference guide`.
+**Retired** - the browser help entry is no longer part of M-PACT. Agents should not advertise `M-PACT help`, `M-PACT quick reference`, `M-PACT guide`, or `M-PACT reference guide` as commands that render and open HTML.
 
-**Corrected** - the anchoring paragraph in section 12 now names help alongside handoff and save-context. The open anchoring question now excludes all three implemented anchored surfaces.
+**Corrected** - the anchoring paragraph in section 12 now names only handoff and save-context as implemented anchored surfaces.
 
-**Clarified** - the Markdown-only form decision still governs the guide source. The HTML pages created by the help renderer are generated output, not a second guide to maintain.
+**Clarified** - the Markdown-only form decision governs the guide source. There is no generated HTML guide to maintain or launch.
 
 ---
 
@@ -328,7 +328,7 @@ Dictated, after the reference audit the same day. Nothing here came from reading
 
 A read of every file in `references/` (27), plus `SKILL.md` and `README.md`, checked against this outline. Scripts were not read; the references are the behavior contract. Full findings in `M-PACT_REFERENCE_AUDIT.md`.
 
-**Corrected** - saved context does not belong to a task. `context-save-restore.md` says it lives in the root scratch folder, is not tied to a task, and needs no current task. Part 4 bullet rewritten. The quick reference had the same error on its "Save context" line and was fixed in its second draft.
+**Corrected** - saved context does not belong to a task. `context-save-restore.md` says it lives in the root scratch folder, is not tied to a task, and needs no current task. Part 4 bullet rewritten.
 
 **Corrected** - the mental model's "never erased" now names the journal as the one editable record, per `write-journal-entry.md`.
 
@@ -336,9 +336,9 @@ A read of every file in `references/` (27), plus `SKILL.md` and `README.md`, che
 
 **Added** - "Recalling a prior conversation" as a Part 4 section. `search-agent-sessions.md` and `list-agent-session-paths.md` had no home in the outline at all.
 
-**Added** - adoption (section 7) and identity repair (section 14). Both are questions the user must answer, which the quick reference rightly excludes and the guide cannot.
+**Added** - adoption (section 7) and identity repair (section 14). Both are questions the user must answer, which the guide cannot skip.
 
-**Added** - startup hooks and what they mean for the user: refresh on its own, restore after automatic compaction, the Codex `/hooks` trust step, the hook note in replies. Sections 5, 6, and the save/restore bullet.
+**Added** - startup hooks and what they mean for the user: refresh on its own, restore after automatic compaction, the Codex `/hooks` trust step, and the hook output label. Sections 5, 6, and the save/restore bullet.
 
 **Added** - suppression as a fourth state in section 8; refresh failure, unhandled saved context, and repair announcements in section 14; lookup scope words in "Finding things" and "Rules"; close and reopen consequences; the editable `specification.md` mirror; the design-item approval rule; session-entry startup behavior; starter rules and the scratch folder among things that appear.
 
@@ -362,4 +362,4 @@ Kept for history. A full read of `scripts/` (28 files) and `references/` (25 fil
 
 **Resolved, not just corrected** - the "Gemini revalidation" open question from the 2026-08-07 draft is closed by the codebase itself: Gemini CLI is confirmed retired (README states it outright), Antigravity replaced it as a first-class target, and Copilot CLI is documented as best-effort/unvalidated. Section 4 states this as settled.
 
-**Confirmed unchanged at the time** - the quick-reference-as-on-demand-helper-output idea was still purely a plan; nothing in that codebase implemented it. Superseded by the 2026-09-07 help update above. The voice/scope framing, the disclaimer in section 3, the handoff-verb grammar in section 10 (apart from the added mutation-gate bullet), and the overall five-part structure all held up against the current code without needing correction.
+**Confirmed unchanged at the time** - the quick-reference-as-on-demand-helper-output idea was still purely a plan; nothing in that codebase implemented it. It was later implemented, then retired on 2026-09-14. The voice/scope framing, the disclaimer in section 3, the handoff-verb grammar in section 10 (apart from the added mutation-gate bullet), and the overall five-part structure all held up against the current code without needing correction.

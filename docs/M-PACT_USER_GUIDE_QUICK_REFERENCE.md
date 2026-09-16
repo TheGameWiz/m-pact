@@ -1,18 +1,6 @@
-# M-PACT Quick Reference - current draft
+# M-PACT Quick Reference
 
-Working document, validated 2026-09-13 against the current owner references. This is the capability list: a marked section of the shipped guide, extractable by delimiters, that `M-PACT help` and `M-PACT quick reference` render and open on demand instead of the agent re-reading the whole guide. It is not a second document. The text between the markers below is the guide's Quick Reference section, and the same text is what `M-PACT help` renders. One file, two consumers.
-
-Audience filter, unchanged: user-invoked capabilities are listed, with short user-visible reminders for startup and restore. Things the system asks *you* (project adoption, the identity repair question, the orphaned-spec repair announcement) and states you do not set (suppression) are deliberately absent; the guide covers them in sections 7, 8, and 14. Pure lookup plumbing is folded into two lines under "Finding things" rather than listed per script.
-
-Phrasing convention: where the skill anchors a guaranteed minimum (help, handoff, and save-context), the anchored form is shown in **bold italics** and is reliable as written. Every other *"say something like"* phrasing is one wording among many that works, deliberately varied so nobody reads it as a required vocabulary. The guide promises no anchored forms for other operations; if the skill ever adds some, this is the file that swaps them in.
-
----
-
-<!-- BEGIN QUICK REFERENCE -->
-
-## Quick Reference
-
-One line each, grouped the way you'll meet them. Read this when you already know roughly what you want and just need the reminder. The main guide has the full explanation, the disclaimers, and what to watch out for. Say ***"M-PACT help"***, ***"M-PACT quick reference"***, ***"M-PACT guide"***, or ***"M-PACT reference guide"*** to have an agent open this list in your browser; the page links to the full guide.
+One line each, grouped the way you'll meet them. Read this when you already know roughly what you want and just need the reminder. The main guide has the full explanation, the disclaimers, and what to watch out for.
 
 ### Getting set up
 
@@ -86,17 +74,3 @@ Pick one from the first column and one from the second. `<Kind>` is `Design` or 
 Taking never authorizes a change by itself; the added action bounds what can change. `Discuss` changes nothing durable, `Fold in Results` changes only design/spec/log state, and `Implement` or `Implement Fixes` is the code/reference-work path. A chain such as *"Take Handoff, Evaluate Review, Fold in Results, Write Handoff"* runs every step in order and writes a record only because it ends on a giving phrase.
 
 The full user guide is at `docs/USER_GUIDE.md`.
-
-<!-- END QUICK REFERENCE -->
-
----
-
-## Notes for review
-
-- Current validation pass (2026-09-13): the handoff rows now match `references/take-task-handoff.md`; standalone handoff creation matches `references/create-task.md`; stale notes about unanchored `Implement Fixes` and `Fold in Results` were removed.
-- The guide path on the last line names `docs/USER_GUIDE.md`, the installed skill's guide file, per t0043's design specification (record 4). `M-PACT help`, `M-PACT quick reference`, `M-PACT guide`, and `M-PACT reference guide` render this block and the full guide to two linked HTML files and open the quick-reference one. There is no print mode, so this plain path exists only for a reader who cannot follow the rendered page's own link to the full guide.
-- The grid's third-column wording is a draft. Its purpose is that a reader can scan across without assembling the grammar from prose; if a cell needs a second sentence to be understood, the cell is wrong.
-- `Implement Fixes`, `Fold in Results`, and `Discuss` are anchored handoff forms. `Implement Fixes` is accepted phrasing for implementation in a fix-shaped context; `Fold in Results` is design/spec/log only; `Discuss` is no-mutation discussion.
-- Deliberately excluded, unchanged: `write-task-spec.js` (`[0003-decide-the-fate-of-write-task-spec]` still open); adoption; identity repair; orphaned-spec repair; suppression.
-- Placement, per the spec: early in the guide, after the mental model (Part 1, section 2), before the rest of Part 1 continues into the agent disclaimer.
-- Bold-italic anchored forms are the phrasings here that a reference guarantees. Plain italic examples are user-facing examples, not a promise of a new anchored vocabulary surface.

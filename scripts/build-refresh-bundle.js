@@ -536,8 +536,7 @@ const FALLBACK_TASK_LOG_BUDGET_BYTES = 10 * 1024;
 const FALLBACK_TRANSCRIPT_BUDGET_BYTES = 5 * 1024;
 const TASKLESS_FALLBACK_TRANSCRIPT_BUDGET_BYTES = 10 * 1024;
 const FALLBACK_TRUNCATION_NOTICE = "\n\n[Truncated to fit the fallback section byte budget.]";
-const HOOK_STARTUP_DIRECTIVE = "M-PACT STARTUP DIRECTIVE: This injected refresh output is mandatory pre-answer context. Before answering the Director's first request, read the file named by BundlePath, verify its final line is END REFRESH BUNDLE, treat that bundle as loaded, then emit only the receipt body between BEGIN REFRESH RECEIPT and END REFRESH RECEIPT. Do not print the BEGIN/END marker lines. Do not add a startup heading, summary, or other prose before the receipt.";
-const HOOK_RECEIPT_EMISSION_NOTE = "M-PACT HOOK NOTE: The Director has not seen the receipt. Reading and verifying BundlePath is mandatory before answering the first request. Emit only the receipt body as the first visible response, excluding BEGIN/END marker lines and any startup summary, then continue the Director's requested work. In Antigravity, injected text is transient and the fast path must complete this turn.";
+const HOOK_OUTPUT_HEADER = "M-PACT HOOK OUTPUT";
 
 function parseArgs(argv) {
   const options = {
@@ -1298,9 +1297,9 @@ function main() {
     addLine(bundle, "```");
   }
   addLine(bundle);
-  addLine(bundle, "## Startup Load Requirement");
+  addLine(bundle, "## Startup Load Metadata");
   addLine(bundle);
-  addLine(bundle, "Reading this bundle is mandatory before answering after startup refresh or Director-requested refresh. Verify the final line is `END REFRESH BUNDLE`, treat the verified bundle as loaded context, then emit only the receipt body from the receipt block. Do not print the `BEGIN REFRESH RECEIPT` or `END REFRESH RECEIPT` marker lines, and do not add a startup heading or summary before the receipt.");
+  addLine(bundle, "Generated for M-PACT startup refresh or Director-requested refresh. The receipt block above is the compact user-visible refresh receipt. The terminal marker for a complete bundle is `END REFRESH BUNDLE`.");
   const fallbackReason = fallbackContextReason(savedContextRestore);
   let startupTaskPathForFallback = null;
   addLine(bundle);
@@ -1386,7 +1385,7 @@ function main() {
   fs.writeFileSync(bundlePath, bundleText, { encoding: "utf8" });
 
   if (isMpactHookContext()) {
-    console.log(HOOK_STARTUP_DIRECTIVE);
+    console.log(HOOK_OUTPUT_HEADER);
   }
   console.log("AUDIT: PASS");
   console.log("M-PACT REFRESH BUNDLE MANIFEST");
@@ -1403,9 +1402,6 @@ function main() {
   console.log("END REFRESH RECEIPT");
   if (projectIdentityDisplay.adoptionBlock) {
     console.log(projectIdentityDisplay.adoptionBlock);
-  }
-  if (isMpactHookContext()) {
-    console.log(HOOK_RECEIPT_EMISSION_NOTE);
   }
   console.log("END REFRESH BUNDLE");
 }

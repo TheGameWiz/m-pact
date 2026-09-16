@@ -122,7 +122,7 @@ Seven categories, and each needs a different answer from the user. This is the r
 
 **1. Questions the system asks you.** Project setup required, project adoption required. Nothing is wrong; answer yes or no. These are the only halts that are part of normal operation.
 
-**2. Refusals meaning the request was wrong.** Saving context with no current task, writing to a closed task, a missing or mismatched project ID, an unrecognized flag, a help probe. The agent adjusts and the user usually never sees them.
+**2. Refusals meaning the request was wrong.** Saving context with no current task, writing to a closed task, a missing or mismatched project ID, or an unrecognized flag. The agent adjusts and the user usually never sees them.
 
 **3. Refusals protecting item accounting.** An omitted active-item section, an item dropped without being cleared, or clearing something that was not open. The helper now owns derives-from bookkeeping, so stale typed predecessor values are normalized rather than refused.
 

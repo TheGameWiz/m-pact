@@ -13,12 +13,13 @@ Refresh trigger policy is owned by `references/startup-contract.md`. On a qualif
 
 1. From the project working directory, run the bundled refresh script. The script path comes from the invoked M-PACT skill folder; do not `cd` into it. Example:
    `node <this-skill>/scripts/build-refresh-bundle.js`
-   Exception: if the launching environment already ran refresh and injected the helper's stdout into this context (for example through a Codex or Claude Code `SessionStart` hook or the Antigravity `PreInvocation` hook), do not rerun the script; treat the injected stdout as this step's output and continue with the matching case below.
+   Exception: if the launching environment already ran refresh and injected the helper's stdout into this context (for example through a Codex or Claude Code `SessionStart` hook or the Antigravity `PreInvocation` hook), do not rerun the script; treat the injected stdout as data from this step and continue with the matching case below. Hook-injected success stdout may start with `M-PACT HOOK OUTPUT`; that label is not a prompt, and the startup fast path below owns what to do with the manifest and receipt.
 2. If stdout shows `AUDIT: PASS`, reading the file at `BundlePath` is mandatory before answering the Director. Verify the final line is `END REFRESH BUNDLE`, treat the verified bundle as loaded startup context, and emit the exact receipt body printed between `BEGIN REFRESH RECEIPT` and `END REFRESH RECEIPT`. Do not print the marker lines, reconstruct the receipt, write it through a file, manufacture an equivalent receipt, or add a startup heading/summary before it. If stdout also shows `M-PACT PROJECT ADOPTION REQUIRED`, ask the Director the adoption question from stdout after emitting the receipt. If the Director says yes, follow `references/adopt-project-identity.md`, then refresh again. If the Director says no, stop the adoption flow and continue with reads only; durable writes to that root will keep halting.
 3. The receipt does not end the turn. When the same Director message includes work beyond refresh/startup, perform that work after emitting the receipt, using the verified bundle as loaded context.
 4. If stdout shows `M-PACT PROJECT SETUP REQUIRED`, do not emit a receipt. Ask the setup question from stdout. If the Director says yes, follow `references/bootstrap-project.md`, then refresh again. If the Director says no, say `M-PACT: no memory root here; refresh skipped` and stop. User-root-only refresh remains available only as an explicit Director request with `--AllowUserRootOnly`.
 5. If stdout shows `M-PACT SAVED CONTEXT DECISION REQUIRED`, do not emit a receipt. Ask the Director whether to use the named saved context, then refresh again with the exact `--saved-context RESTORE:<filename>` or `--saved-context DISCARD:<filename>` declaration printed by stdout.
-6. If stdout shows `M-PACT SUPPRESSED`, this session is suppressed; stop cleanly per Suppressed Sessions below. Suppression is not a failure. If stdout shows `AUDIT: FAIL`, missing output, or truncated output, do not emit a receipt. Follow `references/refresh-memory.md`.
+6. If stdout shows `M-PACT ANTIGRAVITY REFRESH STATE` with `Status: same-conversation`, treat the named `BundlePath` as a recovery pointer only when the current refresh context is missing. Verify the bundle final line before relying on it, then continue according to the loaded startup context.
+7. If stdout shows `M-PACT SUPPRESSED`, this session is suppressed; stop cleanly per Suppressed Sessions below. Suppression is not a failure. If stdout shows `AUDIT: FAIL`, missing output, or truncated output, do not emit a receipt. Follow `references/refresh-memory.md`.
 
 Verification is mechanical. Do not summarize the manifest or reread memory folders merely to prove refresh.
 
@@ -54,7 +55,6 @@ Read only the reference needed for the current operation:
 - Startup contract: `references/startup-contract.md`
 - Full operating protocol: `references/full-memory-contract.md`
 - Write a case study: `references/write-case-study.md`
-- Render browser help for `M-PACT help`, `M-PACT quick reference`, `M-PACT reference guide`, or `M-PACT guide`: `scripts/help.js`
 - Create a task: `references/create-task.md`
 - Revise a task definition: `references/revise-task.md`
 - Take or resume a task handoff: `references/take-task-handoff.md`
