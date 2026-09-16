@@ -340,7 +340,7 @@ A read of every file in `references/` (27), plus `SKILL.md` and `README.md`, che
 
 **Added** - startup hooks and what they mean for the user: refresh on its own, restore after automatic compaction, the Codex `/hooks` trust step, and the hook output label. Sections 5, 6, and the save/restore bullet.
 
-**Added** - suppression as a fourth state in section 8; refresh failure, unhandled saved context, and repair announcements in section 14; lookup scope words in "Finding things" and "Rules"; close and reopen consequences; the editable `specification.md` mirror; the design-item approval rule; session-entry startup behavior; starter rules and the scratch folder among things that appear.
+**Added** - suppression as a fourth state in section 8; refresh failure, unhandled saved context, and repair announcements in section 14; lookup scope words in "Finding things" and "Rules"; close and reopen consequences; the editable `specification.md` mirror; the design-item approval rule; provider transcript trailhead behavior; starter rules and the scratch folder among things that appear.
 
 **Reframed** - section 7's nesting "trap." Nesting is the memory chain working as designed; the trap is an unrelated project inside another's tree.
 
