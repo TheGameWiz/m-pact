@@ -249,7 +249,7 @@ A request is a verb, an object, and an outcome. The verb carries direction and h
 
 Here is the round trip you will do all day, three lines, verbatim. *"Handoff, Request Design Review"* going out to the other window. *"Take Handoff, Design Review"* on the other end, to act on it. *"Handoff, Review Results"* coming back. The same three lines work with "Implementation" in place of "Design." That is the whole pattern. You have it after six lines.
 
-For the complete set of phrasings, see the handoff grid in the [Quick Reference](M-PACT_USER_GUIDE_QUICK_REFERENCE.md). It is not repeated here. This section is the structure and the samples. The grid is a lookup table for when you already know roughly what you want.
+For the complete set of phrasings, see the handoff grid in the [Quick Reference](USER_GUIDE_QUICK_REFERENCE.md). It is not repeated here. This section is the structure and the samples. The grid is a lookup table for when you already know roughly what you want.
 
 Two operations are guaranteed to resolve exactly as written: handoff, in the forms above, and saving or restoring context. Those are reliable because the tool checks for them by name. Everything else resolves by meaning. This guide deliberately varies its own phrasing for everything else so nothing here reads as a required vocabulary. If you say it in plain English and it is clear what you want, it should work.
 
