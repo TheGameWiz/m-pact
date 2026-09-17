@@ -85,7 +85,7 @@ The script is the executable startup spec. It:
 - reports active-project identity status without repairing path mismatches
 - builds the layered rule index
 - reads and inlines `startup-contract.md`
-- lists core rule names without reading rule bodies
+- lists rule filenames without reading rule bodies
 - notes active tasks with the current task first
 - reports active task folders missing `task.md`
 - reports orphaned specification companions for active tasks
@@ -101,7 +101,7 @@ After successful refresh, the verified bundle is the loaded startup context; con
 
 If refresh reports `project: (none found)` after running from a skill install directory such as `.codex/skills/m-pact`, `.claude/skills/m-pact`, or `.gemini/config/skills/m-pact`, that result is invalid for the workspace; re-run from the real project root before proposing bootstrap.
 
-Startup does not load design specifications, task logs, journals, case studies, or non-core rule bodies as context by default. It may inspect design specification and log catalogs, and legacy log frontmatter, to report orphaned specification companions.
+Startup does not load design specifications, task logs, journals, case studies, or rule bodies as context by default. It lists rule filenames from each root in the memory chain. It may inspect design specification and log catalogs, and legacy log frontmatter, to report orphaned specification companions.
 
 ## 6. Refresh Receipt
 
@@ -109,7 +109,7 @@ Every startup load and every Director-requested refresh must emit the script-pro
 
 ```text
 M-PACT MEMORY REFRESH
-activeProjectRoot=<active-root>; projectId=<n>; projectIdentity=ok
+activeProjectRoot=<active-root>; projectId=<n>; projectName=<name>; projectIdentity=ok
 audit=PASS; bundle=loaded; output-complete=END REFRESH BUNDLE
 ```
 
@@ -138,7 +138,7 @@ Use `references/find-memory-artifact.md` for on-demand find/list/read requests a
 
 ## 9. Durable Rules
 
-Rules are short files in `rules/` with YAML frontmatter. Filenames carry the index meaning as level one of the rules (owner: `startup-contract.md`); `description` adds scope or triggers; bodies are the controlling detail, read on correlate.
+Rules are short files in `rules/` with YAML frontmatter. Refresh lists filenames from each root in the memory chain. Core rule filenames are level-one context; non-core filenames are lookup hints. `description` adds scope or triggers; bodies are the controlling detail, read on correlate.
 
 - Rule writes: Director-gated for ambiguous, judgment-call, or override rules; owner `references/write-rule.md`; writes one file in `rules/`; likeliest mistakes: duplicating a rule already in a chain root instead of merging, or writing the file directly instead of through the helper.
 - Surface all rule writes. Put broad rules in the highest applicable root; child roots keep narrower project rules. Long history belongs in case studies, not rule bodies.

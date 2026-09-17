@@ -20,7 +20,7 @@ Project identity is stored in filename sentinels. The user root has one zero-byt
 
 ZIP containers are helper-owned black boxes. Agents must not inspect, extract, mutate, or write ZIP files directly; use `list-members.js`, `read-member.js`, `search-bodies.js`, `read-member-span.js`, and the append/write helpers. Direct ZIP access risks stale reads, format drift, record-number collisions, and write corruption.
 
-The startup rule index is level one of the rules: each listed core-rule filename is a rule in force as stated. When current work correlates to a level-one entry, read the rule body before proceeding; the body is the controlling detail, and acting against an unread correlated rule is a rule violation, not an oversight. Non-core rules are lookup-only and have no standing level one.
+The startup rule index lists rule filenames from each root in the memory chain. Core rule filenames are level-one context and are in force as stated. Non-core rule filenames are lookup hints and have no standing level one. When current work correlates to any listed filename, read the full rule body before proceeding; the body is the controlling detail, and acting against an unread correlated rule is a rule violation, not an oversight.
 
 ## Refresh
 

@@ -620,10 +620,35 @@ function formatDisplayPathList(items) {
   return formatList((items || []).map(formatDisplayPath));
 }
 
+function projectNameForRoot(activeRoot) {
+  if (!activeRoot) {
+    return null;
+  }
+  const name = path.basename(path.dirname(activeRoot));
+  return name || null;
+}
+
+function receiptValue(value) {
+  return String(value).replace(/[;\r\n]+/g, " ").trim();
+}
+
+function projectNameReceiptPart(activeRoot) {
+  const name = projectNameForRoot(activeRoot);
+  const safeName = name ? receiptValue(name) : "";
+  return safeName ? `projectName=${safeName}; ` : "";
+}
+
+function projectNameManifestPart(activeRoot) {
+  const name = projectNameForRoot(activeRoot);
+  return name ? ` (${name})` : "";
+}
+
 function describeProjectIdentity(activeRoot, userRoot) {
   if (!activeRoot) {
     return { receipt: "projectIdentity=(none)", manifest: "- Project identity: (none)" };
   }
+  const nameReceipt = projectNameReceiptPart(activeRoot);
+  const nameManifest = projectNameManifestPart(activeRoot);
   const initialIdentity = readProjectSentinel(activeRoot);
   const initialCounter = readCounterSentinel(userRoot, { allowMissing: true });
   if (initialIdentity.state === "missing") {
@@ -635,14 +660,14 @@ function describeProjectIdentity(activeRoot, userRoot) {
       }
       const block = adoptionNotice(activeRoot).mpactNotice;
       return {
-        receipt: "projectIdentity=adoption-required",
-        manifest: "- Project identity: adoption-required",
+        receipt: `${nameReceipt}projectIdentity=adoption-required`,
+        manifest: `- Project identity: project${nameManifest}; adoption-required`,
         adoptionBlock: block,
       };
     } catch (error) {
       return {
-        receipt: `projectIdentity=blocked`,
-        manifest: `- Project identity: blocked (${error.message})`,
+        receipt: `${nameReceipt}projectIdentity=blocked`,
+        manifest: `- Project identity: project${nameManifest}; blocked (${error.message})`,
       };
     }
   }
@@ -651,29 +676,29 @@ function describeProjectIdentity(activeRoot, userRoot) {
       ensureCounterInitialized(userRoot);
     } catch (error) {
       return {
-        receipt: `projectId=${initialIdentity.projectId}; projectIdentity=blocked`,
-        manifest: `- Project identity: project ${initialIdentity.projectId}; blocked (${error.message})`,
+        receipt: `projectId=${initialIdentity.projectId}; ${nameReceipt}projectIdentity=blocked`,
+        manifest: `- Project identity: project ${initialIdentity.projectId}${nameManifest}; blocked (${error.message})`,
       };
     }
   }
   const identity = initialIdentity;
   if (identity.state !== "valid") {
     return {
-      receipt: `projectIdentity=${identity.state}`,
-      manifest: `- Project identity: ${identity.state}`,
+      receipt: `${nameReceipt}projectIdentity=${identity.state}`,
+      manifest: `- Project identity: project${nameManifest}; ${identity.state}`,
     };
   }
   const counter = readCounterSentinel(userRoot);
   if (counter.state !== "valid") {
     return {
-      receipt: `projectId=${identity.projectId}; projectIdentity=counter-${counter.state}`,
-      manifest: `- Project identity: project ${identity.projectId}; counter ${counter.state}`,
+      receipt: `projectId=${identity.projectId}; ${nameReceipt}projectIdentity=counter-${counter.state}`,
+      manifest: `- Project identity: project ${identity.projectId}${nameManifest}; counter ${counter.state}`,
     };
   }
   const status = identity.projectId > counter.value ? "id-above-counter" : "ok";
   return {
-    receipt: `projectId=${identity.projectId}; projectIdentity=${status}`,
-    manifest: `- Project identity: project ${identity.projectId}; ${status}`,
+    receipt: `projectId=${identity.projectId}; ${nameReceipt}projectIdentity=${status}`,
+    manifest: `- Project identity: project ${identity.projectId}${nameManifest}; ${status}`,
   };
 }
 
@@ -994,8 +1019,8 @@ function main() {
   }
   const failures = [];
   const bundle = [];
-  const coreRuleNames = [];
   const ruleIndexParts = [];
+  const ruleNameGroups = [];
   const scriptDir = __dirname;
   const skillDir = path.dirname(scriptDir);
   const startupContractPath = path.join(skillDir, "references", "startup-contract.md");
@@ -1110,11 +1135,11 @@ function main() {
     const rulesDir = path.join(root, "rules");
     const rules = listMarkdownFiles(rulesDir);
     const nonCoreCount = rules.filter((rule) => !rule.name.startsWith("core-")).length;
-    ruleIndexParts.push(`${formatDisplayPath(root)}: ${rules.length} rules, ${nonCoreCount} unread non-core`);
-
-    for (const rule of rules.filter((item) => item.name.startsWith("core-"))) {
-      coreRuleNames.push(rule.name);
-    }
+    ruleIndexParts.push(`${formatDisplayPath(root)}: ${rules.length} rules, ${nonCoreCount} non-core`);
+    ruleNameGroups.push({
+      root: formatDisplayPath(root),
+      names: rules.map((rule) => rule.name),
+    });
   }
 
   if (activeRoot) {
@@ -1330,19 +1355,27 @@ function main() {
   addLine(bundle, "## Protocol References Loaded Or Verified");
   addLine(bundle);
   addArtifact(bundle, "startup-contract.md", startupContractPath, startupContractText);
-  addLine(bundle, "## Core Rule Names Noted");
+  addLine(bundle, "## Rule Names Noted");
   addLine(bundle);
   addLine(bundle, `Rule index: ${ruleIndexDisplay}.`);
-  addLine(bundle, "This rule index is level one of the rules: each filename below is a rule in force as stated. When current work correlates to an entry, read the rule body before proceeding; the body is the controlling detail. Non-core rules are lookup-only.");
+  addLine(bundle, "Rule bodies are not loaded during refresh. Core rule filenames are level-one context and are in force as stated. Non-core rule filenames are lookup hints. When any listed filename may affect the current work, read the full rule body before proceeding; the body is the controlling detail.");
   addLine(bundle);
-  if (coreRuleNames.length === 0) {
+  if (ruleNameGroups.length === 0) {
     addLine(bundle, "(none)");
     addLine(bundle);
   } else {
-    for (const ruleName of coreRuleNames) {
-      addLine(bundle, `- ${ruleName}`);
+    for (const group of ruleNameGroups) {
+      addLine(bundle, `### ${group.root}`);
+      addLine(bundle);
+      if (group.names.length === 0) {
+        addLine(bundle, "- (none)");
+      } else {
+        for (const ruleName of group.names) {
+          addLine(bundle, `- ${ruleName}`);
+        }
+      }
+      addLine(bundle);
     }
-    addLine(bundle);
   }
 
   addLine(bundle, "## Active Tasks Noted");

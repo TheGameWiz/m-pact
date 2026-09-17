@@ -100,7 +100,9 @@ function splitList(value) {
 }
 
 function defaultHomeDir(env = process.env) {
-  return env.USERPROFILE || env.HOME || os.homedir();
+  const platformHome = process.platform === "win32" ? env.USERPROFILE : env.HOME;
+  const alternateHome = process.platform === "win32" ? env.HOME : env.USERPROFILE;
+  return platformHome || alternateHome || os.homedir();
 }
 
 function providerRootFromHome(providerName, homePath) {
@@ -419,12 +421,24 @@ function hasUnprunableMpactRefreshHooks(sessionStart) {
   return sessionStart.some((entry) => hasUnprunableMpactRefreshHook(entry));
 }
 
+function commandArg(value) {
+  const normalized = String(value).replace(/\\/g, "/");
+  if (process.platform === "win32") {
+    return `"${normalized.replace(/"/g, '\\"')}"`;
+  }
+  return `'${normalized.replace(/'/g, "'\\''")}'`;
+}
+
+function nodeHookCommand(scriptPath, flags = []) {
+  return [commandArg(process.execPath), commandArg(scriptPath), ...flags].join(" ");
+}
+
 function refreshHookCommand(scriptPath) {
-  return `node "${scriptPath.replace(/\\/g, "/")}" ${REFRESH_HOOK_FLAG}`;
+  return nodeHookCommand(scriptPath, [REFRESH_HOOK_FLAG]);
 }
 
 function antigravityHookCommand(scriptPath) {
-  return `node "${scriptPath.replace(/\\/g, "/")}"`;
+  return nodeHookCommand(scriptPath);
 }
 
 function installClaudeSessionStartHook(providerRoot) {

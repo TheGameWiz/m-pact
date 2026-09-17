@@ -1,804 +1,557 @@
-# M-PACT: Multi-Provider Agent Context Toolkit User Guide
+# M-PACT User Guide
 
-M-PACT helps local coding agents share memory. It was designed and validated for Codex and Claude Code, with Antigravity support replacing the retired Gemini CLI extension. Its goal is simple: let agents remember useful project information, share it with each other, and pick up work without depending on one chat window to hold everything.
+## Table of contents
 
-M-PACT stores memory at two levels: global memory that can follow you across projects, and project memory that belongs to one workspace. That memory can include shared rules, project tasks, task logs, task specifications, case studies, and project journals.
+- [Part 1 - Overview](#part-1---overview)
+  - [What this is and who it's for](#what-this-is-and-who-its-for)
+  - [The mental model](#the-mental-model)
+  - [What to expect from agents](#what-to-expect-from-agents)
+  - [Platforms and agents](#platforms-and-agents)
+- [Part 2 - Getting set up](#part-2---getting-set-up)
+  - [Installing M-PACT (once per agent)](#installing-m-pact-once-per-agent)
+  - [What happens on its own, and what the first run will ask for](#what-happens-on-its-own-and-what-the-first-run-will-ask-for)
+  - [Setting up a project](#setting-up-a-project)
+  - [Turning it off, back on, or removing it entirely](#turning-it-off-back-on-or-removing-it-entirely)
+- [Part 3 - How to ask for things](#part-3---how-to-ask-for-things)
+  - [Say the verb, not just the ritual](#say-the-verb-not-just-the-ritual)
+  - ["Handoff" means three different things](#handoff-means-three-different-things)
+  - [Your words become part of the record](#your-words-become-part-of-the-record)
+  - [How a request is built, with samples](#how-a-request-is-built-with-samples)
+- [Part 4 - What you can ask for](#part-4---what-you-can-ask-for)
+  - [Starting a session](#starting-a-session)
+  - [Saving and restoring context](#saving-and-restoring-context)
+  - [Creating a task](#creating-a-task)
+  - [Switching the current task](#switching-the-current-task)
+  - [Revising a task's definition](#revising-a-tasks-definition)
+  - [Designing and iterating](#designing-and-iterating)
+  - [Taking a handoff](#taking-a-handoff)
+  - [Writing a handoff](#writing-a-handoff)
+  - [Writing a task log](#writing-a-task-log)
+  - [Closing and reopening a task](#closing-and-reopening-a-task)
+  - [Rules](#rules)
+  - [Journal entries](#journal-entries)
+  - [Case studies](#case-studies)
+  - [Finding things](#finding-things)
+  - [Recalling a prior conversation](#recalling-a-prior-conversation)
+- [Part 5 - Putting it together](#part-5---putting-it-together)
+  - [A worked example](#a-worked-example)
+  - [When something goes wrong](#when-something-goes-wrong)
 
-This makes it possible to use more than one agent on the same project at the same time. One agent can work on a design, another can review it, another can implement it, and another can verify the code. They can hand work back and forth through task logs and specifications instead of trying to reconstruct state from chat history.
+## Part 1 - Overview
 
-The workflow is flexible, but one useful pattern is to pair agents from different providers. For example, Claude Code can be useful for design, code review, completeness checks, and test verification. Codex can be useful for design review, implementation, and testing. Together they can challenge each other's assumptions and often reach a good result with fewer iterations.
+### What this is and who it's for
 
-The system has one important separation:
+M-PACT is a multi-provider coding tool. Built for a world where you're not limited to one AI agent, it lets you orchestrate several, even across different providers, so they remember your work, hand it off to each other, and catch each other's mistakes instead of you starting over every time.
 
-- The `m-pact` skill owns procedures: refresh, lookup, bootstrap, task operations, rule writing, and artifact templates.
-- Memory roots hold state: rules, tasks, case studies, and journals.
+Here's what that looks like in practice:
 
-This guide describes the user-facing operations, what each one is for, and why you would ask an agent to use it.
+**Two agents, two perspectives** - Assign different AI providers to review each other's work. Because they're trained differently, they catch different kinds of mistakes, giving you a second opinion no single agent could offer alone.
 
-## What You Can Do
+**Persistent memory across agents and sessions** - Work continues seamlessly across a fresh session, whether that's a new tab, a cleared context, or switching to a different agent entirely. And when a quick summary doesn't have the detail you need, you can search back through the actual conversation to find it.
 
-At the simplest level, M-PACT lets you:
+**Save context whenever you want, and it restores automatically** - Compaction eats the conversation, not just the record. Everything you talked through, the options you ruled out and why, is gone the moment the context resets. Ask once and it's saved to disk, and the next session picks up where you left off automatically.
 
-- Create shared rules that teach agents your coding style, preferences, project habits, and recurring lessons.
-- Use saved-context files when you explicitly want to preserve same-agent context before compaction or restart.
-- Create project tasks with logs and specifications so agents can design, implement, review, test, and verify work in a structured loop.
-- Create case studies for important successes, failures, investigations, and lessons that you want future agents to remember.
-- Write journal entries for project notes you want to keep but do not want to turn into rules, tasks, or case studies.
+**Work organized as tasks, each with its own blueprint** - A project breaks down into tasks, and each task carries its own design spec alongside the implementation, so agents build against something you've already agreed on rather than improvising as they go.
 
-A common task workflow looks like this:
+**One list, from design to done** - Every item moves through the same tracked path, from design through implementation to final verification, with agents doing the back and forth and flagging anything that still needs your call.
 
-1. Tell one agent to create a task for the work.
-2. Describe the goal and ask it to write a task log or task specification.
-3. Switch to another agent and say `Take Handoff, Review Design`; it should inspect the codebase and identify risks or gaps.
-4. Have that agent write its own log entry back to the task.
-5. Repeat the loop until the design, implementation plan, code, tests, and verification are complete.
-6. Close the task when the work is done.
+**Handoff seamlessly between agents** - Use it to hand off a design review, code review, implementation, or verification to another agent, or back to a fresh session of the same one, and the full context, what's decided, what's pending, comes with it.
 
-For same-agent context management, you can explicitly ask the agent to save context before you compact, clear, or restart a session. That writes one saved-context file for the resolved agent under the active memory root `.tmp` directory. After that, run M-PACT refresh in the next context; recent saved context is restored automatically, while older saved context asks whether to restore or discard it.
+**One set of rules, every agent follows** - Your preferences, standards, and lessons learned, written once, followed by every agent.
 
-## Install Targets
+**Also capture everything that isn't a task** - Not every thought fits neatly into a task, so journals and case studies give you a place to capture insights, decisions, and lessons that would otherwise just get lost.
 
-M-PACT is packaged as one folder with native entrypoints for multiple local agent runtimes:
+None of this requires a rigid structure. Run M-PACT with a single agent if that's your preference, or bring in a second agent, which is a common pattern, one as your design partner, the other for implementation, each circling back to check the other's work. Beyond that, the door's open too, however many agents fit the way you work.
 
-```text
-~/.codex/skills/m-pact/
-~/.claude/skills/m-pact/
-~/.gemini/config/skills/m-pact/   # Antigravity
-```
+#### How you talk to M-PACT
 
-Copilot CLI may later use `~/.copilot/skills/m-pact/` or `~/.agents/skills/m-pact/`, but that install path remains best-effort and is not enabled by the default helper.
+You use M-PACT by talking to your agent. You say things like "save where we are," "write this up for Codex," or "have Claude review the design." There is no command line to learn.
 
-Use `$m-pact` in Codex, `/m-pact` in Claude Code, and `/m-pact` in Antigravity when skill invocation is available. Copilot CLI may use `/m-pact` or `m-pact` if its runtime exposes the skill, but this path is best-effort until validated.
+A small set of handoff phrases is guaranteed to resolve exactly as written. You'll meet them in Part 3. They are the floor, the thing you fall back on when you are being terse and precision matters, especially when work crosses from one agent to another. They are not the normal voice of the tool. Part 5 has a worked example of what a session actually sounds like. It is full sentences and back and forth. Nothing in it resembles typing a command.
 
-Codex, Claude Code, and Antigravity use `SKILL.md`. Antigravity additionally uses a provider-global `PreInvocation` hook and a `~/.gemini/GEMINI.md` backstop shim. Gemini CLI is no longer listed as validated. Enterprise Gemini Code Assist licensees may still have a working Gemini CLI, but M-PACT no longer ships a Gemini CLI extension. Copilot CLI-facing instructions are included for future compatibility, but Copilot CLI has not yet been validated as a first-class supported runtime.
+#### Three things the overview leaves out
 
-## Compatibility
-M-PACT startup refresh is for local agent runtimes only. Codex CLI and Claude Code are validated targets, and Antigravity support uses the local skill and hook surfaces. Copilot CLI and other compatible local agents may work if they have shell access, filesystem access, and Node.js 18 or newer, but they are best-effort until tested.
+**Windows are the unit.** Multi-provider means two windows open on the same project, whether those are terminal sessions or editor panels. Two is the recommended shape. Three or four also work. The agent leading the design writes a review handoff, each of the other agents takes it and writes back its findings, and the lead takes a handoff on the results. One agent in one window works too, and you still get tasks, memory, and pick-up-where-you-left-off. You are just not getting the second opinion the tool was built around.
 
-Web-only ChatGPT or Claude clients may be able to read or install skill instructions in products that support skills, but they cannot refresh local `.AgentMemoryRoot/` or `.AgentMemory/` folders directly. For web-only work, provide an uploaded refresh bundle or uploaded memory artifacts instead of asking the web agent to run local refresh.
+**Where this came from.** M-PACT came out of running two agents on the same code and finding that each one alone failed in its own way. The disagreement between them turned out to be the useful part. Earlier systems worked the same problem before this one. They are history, not instruction, and nothing in this guide depends on knowing them.
 
-### Harness Suppression
+**What it is not.** It is not a chat archive. It is not a wiki. It is not automatic. Records are written when you ask for them. The one thing the tool writes on its own is a small repair record when it finds a gap in a task's history, and it announces that when it happens.
 
-Set `MPACT_SUPPRESS` to a truthy value, such as `1`, when another launcher, wrapper, or host environment should own startup and runtime context for a session because its own memory or context system may conflict with M-PACT. ConflabCode is the motivating case. Suppression is a compatibility guard for hosts and harnesses, not the ordinary way a user turns M-PACT off.
+### The mental model
 
-When `MPACT_SUPPRESS` is set, provider startup shims should not invoke M-PACT. Helper scripts enforce the same rule themselves: they print `M-PACT SUPPRESSED`, end with `END M-PACT SUPPRESSED`, and stop before reading memory or writing setup state. Direct helper invocations exit nonzero; installed hook invocations exit cleanly so a launcher-owned session can receive the suppression notice without recording a failed hook run.
+Two or more agents, in separate windows, working one project. They cannot see each other's conversations. What they share is what gets written down.
 
-To use M-PACT again in that session model, unset `MPACT_SUPPRESS`, set it to an empty value, or start a normal session without that environment variable. Use disable when you want a user-facing off switch for automatic startup behavior.
+That is the fact underneath everything else in this guide. Memory is shared across your agents. It is not tied to one chat.
 
-## Quick Start
+There are two levels of memory. One follows you everywhere, across every project you work in. The other belongs to a single project. Projects can nest. A project that lives inside another project's folder inherits its parent's memory, reading the parent's rules and history and writing only to its own.
 
-### Provider Runtime Setup
+Tasks are the unit of work. A task carries a definition, a design specification, and a log. The log is the chronological record, one entry after another as things happen. The specification is the current statement of what was decided and why. People confuse the two all the time, so here it is plainly: the log is history, the spec is the plan as it stands right now.
 
-Install M-PACT separately for each provider you want to use. After placing M-PACT in that provider's skill folder, run runtime setup from that provider's installed copy:
+One mechanical fact explains the whole design rhythm you'll meet in Part 4. Design items are born in the log, one entry at a time, and the specification is assembled from them when you ask for it. The list of items is the real thing. The specification is a snapshot of that list with a narrative wrapped around it.
 
-```text
-node scripts/install-mpact.js
-```
+Starting a session loads a compact snapshot, not the whole archive. Everything else is fetched when you or the agent actually need it.
 
-Provider skill placement is provider-specific and follows the normal skill model:
+Writes are append-only. A record that turns out to be wrong is corrected by a later record. It is never erased. The one exception is the journal, which you can ask an agent to edit in place. Task logs and specification records only ever grow. The plain-text copy of a specification's narrative that you can edit by hand is a working copy, and folding your edits in appends a new record rather than rewriting an old one.
 
-```text
-~/.codex/skills/m-pact/
-~/.claude/skills/m-pact/
-~/.gemini/config/skills/m-pact/   # Antigravity
-```
+There are two different memories of any conversation: the record an agent chose to write down, and the transcript of what was actually said. M-PACT keeps the first on hand and knows where to find the second when the record isn't enough.
 
-The runtime setup helper does not copy itself across provider roots. It creates or preserves `.AgentMemoryRoot/`, creates or preserves the `project-count__<n>` identity counter, installs starter user-root rules without overwriting existing rule files, and installs only the current or explicitly requested provider-global startup shim:
+That is the whole shape. Part 2 is setup and Part 3 is how to ask for things. Both will make more sense now that you have seen the picture whole.
 
-```text
-~/.codex/AGENTS.md
-~/.claude/CLAUDE.md
-~/.gemini/GEMINI.md
-```
+### What to expect from agents
 
-Install does not create project `.AgentMemory/` roots or project-local instruction files. Repeat provider placement and runtime setup for Codex, Claude, and Antigravity separately when you want all three configured.
+Before you trust anything the rest of this guide describes, it is worth being honest about what M-PACT changes and what it does not.
 
-Lifecycle commands:
+**The bargain, stated first.** The tool adds structure and evidence. It does not add control. Nobody controls the agents. M-PACT builds structure that makes them more dependable, and there are no guarantees underneath that. If you tell an agent to delete a drive, that can happen, and nothing here prevents it. The guardrails are yours. A mistake made through an agent is your responsibility, not the tool's.
 
-```text
-node scripts/install-mpact.js --disable
-node scripts/install-mpact.js --enable
-node scripts/uninstall-mpact.js
-```
+Think of it as a deal with the devil. You can write the cleverest instruction you like, and there is always a reading you did not anticipate. The agent is not gaming you. It does not know what you left unsaid, and it does not know the relationships sitting in your head that never made it into the conversation.
 
-Disable removes provider-global M-PACT shim blocks and M-PACT-owned startup hooks while leaving installed skill directories and all memory in place. The skill stays available for explicit invocation, but automatic startup refresh stops. Enable restores those shim and hook entries. Disable and enable keep the suppression gate because they are setup commands.
+A close cousin of that is literal compliance. Tell an agent not to do a specific thing, and it will often obey that instruction to the letter while finding the nearest path to the exact outcome you were trying to prevent. Naming the move you are afraid of can make it worse, because now that move is on the table. This comes from months of watching it happen, not from measuring it. The practical advice is to state the goal and the boundary, and leave the specific move you fear unnamed.
 
-Uninstall removes provider shims, M-PACT-owned hooks, provider permission entries for the resolved M-PACT user root, and installed M-PACT skill directories. It defaults to Codex, Claude, and Antigravity, and it is available even when `MPACT_SUPPRESS` is set because it reads and writes no memory. Pass `--user-root <path>` when removing an install that used a non-default user root. Uninstall stops future automatic behavior, but it does not delete memory.
+None of this is common. Rare is not the same as safe. The cost of a rare failure is not proportional to how often it happens, so no frequency above zero is really acceptable, and the burden of checking stays with you.
 
-Deleting memory is a separate manual action. The memory targets are `.AgentMemoryRoot/` and project `.AgentMemory/` folders. Provider homes such as `.codex/`, `.claude/`, and `.gemini/` also contain non-M-PACT provider configuration, so leave them alone unless you intend to remove that broader configuration too.
+The failure that produced this tool in the first place was not forgetting. It was narration. An agent described work in confident, specific detail, and the work had never happened. You read it as a report, you build on top of it, and you find out later the foundation was fiction. That is why M-PACT puts evidence on disk instead of taking the agent's word for it. The full story is in the ["Trust, Yet Verify" section](https://github.com/TheGameWiz/Measure-Twice-Cut-Once/blob/main/Articles/Dont-Make-Me-Come-Back-There.md#trust-yet-verify) of *Don't Make Me Come Back There*. It is worth reading once in full rather than summarized here.
 
-### New Project Setup
+Instructions to agents are not guarantees, and they are not consistent. The same sentence lands differently on different agents, and differently on the same agent on different days. What is reliable is the machinery underneath: numbering, naming, timestamps, validation, refusals, the receipt after a refresh. That is code, and it behaves the same way every time. What varies is judgment. Whether the agent wrote anything at all. Whether it took the handoff you meant. What it put in the body. Whether it stopped where you wanted. Whether it actually read what it says it read.
 
-Runtime setup configures the current provider's global startup shim and creates the user `.AgentMemoryRoot/`. A new workspace still needs project setup.
+So the working rule is this. Trust the machinery, verify the judgment. Say what you mean, specifically. Read what an agent claims it did. A wrong record gets corrected by the next one. Reopening something is normal, not a failure of the earlier work.
 
-For a new project, ask:
+Expect, too, that a workflow tuned to one agent will not transfer cleanly to another. You will develop your own feel for each one.
 
-```text
-Set up m-pact for this project.
-```
+### Platforms and agents
 
-The project bootstrap helper ensures required user-root setup, then adds the project scaffold: `.AgentMemory/` with its project identity sentinel. Artifact folders and ZIP containers are lazy and are created only when first used. It should not run refresh after bootstrap unless you also ask it to refresh, load, or verify. Provider-global shims should invoke M-PACT for configured runtimes; project bootstrap does not write project instruction files.
+M-PACT is built to be portable. No hardcoded paths, no shell-specific commands, POSIX behavior as the default with Windows handled as its own case.
 
-If you start an agent from a subfolder below an existing project `.AgentMemory/`, refresh uses the nearest parent project root. It should not ask to create another `.AgentMemory/` in the subfolder unless you explicitly ask for a new child project root.
+In practice it has been developed and exercised on Windows, and it has since been run on macOS and confirmed working. Linux has not yet been tried. Treat that as untested rather than unsupported. If you are the first to try it there, what you find is worth reporting.
 
-Use this wording instead of "install m-pact" when the skill is already installed and your goal is to configure the current workspace.
+Codex CLI and Claude Code are validated. Antigravity is a full target alongside them, same shape plus its own startup hook. Copilot CLI may work through the same shims but has not been validated as a first-class runtime. Treat it as best-effort. Gemini CLI is retired. M-PACT no longer ships a Gemini CLI extension, and no agent should list it as a target.
 
-### Routine Use
+M-PACT needs Node.js 18 or newer and an agent with shell and filesystem access. Web-only clients cannot reach local memory at all.
 
-Use M-PACT when you want an agent to:
+---
 
-- Run multiple visible agent sessions across one provider or many providers.
-- Start a session with the right standing context.
-- Pick up a task after another agent or previous session.
-- Preserve a compact checkpoint before context gets messy.
-- Record a durable rule after a repeated mistake or important preference.
-- Keep project-specific memory separate from user-level memory.
-- Store richer narratives, like investigations or decisions, without bloating startup context.
+## Part 2 - Getting set up
 
-Do not use it for information the agent can cheaply recover from source code, git history, or current project files.
+Two separate things get confused here. Installing ties M-PACT into an agent. Setting up a project tells M-PACT that a workspace has memory. They are different steps, done at different times, for different reasons.
 
-At the start of a new agent context, say:
+### Installing M-PACT (once per agent)
 
-```text
-Use $m-pact and refresh memory.
-```
+Installing is more than dropping a folder in place. It ties M-PACT into the agent so the agent sees it and acts on it every time it starts, not only when you remember to ask. You repeat this once for each agent you want to use.
 
-The agent should run the skill's refresh procedure. If a project memory root exists, it loads the memory chain and emits a compact refresh receipt. The visible receipt starts with `M-PACT MEMORY REFRESH`; internal begin/end marker lines in the bundle are not shown. The full roots, rules, and task pointer details stay inside the loaded bundle instead of being printed during normal startup.
+What installing does not do is touch any project. That is the thing people actually worry about, so here it is concretely. The only files an install writes outside its own folders are user-global: the agent's own instruction file at the user level, its hook settings, and a permission entry so the agent can read your user memory root. No file inside any of your projects is touched.
 
-For project roots with identity, the refresh receipt also includes the active project root and project ID. If an older project root has no identity sentinel yet, refresh reports `projectIdentity=adoption-required` and prints a `M-PACT PROJECT ADOPTION REQUIRED` question. If you answer yes, the agent runs the one-root adoption helper, refreshes again, and then passes that ID back to durable project-root write helpers as `--project-id <n>`.
+Where it does write to the instruction file, it writes carefully. It adds a short block between two marker lines. Existing content in that file is preserved. A second install replaces only the marked block. If the markers are malformed, it refuses rather than guessing.
 
-After the receipt, refresh itself is complete. If the same message included work beyond refresh, the agent should continue with that work using the loaded context. The agent should not scan `.AgentMemory`, rules, tasks, or the generated bundle just to verify the refresh. The bundle is already the verified startup context. Ask for targeted lookup when you want a specific memory artifact.
+Installing also puts a few things in place that you will actually see later. A startup hook for that agent, so refresh runs on its own. A user memory root in your home folder, outside any project. And a set of starter rules in that root. The starter rules are editable defaults. Read them, change them, delete the ones that don't fit the way you work. Adding rules of your own later is covered under "Rules" in Part 4.
 
-This startup refresh is the practical bridge for multi-provider work. A Codex tab, a Claude Code tab, and an Antigravity session can all begin from the same memory chain instead of acting like separate isolated chats. Copilot CLI is a plausible future target, but the current project should describe it as unvalidated best-effort support.
+Codex asks you to review and trust the startup hook through its own hooks command before it will run. The install's output tells you so. That is the one manual step in the whole process. If you skip it, you get no automatic refresh and no error explaining why.
 
-If no project `.AgentMemory/` exists, normal refresh should stop before emitting a receipt and ask whether to create project scaffolding. If you answer yes, the agent should add `.AgentMemory/` and then run refresh again. Artifact folders and ZIP containers remain absent until an approved operation needs them. If you answer no, the agent should run user-root-only refresh and emit that receipt.
+None of this should feel heavy. It is a few minutes per agent, once.
 
-Refresh is only for:
+### What happens on its own, and what the first run will ask for
 
-- New contexts or session startup.
-- Completed compaction/context loss with concrete evidence.
-- Explicit "refresh memory" requests.
+Refresh runs at session start, after a clear, and after a compaction. You do not ask for it. You know it ran because of the short receipt at the top of the agent's first reply. The receipt names the project it loaded, which is your chance to confirm the agent landed in the right place.
 
-Do not refresh just because a task is large. Use targeted lookup, task handoffs, and checkpoints while the current context is still intact.
+Refresh also tells the agent whether the current task has log entries it hasn't read yet, and who wrote them. The agent is told not to go read those on its own. They may be work another agent left mid-flight that hasn't been routed to you. If you want them read, say so.
 
-The refresh bundle is complete when emitted. It loads a compact startup snapshot and leaves detailed history for targeted lookup when you need it.
+The first time an agent refreshes, expect a permission prompt or two. It needs to run the refresh helper and to read your user memory root, which lives outside the project. Approve it once and it should not ask again.
 
-Common lookup requests:
+If it keeps asking, that is a signal, not something to live with. Someone who wasn't told to expect one prompt has no way of knowing that ten prompts means something is wrong. So here it is plainly: one approval per agent should be the whole story. Permissions are set per agent, not per machine, so a second agent means the same one-time prompt for that one. Getting this right the first time is the difference between the tool feeling smooth and feeling like it interrupts you constantly.
+
+### Setting up a project
+
+Setting up a project is separate from installing. Installing configures the agent. This gives a workspace its own memory folder so the agent has somewhere project-specific to write.
+
+There are two ordinary ways this happens. Startup notices you are in a folder with no memory and offers to set it up, or you ask for it directly.
 
 ```text
-Find memory entries about task handoffs.
-List the active project rules.
-Show layered rules about code review.
-Read the current task.
+Set up M-PACT here.
 ```
 
-Common task-continuity requests:
+There is a third case worth knowing about. A project that already has memory from an earlier version of M-PACT loads normally, shows you the receipt, and then asks whether to adopt this project. Yes registers it. No leaves reading working, and every write halts until you say yes later. This is a one-project question. It never sweeps across your machine.
+
+A freshly set up project looks nearly empty, and that is expected. Two things show up as you work. A scratch folder, kept out of version control on its own, holds temporary input and any context you have asked to save. And each task gets a plain-text copy of its current design narrative that you are free to edit by hand. More on that under "Designing and iterating" in Part 4.
+
+One more thing to know before you set up. A project inside another project's folder inherits the parent's memory by design. It reads the parent's rules and history and writes only to its own. That is exactly what you want when the child really is part of the parent. It is a trap when an unrelated project happens to live inside another one's folder. Know which situation you are in before you set up.
+
+Finally, a word about switching projects, because there is no command for it. M-PACT has no current-project pointer. The project is wherever your agent was launched from, whether that is the folder your editor has open or the directory you were sitting in when you started the CLI. From there the agent walks up and uses the first memory root it finds. A session stays bound to that project for its whole life. To work on a different project, start a session there. There is no switching mid-session, and no command for it, because nothing the agent runs can move the runtime it is running inside. Tasks have an explicit pointer you move on purpose. Projects do not. Launch location is the pointer.
+
+### Turning it off, back on, or removing it entirely
+
+There are three operations here, and a fourth state you do not set yourself. They are worth keeping apart, because "turn it off" means something different depending on which one you actually want.
+
+**Disable** silences the automatic startup refresh for one agent. The skill stays installed, and you can still invoke it by name. It just stops running itself at the start of every session.
 
 ```text
-Handoff.
-Handoff to Claude.
-Make this a task.
-Create a task from this conversation.
-Take Handoff, Review.
-Write a task log checkpoint for what we just decided.
-Write the task specification with this decision and write the paired log.
-Close this task as complete.
-Reopen task t0007 because there is follow-up work.
+Disable M-PACT for Codex.
 ```
 
-Common durable-context requests:
+**Enable** undoes a disable.
 
 ```text
-Save context for this task before compaction.
-Create a case study for this debugging incident.
-Add a user-level rule that agents must verify X before doing Y.
-Write a journal entry in my voice about this design decision.
+Turn M-PACT back on for Codex.
 ```
 
-If a project has no `.AgentMemory/`, ask:
+**Uninstall** is the actual off-ramp. It removes the instruction block, the hooks M-PACT owns, the permission entries, and the installed skill folders. M-PACT stops existing for that agent until you reinstall it. It works even when the session is suppressed, and it refuses to run from inside a folder it would have to delete.
 
 ```text
-Bootstrap M-PACT for this project.
+Uninstall M-PACT from Claude Code.
 ```
 
-Project bootstrap first ensures the user `.AgentMemoryRoot/` exists through the helper-owned setup path if needed. Then it creates only the local memory root. The root's artifact folders are created later by the first approved write that needs them. It does not write project-local instruction files.
+Each of these targets one agent at a time. Disabling Claude Code does not touch Codex.
 
-If your user root is missing, ask:
+None of the three ever touch memory. Here is why before how. Your records are left in place because they may still be worth having. They are a written record of the actions you took. They are stored as ordinary zip files full of plain text, markdown and JSON and the like, and any unzip tool opens them whether or not M-PACT is installed. If you do want them gone, the memory lives in two places: a memory root in your home folder, and a memory folder inside each project. Both are safe to delete by hand.
+
+That deletion is the one irreversible action anywhere in this guide. Everything else, disabling, uninstalling, walking away for months, can be undone by reinstalling. Deleting the memory folders cannot.
+
+The fourth state is **suppressed**. If a reply shows `M-PACT SUPPRESSED`, some other program that launched the agent has told M-PACT to stand down because it manages context itself. ConflabCode is the case this was built for. Nothing is broken and nothing was refreshed. You did not set this, and you do not clear it from inside the session. It is an environment setting owned by whatever launched the agent. Disable and enable are blocked while suppressed, because both run through the same setup path install uses. Uninstall is not blocked, because it never reads or writes memory.
+
+---
+
+## Part 3 - How to ask for things
+
+This part teaches a principle, not a vocabulary. If it lands, most of the rest of this guide is self-service.
+
+### Say the verb, not just the ritual
+
+Every useful request carries three things: which operation you want, how much authority you are granting, and what you want back.
+
+The extra words in a request are not politeness. They are scope. "Take handoff" grants a read and a report. "Take handoff and implement" grants a change. Leave the verb out and you get the safe default, a read and a report. Sometimes that is not what you wanted, and now it costs you a round trip.
+
+Being specific also gives the agent something precise to push back on. Vague requests get silent compliance with the wrong thing, because there was nothing concrete enough to object to. Vagueness is not safer. It just delays the disagreement.
+
+The verbs mean the same thing everywhere in the tool. **Write** appends a record. **Create** starts a new container. **Revise** changes a definition. **Modify** edits in place, and only journal entries allow it. **Save** saves your context so it can be restored. **Set** sets the current task, and that is the only pointer there is to set. "Update" is the one word that means something different depending on what you point it at, so it is worth avoiding for that reason alone.
+
+### "Handoff" means three different things
+
+Same word, three durable outcomes. The surrounding verb picks which one you mean.
+
+**Take** a handoff, and you are reading an existing task and reporting on it, and the report is a chat response, an opinionated evaluation with a recommendation, not a document. **Write** a handoff, and you are authoring a record into the task you are already in. **Handoff** on its own, or "hand this off," or "handoff to Codex," without naming a task, asks whether to create a brand-new task from the conversation you are having. That one is confirmation-gated on purpose. It is the phrasing most likely to surprise someone.
+
+Taking a handoff is never itself permission to change anything. Not code, not the task, not the log. Reading and reporting is the whole grant. If you want more, say so in the same breath: "take handoff and implement," not "take handoff" followed by a separate ask later.
+
+A chained instruction runs every step in the order you gave it. It only writes a durable record if it ends on a giving phrase. A chain that ends mid-action does the work and writes nothing down about it.
+
+The direction lives in the verb, not in the object after it. A handoff is an act of giving, so the bare word already names the giving side. "Take," "receive," or "get" name the receiving side, and any receiving phrase is an instruction to act. That means "Take Handoff, Design Review" and "Take Handoff, Review Design" resolve the same way. You review. Word order on the object does not matter.
+
+On the giving side, one word does the real work: **Results**. Without it, you are asking for a review. "Handoff, Design Review" and "Handoff, Request Design Review" both mean "please review my design." With it, you are handing a review back. "Handoff, Review Results" means "here is what I found." The returning phrase does not need to say which kind of review it was. The record it is answering already says.
+
+Last, the current-task pointer is a fallback, not an authority. You can name the task directly: "take the handoff for task 7." If you don't, the agent resolves against whichever task was last created, revised, or set as current, in any window. With two windows open on two different tasks, a bare "take handoff" can land on the other window's task. That is exactly why the agent's first line always names the task it resolved. It is your chance to catch it before anything else happens.
+
+### Your words become part of the record
+
+What you ask for gets captured into the task's record. The next agent reads exactly that phrasing. That agent may be a different provider, or it may be you in a future session.
+
+So the words you choose are not disposable. Vague phrasing gets written down exactly as vague as it sounded, and it travels forward that way with none of your tone or context to fill the gap. Precise phrasing travels forward precise. Saying what you mean pays twice: once when the current agent acts on it, and again when someone else has to reconstruct your intent from it.
+
+### How a request is built, with samples
+
+A request is a verb, an object, and an outcome. The verb carries direction and how much authority you are granting. The object says what kind of work. The outcome is what you want handed back. Presented that way it is just ordinary English, verb plus noun, because that is what it is.
+
+Here is the round trip you will do all day, three lines, verbatim. *"Handoff, Request Design Review"* going out to the other window. *"Take Handoff, Design Review"* on the other end, to act on it. *"Handoff, Review Results"* coming back. The same three lines work with "Implementation" in place of "Design." That is the whole pattern. You have it after six lines.
+
+For the complete set of phrasings, see the handoff grid in the [Quick Reference](M-PACT_USER_GUIDE_QUICK_REFERENCE.md). It is not repeated here. This section is the structure and the samples. The grid is a lookup table for when you already know roughly what you want.
+
+Two operations are guaranteed to resolve exactly as written: handoff, in the forms above, and saving or restoring context. Those are reliable because the tool checks for them by name. Everything else resolves by meaning. This guide deliberately varies its own phrasing for everything else so nothing here reads as a required vocabulary. If you say it in plain English and it is clear what you want, it should work.
+
+---
+
+## Part 4 - What you can ask for
+
+One short section for each thing you can ask an agent to do, in roughly the order you will meet them. Each section answers the same four questions: when you'd want this, what to say, what happens, and what to watch for.
+
+### Starting a session
+
+You don't ask for this one. It happens on its own at the start of a session, after a clear, and after a compaction. What you see is a short receipt at the top of the reply confirming which project the agent loaded.
+
+The agent also knows, from that load, whether the current task has log entries it hasn't read yet. It is told not to go read them just because it noticed them. If you want them read, say so.
 
 ```text
-Bootstrap my .AgentMemoryRoot with the starter rules.
+Catch me up on what I've missed on the current task.
 ```
 
-User-root bootstrap installs bundled starter core rules unless you ask to skip them. These starter rules are editable defaults. Review them and edit, delete, or replace anything that does not fit your workflow.
+Otherwise, treat the receipt as confirmation that the agent is grounded and in the right place, and get on with whatever you came to do.
 
-As a general pattern: start each new context with refresh, use targeted reads during normal work, and write the smallest durable artifact that fits. Use a rule for behavior, a task log for task state, a journal for project notes, and a case study for a narrative lesson.
+### Saving and restoring context
 
-## Core Concepts
-
-### Director
-
-The user is the Director. The Director has decision authority over task creation, durable rules, memory writes, bootstrap, deletion, close/reopen actions, and ambiguous judgment calls.
-
-### Memory Roots
-
-There are two root types:
-
-- User root: `.AgentMemoryRoot/`, usually under the user's home directory.
-- Project root: `.AgentMemory/`, placed in a project folder.
-
-The memory chain is broad-to-specific:
+Saving is something you ask for, typically right before a compaction, a clear, or a restart you know is coming.
 
 ```text
-~/.AgentMemoryRoot/
-ancestor/.AgentMemory/
-nearest-project/.AgentMemory/
+Save context before we compact.
 ```
 
-The nearest project `.AgentMemory/` is the active root. Most project writes default there.
-
-Subfolders inherit the nearest parent project root. Running refresh inside `project/subfolder/` should use `project/.AgentMemory/` when it exists, not prompt for a new subfolder root. Create a child `.AgentMemory/` only when you explicitly want that subfolder to become its own M-PACT project.
-
-### Standard Root Shape
-
-Both user and project roots may eventually have this shape:
+Restoring is not something you ask for in the normal case. The next refresh picks the saved context up and folds it in. That includes the refresh a hook runs automatically after a compaction, which is what makes "it restores automatically" true. A save from the last ten minutes is picked up without asking. Anything older makes the agent stop and ask you, by filename, whether to restore it or discard it. It never guesses.
 
 ```text
-.AgentMemoryRoot/ or .AgentMemory/
-  project-count__<n>       # user root only
-  project__<path-slug>     # project roots only
-  rules/
-  tasks/
-  case-studies.zip
-  journal.zip
+Restore context.
 ```
 
-Task folders may contain:
+That works if you want to say it anyway, but you rarely need to.
+
+Saved context belongs to the agent that saved it, for that same agent after it loses its own context. It is not tied to a task. You were probably mid-task when you saved, so the content will lean heavily on that task, but that is just what was in it. It is not a handoff to another agent either. A handoff is a task log entry. This is same-agent continuity. There is one saved context per agent per project at a time. Saving again replaces the last one.
+
+If you never asked for a save and lose context anyway, refresh builds a fallback. With a current task open, it pulls the recent task log and adds a small slice of the current transcript for nuance. Without a task, it reads a slice of the transcript directly. It is a floor, not a replacement for saving. Keeping an eye on your context still matters.
+
+### Creating a task
+
+Ask for a task when work needs to survive a closed tab, get reviewed by someone else, or involve more than one agent.
 
 ```text
-tasks/
-  current__A__p2-t0007-short-task-slug
-  A__p2-t0007-short-task-slug/
-    task.md
-    specification.zip
-    log.zip
+Create a p2 task for documenting the new onboarding flow.
 ```
 
-The shape is lazy. A new project bootstrap creates `.AgentMemory/` and its `project__<path-slug>` identity sentinel only. `rules/`, `tasks/`, `case-studies.zip`, and `journal.zip` appear only when first used. A new task folder starts with `task.md`; its specification and log ZIPs appear only when those records are written.
-
-Project identity sentinels are helper-owned. New project bootstrap mints identity automatically. Existing pre-identity roots use lazy confirmed adoption: they are considered only when encountered by refresh or a durable write, and identity is minted only after you answer yes to the adoption question. If a moved or copied project reports a path mismatch, use the repair helper instead of hand-editing sentinel files.
-
-### Filenames Are The Index
-
-There is no separate index file. Filenames and directory listings are the table of contents.
-
-This matters because memory should be cheap to scan. A good filename tells the agent whether a file is relevant before reading the body.
-
-## Refresh Memory
-
-### What It Does
-
-Refresh loads startup context from the memory chain. It resolves roots, inlines the compact startup contract, lists core rule filenames without loading rule bodies, notes non-core rule filenames, notes active tasks, reads the pointed current task when one is valid, and reports what was loaded.
-
-### Why Use It
-
-Use refresh so a new or compacted agent context starts grounded in durable memory instead of guessing from partial chat history.
-
-### How To Use It
-
-Start a new local agent session, then ask that agent to refresh M-PACT. The agent should run the skill's refresh helper from the project you are working in, verify the generated bundle, print the compact receipt, and then continue with your actual work. You do not need to tell it which files to read unless you want a targeted lookup after refresh.
-
-### When To Ask For It
-
-Ask for refresh when:
-
-- Starting a new agent context.
-- Returning after completed compaction or context loss with concrete evidence.
-- You explicitly want memory reloaded.
-
-Example:
-
-```text
-Use $m-pact and refresh memory.
-```
-
-### What To Expect
-
-The agent should emit the compact stdout refresh receipt body, starting with `M-PACT MEMORY REFRESH` and excluding internal begin/end marker lines. It must still verify the bundle at `BundlePath` before emitting the receipt. After the receipt, the refresh flow is done; the agent should not self-verify by scanning memory folders. If refresh fails with `AUDIT: FAIL`, the agent should stop and report the exact failure instead of pretending memory loaded.
-
-Antigravity startup refresh is installed as a provider-global `PreInvocation` hook named `m-pact-refresh` in `~/.gemini/config/hooks.json`. The hook runs `scripts/antigravity-refresh-hook.js` from the installed skill, passes exactly one reported workspace path to `build-refresh-bundle.js --hook`, and injects the refresh output as transient context. If Antigravity reports more than one workspace path, the hook refuses to guess which project to refresh and injects a clear notice instead.
-
-### What Not To Do
-
-Do not refresh just because work is large or a handoff exists. While context is intact, use targeted lookup and checkpoints.
-
-## Memory Root Policy
-
-### What It Does
-
-Memory root policy helps the agent understand the intended scope of a read or write without making it reimplement root discovery. Helpers own the mechanics: active root discovery, explicit `--root`, task lookup, user-root validation, chain order, and sentinel rules.
-
-### Why Use It
-
-Use memory root policy when placement matters. It keeps ordinary writes on the active project root, reserves user-root writes for explicit user-level or cross-project intent, and keeps inherited roots read-only by default. Durable project-root writes require the project ID from the latest refresh or successful write receipt; user-root writes and read helpers do not. Successful project-write helper receipts include `projectPath` beside `projectId` so you can verify the project by name/path.
-
-The startup bundle may include root orientation such as the start path, user root, project roots, active project root, project identity, memory chain, current-task state, and active task names. It does not include a full memory-root tree by default.
-
-### How To Use It
-
-Name the project, path, or scope when you want something written outside the active project. Otherwise, ask naturally and let the helper resolve the active root. This is useful when you are in one workspace but want to add a task, rule, journal, case study, or lookup to another known project. A write to a different project root can proceed when the loaded project ID matches that target. `--cross-project` is only for explicitly approved writes to a project whose ID was not loaded. It lifts the requirement to supply a project ID, not the check itself: if you do supply one and it contradicts the target, the write still halts, and the target identity is validated either way.
-
-### Common Requests
-
-```text
-Which memory root is active here?
-Show the memory chain.
-Use the user root for this rule.
-Add a task to the Conflab project.
-```
-
-## Bootstrap Memory Roots
-
-### What It Does
-
-Bootstrap creates the memory root for a missing `.AgentMemoryRoot/` or `.AgentMemory/`. Project bootstrap does not create local startup shims; provider-global shims and hooks should make future Codex, Claude Code, Antigravity, and compatible local-agent sessions refresh memory automatically. Artifact folders and ZIP containers are lazy. Copilot-facing shims are included as best-effort future support.
-
-### Why Use It
-
-Use bootstrap when a project or user has no memory root yet and you want agents to start preserving durable context.
-
-### How To Use It
-
-Ask for project bootstrap when the current workspace does not have `.AgentMemory/`. Ask for user-root bootstrap or provider runtime setup when `.AgentMemoryRoot/` does not exist yet. The agent should explain what it is about to create and wait for your approval before writing the root.
-
-### User Root Bootstrap
-
-Approved user-root bootstrap creates the root:
-
-```text
-.AgentMemoryRoot/
-```
-
-It also creates or preserves the `project-count__<n>` identity counter and installs bundled starter core rules unless you ask to skip them. Installing starter rules creates `rules/` because rule files are being written. If you skip starter rules, `.AgentMemoryRoot/` otherwise remains empty until first use.
-
-The starter rules are editable defaults. Review, edit, delete, or replace any rule that does not fit your workflow.
-
-### Project Bootstrap
-
-Approved project bootstrap creates the root:
-
-```text
-.AgentMemory/
-```
-
-Before creating that root, project bootstrap ensures `.AgentMemoryRoot/` exists. If it is missing, the helper uses provider runtime setup mechanics first. Project bootstrap mints the project identity sentinel and does not configure project startup shims. Startup is handled by provider-global shims installed during provider runtime setup.
-
-Project bootstrap is only needed when no `.AgentMemory/` exists in the current folder or any ancestor folder. If an ancestor project root exists, the child folder inherits it.
-
-After setup from a refresh project-setup yes/no prompt, the agent should run refresh once and emit the receipt for the new `.AgentMemory/`. For a standalone bootstrap request, it should run refresh only if you also ask it to refresh, load, or verify.
-
-### Approval Gate
-
-Bootstrap is never silent. The agent should create only what you approved.
-
-## Find, List, Or Read Memory Artifacts
-
-### What It Does
-
-The lookup procedure searches memory artifacts by scope and type. It searches filenames first, then reads bodies only after narrowing candidates.
-
-### Why Use It
-
-Use lookup when you want to find prior context without loading everything into the current chat.
-
-### How To Use It
-
-Ask the agent to find, list, or read the kind of memory you need and include a few topic words. Lookup is best when you remember that something was discussed but do not know which task, rule, case study, or journal entry contains it. The helper should narrow by filenames first, then read only the likely matches.
-
-### Scopes
-
-Unscoped, `local`, or `active` means the active project root.
-
-`root`, `user`, `global`, or `cross-project` means `.AgentMemoryRoot/`.
-
-`parent` means the nearest parent `.AgentMemory/` above the active root.
-
-`all` or `layered` means user root, ancestor project roots, then active root.
-
-Normal lookup is lineage-based. Agents should not scan sibling projects unless you name them.
-
-### Common Requests
-
-```text
-Find layered rules about review.
-Read task A__p1-t0012-refresh-script.
-Show case studies about context compaction.
-Search user memory for handoff rules.
-```
-
-## Rules
-
-### What They Are
-
-Rules are short durable instructions stored in `rules/`. They capture user preferences, behavior constraints, incident-driven lessons, and project-specific operating rules.
-
-Core rules use `core-*.md` filenames. Refresh lists core rule filenames and notes non-core rule filenames; it does not load any rule body. Read a rule body with targeted lookup when that rule may affect the current work.
-
-### Why Use Them
-
-Use rules when an instruction should persist across sessions and should shape future agent behavior.
-
-Good rule topics:
-
-- A repeated agent failure mode.
-- A workflow constraint.
-- A project-specific behavior that should not be forgotten.
-- A broad preference that is too important to rely on chat memory.
-
-### How To Use Them
-
-Ask for a rule when you want future agents to behave differently, not just remember what happened. Say whether the rule is project-level or user-level. The agent should check for an existing matching rule when duplication is plausible, then write or update the smallest rule that captures the durable behavior.
-
-### How Rules Are Written
-
-The filename should carry the main meaning, such as:
-
-```text
-core-review-implementation-against-spec-first.md
-```
-
-The frontmatter `description` adds scope, trigger, or nuance beyond the filename. The body should not repeat the filename or description.
-
-### Approval Gate
-
-Ambiguous or judgment-call rules require Director confirmation. User-level/global rules require explicit user-level placement.
-
-### Common Requests
-
-```text
-Add a project rule that agents must read the spec before reviewing code.
-Write this as a user-level rule.
-Check whether we already have a rule for this.
-Update the existing handoff rule instead of creating a duplicate.
-```
-
-## Tasks
-
-### What They Are
-
-Tasks are folders under `tasks/`. They store durable task state, ordered logs, and optional current specifications.
-
-Task folder names encode status, priority, task number, and slug:
-
-```text
-A__p1-t0003-refresh-script-hardening/
-C__px-t0010-old-investigation/
-```
-
-`A__` means active. `C__` means closed.
-
-### Why Use Them
-
-Use tasks when work needs structured continuity across agents or sessions. Tasks are the right tool for multi-step implementation, investigations, reviews, and handoffs.
-
-Tasks can also be useful for standing workstreams, such as UI polish or article refinement, where the subject stays stable but individual passes are small.
-
-### How To Use Them
-
-Ask for a task when work needs continuity, review, implementation steps, testing, or a handoff between agents. Give the agent the goal, priority if it matters, and any acceptance criteria you already know. The agent should create the task, make it current, and write an initial log entry when the task comes from the current conversation.
-
-### Task Creation
-
-Task creation is Director-orchestrated only. The agent should not create a task based only on its own judgment.
-
-You can create a task from a fresh instruction:
-
-```text
-Add a p2 task for documenting M-PACT user workflows.
-Create a p2 task for documenting M-PACT user workflows.
-```
-
-You can also create a task from the live conversation:
+Or, from a conversation already in progress:
 
 ```text
 Make this a task.
-Create a task from this conversation.
 ```
 
-For conversation-created tasks, the agent should create an ordinary task with the next normal task number, derive a meaningful title and slug from the discussion, make it current, and write the first task log entry with enough state for another agent or future context to resume. This is not a separate scratch-task type; it is just a normal task whose source material was the conversation.
+For a task built from conversation, the agent derives a title from what you have been discussing and writes an opening log entry with enough detail for someone else, or you in a future session, to pick it up cold. The new task becomes the current task. Task creation only happens when you ask for it. An agent should never decide on its own that a conversation deserves to become one.
 
-If you say only "add a task" or "create a task," the agent may ask a short clarification unless the current conversation has one obvious topic. If you say "make this a task" or "create a task from this conversation," it should not stop to ask for a title by default.
-
-### Current Task Pointer
-
-The current task pointer is a zero-byte sentinel named `tasks/current__<active-task-folder>`. The pointer is entirely in the filename and has no extension or body. It is an attention pointer, not a task index, queue, activity timestamp, or log cursor. If there is no current task, no `current__*` file should exist. If multiple `current__*` files exist, agents should report ambiguity, leave them in place, and proceed as if there is no current task until explicit repair.
-
-### Task Close And Reopen
-
-Closing or reopening a task requires explicit Director instruction. Close marks the task closed. Reopen marks it active again and makes it current.
-
-Close a task when you have decided the work is complete or no longer active. Reopen it when follow-up work belongs with the same task history instead of a new task. The agent should not close or reopen based only on its own sense that the work is done.
-
-Common requests:
+### Switching the current task
 
 ```text
-Close the current task as complete.
-Reopen t0008 because we found follow-up work.
+Switch to the onboarding-flow task.
 ```
 
-## Task Handoffs
+This moves a pointer that is shared by every window on the project, not just the one you typed it into. With two windows open on two different tasks, moving the pointer in one changes what a bare "take handoff" resolves to in the other. See ["Handoff" means three different things](#handoff-means-three-different-things). When that matters, name the task instead of relying on the pointer.
 
-### What They Are
+### Revising a task's definition
 
-A task handoff is a read/analyze/evaluate/report operation for an existing task. The agent reads `task.md`, the latest `specification.zip` member when present, and the ordered log span needed for continuity. The expected output is not just a summary: the agent should evaluate the current handoff span for feasibility, risks, assumptions, implementation or specification issues, and recommend the best next path when evidence supports one.
-
-### Why Use Them
-
-Use handoffs when one agent or session needs to understand current task state before deciding what to do next.
-
-### How To Use Them
-
-Ask the receiving agent to use an anchored receiving form such as `Take Handoff, Review Design` when you want it to understand the task before acting. The agent should read the task, current spec, and the needed ordered log span, then report state, risks, assumptions, and recommended next steps. Ask it to implement, edit, or log separately if you want it to continue beyond analysis.
-
-You can also use an explicit task-creation phrase to create the handoff task from the current conversation:
+Use this when the task's own definition, its title, priority, source, context, or acceptance criteria, needs to change after work has started.
 
 ```text
-Make this a task.
-Create a task from this conversation.
+Revise this task: acceptance now includes handling the empty-state case.
 ```
 
-In that case, the current agent should create a normal task from the conversation, make it current, and write the first log entry as the compressed handoff state.
+This is distinct from revising the design inside the task, covered next. The task's definition is the container. The design specification is the plan living inside it.
 
-Standalone handoff phrases such as `handoff`, `hand this off`, or `handoff to Claude` naming no existing task ask before creating a new task from the live conversation: "Do you want me to create a new task from this conversation?" If you say yes, the agent creates it; if no, it continues the conversation and writes nothing. It should not append to an older task just because a `tasks/current__*` sentinel still points there from earlier work. To write a handoff for an existing task instead, say that explicitly:
+### Designing and iterating
+
+This is the rhythm at the center of the tool. It is worth walking through as a sequence rather than a list of features.
+
+1. **Brainstorm with one agent.** Pick whichever agent you want as design lead for this task and talk it through, by dictation if that is easier, for as many rounds as it takes. Nobody has to say the word "item" for any of this to count. You are just talking. When you feel close, ask for a summary and read it.
+
+2. **Items are born in the log.** When something is worth keeping, say so.
+
+   ```text
+   Add that to the design.
+   ```
+
+   That appends a log entry containing a new, numbered item. That is the entire mechanism. A numbered item exists because it was added to the active list, and the number is its identity from then on. Adding an item is the one ask an agent has to get an explicit yes on. Silence means no item was created. The agent should also name the item back to you in its reply, not just file it quietly.
+
+3. **The specification assembles them.** This is a separate step that gathers the items into one document alongside a narrative.
+
+   ```text
+   Write the design spec.
+   ```
+
+   You can run an entire task on the item list alone and never write a spec. The spec is a checkpoint you reach for when you want to see the whole shape of the design in one place. It is not a required step.
+
+4. **The design loop.** Hand it to the second window for review.
+
+   ```text
+   Handoff, Request Design Review.
+   ```
+
+   The reviewer takes it and finds the things that looked fine in conversation but don't hold up against how it thinks about implementation. It writes back "Handoff, Review Results." In the lead window, "Take Handoff, Fold in Results" pulls those findings into the design. Two or three rounds of this is normal. By the second round the reviewer's gaps are usually real ones.
+
+5. **Implement.** When the design is settled, send it over for building.
+
+   ```text
+   Handoff, Implement.
+   ```
+
+   In the other window, "Take Handoff, Implement" moves that agent into building against the agreed items. The list stops being a design artifact and becomes the thing implementation is measured against.
+
+6. **The implementation loop.** The implementer hands back "Handoff, Request Implementation Review." The lead takes it, finds what doesn't match the agreed items, and writes "Handoff, Review Results." The implementer takes those results, checks whether they are real, fixes them with "Take Handoff, Implement Fixes," and hands back for review again. Same shape as the design loop, repeated until you are satisfied.
+
+A few things to know about this rhythm. Items are permanent once written, and their wording tends to harden later than you'd expect, so it is worth getting it close to right the first time. Reopening an item later is completely normal. A bug in work an item already covers keeps that item open. Only a genuine gap, scope the list does not cover, earns a new item.
+
+And the narrative half of the specification has a plain-text copy sitting in the task's folder. You can open it and edit it directly.
 
 ```text
-Write a handoff for the current task.
-Handoff this task.
-Write a handoff log to task A__p2-t0012-example.
+Fold in my edits to the specification.
 ```
 
-After a created handoff, go to the other agent or new session and say:
+That file is regenerated after every specification write, so your edits go in before you ask for the next write, not after.
+
+### Taking a handoff
 
 ```text
-Take handoff.
-Take handoff from Codex.
+Take Handoff, Design Review.
 ```
 
-The receiving agent should resolve the single `tasks/current__*` sentinel, then take that task handoff.
-
-### Cold-Start Log Loading
-
-When an agent enters a task from a fresh session or after context loss, it should load enough context to work without silently consuming the whole conversation history.
-
-Default behavior now starts with the handoff read-plan helper:
+The agent's first line names the task it resolved and the purpose it is applying. A wrong task or the wrong kind of review is visible immediately, before it produces anything you'd have to throw away. Say what you want back, or you get the read-only default: a chat response that evaluates what it read, flags risks, and recommends a next step, then stops and waits for you. Taking a handoff on a closed task stops in one sentence. There is nothing to pick up.
 
 ```text
-1. Run scripts/prepare-handoff.js for the current or named task.
-2. Pass any conversation-known read-cursor.
-3. Read task.md, the current specification snapshot, and the recommended log span in order.
+Take Handoff, Discuss.
 ```
 
-The helper owns the byte-budget and collision checks. A cursor should prevent old logs from being treated as current. The agent may still read older logs as background context when useful, but it should not act on them as live state when later records have superseded them. When it does not read all logs, it should say what range it read as the current span, what cursor it used, and what older history it loaded only as background or skipped.
+That one asks the agent to read the handoff and talk it through with you. No code, no design changes, no log writes until you say so. It is a useful pause when you want to think before anything happens. In practice the bare take already behaves this way; "Discuss" just makes the posture explicit.
 
-### Important Limit
+With two windows on two different tasks, name the task. A bare take resolves through the shared pointer, and the other window may have moved it more recently than you think.
 
-"Take this handoff" does not by itself authorize implementation, spec edits, doc edits, task-state changes, or log writes. It means read, analyze, evaluate, verify, and report unless you also explicitly ask the agent to continue implementation or update memory. If judging the handoff requires checking the codebase, spec, tests, or docs, the agent should inspect those artifacts and then give you its recommendation rather than leaving the interpretation entirely to you.
-
-### Common Requests
+### Writing a handoff
 
 ```text
-Take Handoff, Review.
-Resume task A__p1-t0004-example from log 0008 onward.
-Read enough log history to reconstruct the current task state.
+Handoff, Request Implementation Review.
 ```
 
-## Task Logs
+The outgoing phrase carries the kind of work being requested. The returning phrase does not need to, because the record already says which review it was answering. ["Handoff" means three different things](#handoff-means-three-different-things) has the full grammar.
 
-### What They Are
+The agent writes a handoff when you ask for one, not when the work feels finished. That extra round trip is deliberate. A handoff written before the discussion that would have improved it is stale on arrival, and append-only storage keeps it that way.
 
-Task logs are append-only records in a task's `log.zip` container. Each log member has a global record number within that task.
+### Writing a task log
 
-Example:
+Use this for a checkpoint that isn't a handoff. A decision, a test result, a correction worth recording.
 
 ```text
-0009-codex-update-refresh-docs.md
-0010-claude-review-docs.md
+Log this decision before we move on.
 ```
 
-### Why Use Them
+The agent fills in the record's place in the sequence. You never track or supply a number yourself. The phrasing above is an example, not a command to match. Only the handoff grid and the save-context phrases are anchored word for word; everything else, this included, resolves by what you mean.
 
-Use task logs to preserve what happened, what was decided, what changed, and what a future agent must know.
-
-### How To Use Them
-
-Ask for a task log after a decision, implementation pass, review, test result, handoff, or important correction. Logs are best for chronological task state. The agent should write the next numbered log through the helper and include enough detail for another agent to resume without reading the whole chat.
-
-### Numbering Rule
-
-When writing a log entry, the helper handles `log.zip` placement and uses the next record number from the container entry count. The agent supplies the task, agent name, title, body, and metadata from the current request and current conversation. It should not read existing log entries just to write the next log, and it must not assign the record number itself.
-
-### Common Requests
+### Closing and reopening a task
 
 ```text
-Write a task log checkpoint for this decision.
-Write a handoff log entry for the next agent.
+Close this task.
 ```
 
-## Task Specifications
-
-### What They Are
-
-`specification.zip` stores the task design specification. Legacy tasks use numbered full snapshots. New-format tasks use one current narrative blob plus immutable item members, and may also have a helper-maintained editable `specification.md` narrative mirror. A task has no specification container until the first approved specification write.
-
-### Why Use It
-
-Use the task specification when the current task has an evolving source of truth that should be easier to read than a long log chain.
-
-### How To Use It
-
-Ask for a task specification when requirements, design decisions, acceptance criteria, or implementation plans need one current written version. The helper writes or updates new-format specification members and a paired task log so the task history explains why the spec changed.
-
-### Approval Gate
-
-Agents should not write a task specification unless you instruct them to update the spec or fold approved decisions into it.
-
-### Common Requests
+Closing records whatever was still open at the time, and the reply tells you if anything was. Nothing on the list disappears without your knowing.
 
 ```text
-Write the task specification with this decision and write the paired log.
-Fold these requirements into the current spec.
+Reopen the onboarding-flow task, there's follow-up work.
 ```
 
-## Case Studies
+Reopening surfaces that leftover list without automatically putting it back into play. The first log entry after a reopen says plainly what is active again. The usual reason to reopen is not unfinished leftovers at all; it is that you have new design items to add, and the new work belongs with the task's existing record. Reopening is a normal part of the workflow, not an admission that the earlier close was a mistake.
 
-### What They Are
+### Rules
 
-Case studies are narrative write-ups in `case-studies.zip`. They describe incidents, investigations, decisions, pivots, root causes, fixes, and lessons learned.
-
-### Why Use Them
-
-Use case studies when a lesson is too rich for a rule. A rule says what to do; a case study explains why the rule exists and how the lesson was learned.
-
-### How To Use Them
-
-Ask for a case study after a meaningful success, failure, debugging incident, design pivot, or process lesson. They are useful when future agents should understand the story, tradeoffs, symptoms, root cause, and prevention pattern rather than just follow a one-line rule.
-
-### Startup Behavior
-
-Case studies are not read at startup. Agents load them on demand when the topic is relevant.
-
-### Common Requests
+Rules are durable instructions that shape how agents behave going forward.
 
 ```text
-Create a case study for this failed refresh investigation.
-Find case studies about task log numbering.
-Read the case study that explains the filename-led rule model.
+Add a rule: always confirm before deleting a file outside the project.
 ```
 
-## Journals
+A rule lands in the project by default. Say "global" or "user-level" to put it in the memory root that follows you across projects. The agent checks whether an existing rule already covers the same ground and merges into it rather than creating a near-duplicate. The rule's filename is its one-line summary, and every agent reads that filename at every startup. The fuller body is read only when the rule turns out to apply to the work at hand.
 
-### What They Are
+There is no vocabulary for deleting a rule, and that is deliberate, to keep an agent from ever removing one by accident. Rules are plain files in the memory root's rules folder. To delete one, delete the file yourself. The same goes for the starter rules that install put in your user root.
 
-Journal entries are first-person, Director-voiced reflective notes in `journal.zip`.
+### Journal entries
 
-### Why Use Them
-
-Use journals when you want to preserve your own thinking, design reflections, or historical notes for future readers.
-
-### How To Use Them
-
-Ask for a journal entry when you want a Director-voiced note that records your reasoning, preferences, or project history without turning it into an instruction. Journals are good for reflection and background context; they are not a command channel for future agents.
-
-### Important Limit
-
-Journal entries are not prompts, assignments, or startup context. Agents should write them only when you explicitly ask.
-
-### Common Requests
+Journal entries hold notes worth keeping that are not rules or tasks. Reflections, context, things you want on record in your own voice. In practice it works like a project diary.
 
 ```text
-Write a journal entry in my voice about this design pivot.
-List project journal entries from last week.
-Read the user-level journal entry about Conflab-Code.
+Write a journal entry about why we chose this approach over the alternative.
 ```
 
-## Starter Rules
+Journal entries are the one kind of record you can ask to have edited after the fact.
 
-### What They Are
+```text
+Modify that journal entry, I want to add a caveat.
+```
 
-Starter rules are bundled defaults installed during initial `.AgentMemoryRoot/` bootstrap, unless you ask to skip them.
+### Case studies
 
-### Why Use Them
+Case studies capture successes, failures, and lessons worth carrying forward as a narrative rather than a one-line rule.
 
-They give new memory roots a baseline behavior profile: verify before claiming, diagnose before fixing, protect context, keep answers concise, respect Director authority, and treat user rules as incident-driven.
+```text
+Write a case study on the refresh failure we debugged this morning.
+```
 
-### How To Use Them
+A rule says what to do. A case study explains why the rule exists and how the lesson was actually learned. That matters when the rule alone does not convey the stakes.
 
-Use starter rules as editable defaults after first setup. Review them once the user root exists, keep the ones that match your workflow, and change or delete the ones that do not. New behavior that you discover later should usually become a normal rule, not an edit to a starter rule unless it belongs in that baseline.
+### Finding things
 
-### Important Limit
+Ask the question directly and let the agent choose the right kind of lookup.
 
-Starter rules are not immutable policy. They are editable defaults. Review each one and edit, delete, or replace rules that do not match your workflow.
+```text
+What did we decide about the retry logic?
+Find the task where we discussed rate limits.
+List the active rules.
+```
 
-## Shims
+Left unscoped, a lookup searches the current project. Say "global" or "user" for your user-level memory, "parent" for the project above this one, or "all" for the whole chain. Sibling projects are never searched unless you name them.
 
-### What They Are
+### Recalling a prior conversation
 
-The package includes small `AGENTS.md`, `CLAUDE.md`, and `ANTIGRAVITY.md` shim templates. Their job is to tell compatible agents to invoke M-PACT and run refresh on new context.
+This searches the actual transcripts of what was said, not the records an agent chose to write down. It can surface nuance a summary left out. One caveat: there is no guarantee those transcripts still exist. Providers do not keep sessions forever, and a cleared session is gone. When they do exist, this is how you search them.
 
-### Why Use Them
+```text
+When did we talk about switching providers for this task?
+Every time we discussed the pricing model, on any task.
+```
 
-Use provider-global shims when you want a runtime to invoke M-PACT on startup.
+There are three scopes: this task, this project, or every project. The agent uses whichever one you stated and only asks if you gave none. Phrasing also decides how far it looks. "When did we" stops at the first match. "Every time we" sweeps everything.
 
-Project bootstrap does not install these shims. Provider runtime setup writes the current provider's shim to a provider-global location such as `~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`, or `~/.gemini/GEMINI.md`. For Antigravity, the source template is `shims/ANTIGRAVITY.md` and the installed target remains `~/.gemini/GEMINI.md`. `shims/copilot-instructions.md` is available as optional best-effort material if the Director wants GitHub Copilot custom instructions.
+---
 
-### How To Use Them
+## Part 5 - Putting it together
 
-Place M-PACT in each provider's normal skill folder, then run provider runtime setup from that provider's installed copy. The setup helper installs only that provider's global shim and startup hook support. Repeat the same process separately for Codex, Claude Code, and Antigravity when you want all of them configured.
+### A worked example
 
-## Recommended Workflows
+This is a constructed session, not a transcript of a real one. A real session carries domain noise the reader has to see past. A constructed one can be checked line by line against how the tool actually behaves. Two windows, two providers, every line labeled with who is speaking, because the switching between them is the whole point.
 
-### New Project
+The task: add a configuration flag to quiet a noisy log line in an existing service. Small and dull on purpose, so you watch the choreography, not the code.
 
-1. Bootstrap M-PACT for the project.
-2. Confirm `.AgentMemory/` was created.
-3. Add only project-specific rules when real project behavior needs to persist.
-4. Use tasks for structured work and case studies or journals for broader narrative records.
+**Worked example, one task, two windows**
 
-### New User Setup
+| Window 1 - Claude (design lead) | Window 2 - Codex (reviewer, then implementer) |
+|---|---|
+| **Task Setup** | |
+| **Director:** "I want to add a flag to quiet down that noisy debug log in the ingest service. Make this a task." | |
+| **Claude:** Created task 12, quiet the ingest debug log, and made it current. The first log entry has what we just said. What should the flag be called, and does it default on or off? | |
+| **Design** | |
+| **Director:** "Call it `QUIET_INGEST_LOG`, default off, so nothing changes unless someone opts in." | |
+| **Claude:** Add that to the design? | |
+| **Director:** "Yes." | |
+| **Claude:** Item 1 added: introduce `QUIET_INGEST_LOG`, default off, suppresses the ingest debug line when set. Anything else before this goes out for review? | |
+| **Director:** "That's the whole thing. Handoff, Request Design Review." | |
+| **Claude:** Written. Codex can take it whenever you're ready. | |
+| | **Design Review** |
+| | *Director switches to Window 2* |
+| | **Director:** "Take Handoff, Design Review." |
+| | **Codex:** Task 12 from the current pointer, resolving this as a design review. One item: `QUIET_INGEST_LOG`, default off. The gap I'd flag: the item doesn't say whether the flag is read once at startup or checked on every request. Per-request means an environment lookup on the hot path. Startup-only means a running process can't be quieted without a restart. Worth deciding before it gets built. |
+| | **Director:** "Good catch. Startup-only. It's a debug flag, nobody needs to flip it live." |
+| | **Codex:** Handoff, Review Results. Recorded the startup-only decision as the one finding. |
+| **Fold In Results** | |
+| *Director switches to Window 1* | |
+| **Director:** "Take Handoff, Fold in Results." | |
+| **Claude:** Task 12, folding in Codex's design review. One finding, startup-only. Revising item 1 to say the flag is read once at process start, not per request. That was a real gap. Ready to send for implementation? | |
+| **Director:** "Handoff, Implement." | |
+| **Claude:** Written. | |
+| | **Implementation** |
+| | *Director switches to Window 2* |
+| | **Director:** "Take Handoff, Implement." |
+| | **Codex:** Task 12, resolving this as implementation. Done. The flag is read at startup and gates the one debug line. Tests pass. Handoff, Request Implementation Review. |
+| **Implementation Review** | |
+| *Director switches to Window 1* | |
+| **Director:** "Take Handoff, Implementation Review." | |
+| **Claude:** Task 12, reviewing the implementation against item 1. It matches: startup-only, default off, gates exactly one line. One thing worth reopening. Item 1 never says what happens when the value is something other than a clean true or false, an empty string or a typo. Small, but worth deciding before this ships. | |
+| **Director:** "Anything that isn't exactly "true" means off. Add that to item 1." | |
+| **Claude:** Revising item 1 to say non-"true" values fall through to off. Handoff, Review Results. | |
+| | **Fixes and Verification** |
+| | *Director switches to Window 2* |
+| | **Director:** "Take Handoff, Implement Fixes." |
+| | **Codex:** Task 12, resolving this as implementation of the review findings. Done. Non-"true" values now fall through to off, with a test for the empty-string case. Handoff, Request Implementation Review. |
+| | ***Director runs the service with the flag set to "yes", confirms the log line still appears, sets it to "true", confirms it is gone.*** |
+| | **Director:** "Close this task." |
+| | **Codex:** Closed task 12. Nothing was left open. |
 
-1. Install/place M-PACT for each provider you want to use, then run provider runtime setup.
-2. Review starter rules.
-3. Add user-level rules only for broad behavior that should follow you across projects.
+Nothing here required memorizing phrases beyond the handoff grid, and everything else was an ordinary sentence carrying a clear verb. The one moment of friction, Codex catching the startup-versus-per-request question, is what the two-window shape is for. It was a gap the design lead didn't see, caught before it became code. And the Director checked the running service before closing, rather than taking either agent's word for it.
 
-### Multi-Agent Task
+### When something goes wrong
 
-1. Create a task with priority and clear acceptance.
-2. Keep current state in task specifications when the task has evolving requirements.
-3. Write task logs for decisions, implementations, reviews, and handoffs.
-4. Tell the next agent to take the task handoff.
-5. Close the task only when you explicitly decide it is done.
-
-### Context Hygiene
-
-1. Refresh only at actual startup, completed compaction/context loss with concrete evidence, or explicit request.
-2. Use targeted lookup while context is intact.
-3. Use save-context only when you explicitly want a same-agent compaction/restart checkpoint.
-4. Store narrative lessons as case studies, not long rules.
-5. Store durable behavior as short rules, not long narrative records.
-
-## Safety And Authority Model
-
-M-PACT is designed to avoid silent state changes. Agents should surface durable writes and should ask when a memory operation is ambiguous.
-
-Director approval is required for:
-
-- Bootstrap.
-- Project identity adoption.
-- Deletion.
-- Task creation.
-- Task close.
-- Task reopen.
-- Ambiguous durable rules.
-- Writes to inherited or non-local roots.
-- User-level/global placement unless explicitly requested.
-
-Agents may proceed through low-risk details once you clearly authorize the operation.
-
-## Choosing The Right Artifact
-
-Use a rule when future agent behavior should change.
-
-Use a task when structured work needs state, logs, or handoffs.
-
-Use a task log when a task-scoped event or decision needs an append-only record.
-
-Use a task specification when a task needs a mutable current source of truth.
-
-Use a case study when the lesson needs a narrative.
-
-Use a journal when you want a Director-voiced reflection.
-
-Use bootstrap when a root does not exist.
-
-Use refresh when the current agent context needs startup memory.
-
-Use targeted lookup when you need prior context without flooding the current chat.
+| Problem | What to do |
+|---|---|
+| **The agent did more than you wanted.** | Every change is reviewable and every record is append-only, so nothing here is silent or unrecoverable. You can always see what happened and correct it with a new record. |
+| **The agent did less than you wanted.** | Usually a missing verb. See ["Say the verb, not just the ritual"](#say-the-verb-not-just-the-ritual). Say what you want back rather than relying on the default. |
+| **It keeps asking for permission on every session.** | That is a configuration issue on that agent, not normal behavior. See ["What happens on its own, and what the first run will ask for"](#what-happens-on-its-own-and-what-the-first-run-will-ask-for). |
+| **A write halted unexpectedly.** | Read what it is protecting before retrying. The halt is usually there for a specific reason, like a project identity mismatch or a stale saved context. |
+| **Something in a record looks stale or wrong.** | The fix is a new record, not an edit. Ask for the correction directly and let the next entry supersede it. |
+| **Two agents wrote to the same task at the same time.** | The second write is refused outright, not silently lost or corrupted. Re-read the task and retry. There is no fixed limit on how many agents can work one task. The refusal is the safety net, not a working style. Deliberately pointing two agents at the same task at the same time, both implementing, both writing, is asking for trouble. Be deliberate about which window is acting before you act. |
+| **The take landed on the wrong task.** | Two windows, two tasks, and a bare "take handoff" resolved through the pointer the other window had moved. The agent's first line is where you catch this. If it names the wrong task, name the right one and take again. |
+| **Refresh failed.** | The agent should tell you exactly what failed and should not carry on with half-loaded memory. Common causes are a missing or too-old Node.js, output getting cut off, or the agent running refresh from the wrong folder. A message saying there is no memory root here is not a failure by itself. It is what you get after declining project setup. |
+| **You moved, renamed, or copied the project.** | The next write stops and asks whether this location is intended. The old location can't be recovered from what is on disk, so only you can answer. Saying yes gives the project a fresh identity in its new home. |
+| **Saved context couldn't be handled.** | Refresh fails outright rather than silently skip a saved context it can't match to the agent starting up. The failure message names what went wrong, and the fix is on the agent side. This is rare. |
+| **The agent announced a repair you didn't ask for.** | Occasionally a specification item loses its paired log record, and the agent writes a derived one to fill the gap. This is announced rather than asked, because there is nothing for you to approve. The tool is making a gap visible instead of hiding it. |
